@@ -1,6 +1,7 @@
 /** GE-AIOS-18F — Narrative Intelligence (context-aware daily briefing presentation, client-safe). */
 
 import type { AvaDailyActivitySection, NarrativeIntelligenceFocus } from "@/lib/growth/ava-home/narrative/narrative-types"
+import { GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { HOME_LIVING_WAITING_EMPTY_MESSAGE } from "@/lib/growth/home/growth-home-living-experience-18e"
 
 export const GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER =
@@ -14,8 +15,7 @@ export const NARRATIVE_INTELLIGENCE_SECTION_LABELS: Record<AvaDailyActivitySecti
   working_next: "What's next",
 }
 
-export const NARRATIVE_INTELLIGENCE_EMPTY_LEARNED_MESSAGE =
-  "I'm still gathering enough information to identify reliable patterns." as const
+export const NARRATIVE_INTELLIGENCE_EMPTY_LEARNED_MESSAGE = GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE
 
 export const NARRATIVE_INTELLIGENCE_SETUP_INCOMPLETE_MESSAGE =
   "I still need a few setup steps before I can begin researching companies and preparing outreach." as const

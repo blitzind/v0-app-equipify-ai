@@ -1,6 +1,7 @@
 /** GE-AIOS-19C-4A / GE-AIOS-IDENTITY-1B — Zero-assistance adoption polish (client-safe customer copy). */
 
 import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
+import { GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { GROWTH_TRAINING_COMPANY_PROFILE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 import type {
   GrowthHumanApprovalActionType,
@@ -86,8 +87,7 @@ export const GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE =
 
 export const GROWTH_CUSTOMER_EMPTY_WORK_NEXT_LABEL = "Open Company Profile" as const
 
-export const GROWTH_CUSTOMER_EMPTY_MEMORY_MESSAGE =
-  "I haven't earned validated learnings yet. As I research accounts and you approve outreach, patterns will appear here and in Training." as const
+export const GROWTH_CUSTOMER_EMPTY_MEMORY_MESSAGE = GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE
 
 export const GROWTH_CUSTOMER_EMPTY_OPERATIONS_FOCUS =
   "I'm getting oriented. Complete Training if you haven't yet — once companies enter the queue, I'll show what I'm doing and why here." as const

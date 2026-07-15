@@ -107,7 +107,8 @@ export type GrowthPortfolioManagerSnapshot = {
   memory: GrowthPortfolioManagerMemory
   replenishment: GrowthPortfolioReplenishmentDecision
   operator: GrowthPortfolioManagerOperatorProjection
-  marketIntelligence: import("@/lib/growth/market-intelligence/growth-market-intelligence-loop-1a-types").MarketIntelligenceOperatorProjection | null
+  /** Deferred Market Intelligence Loop — always null in Portfolio Manager 1A deployment scope. */
+  marketIntelligence: null
 }
 
 export type PortfolioManagerBusinessProfile = Pick<

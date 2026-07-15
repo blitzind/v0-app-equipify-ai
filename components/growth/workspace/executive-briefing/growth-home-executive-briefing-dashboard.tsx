@@ -350,7 +350,6 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
         <GrowthHomePortfolioManagerSection
           portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
-          marketIntelligence={workspaceSummary?.portfolioManager?.marketIntelligence ?? null}
         />
 
         <GrowthHomeAvaWorkSection

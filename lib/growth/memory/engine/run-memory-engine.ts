@@ -18,7 +18,6 @@ import {
 import { extractSalesOutcomeMemoryEvents } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
 import type { SalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import {
-  buildKnowledgeInsightBullets,
   buildOrganizationalKnowledge,
 } from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
 import type { OrganizationalKnowledgeItem } from "@/lib/growth/memory/knowledge/organization-knowledge-types"

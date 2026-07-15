@@ -2,7 +2,7 @@
 
 import type { AvaStoryBlock } from "@/lib/growth/ava-home/narrative/narrative-types"
 import type { AvaMemorySummary } from "@/lib/growth/memory/types"
-import { buildKnowledgeNarrativeLines } from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
+import { buildValidatedInstitutionalLearningBullets } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { buildTimelineNarrativeLine } from "@/lib/growth/memory/timeline/organization-memory-timeline"
 import { buildCompletedWorkNarrativeLines } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
 import type { SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -18,7 +18,13 @@ export function buildMemoryNarrativeLines(
     memoryEvents: memorySummary.recent_events,
   })
 
-  const learningLines = buildKnowledgeNarrativeLines(memorySummary.organizational_knowledge ?? [])
+  const learningLines = buildValidatedInstitutionalLearningBullets(
+    memorySummary.organizational_knowledge ?? [],
+    2,
+  ).map((finding) => {
+    const text = finding.replace(/\.$/, "")
+    return `I also learned that ${text.charAt(0).toLowerCase()}${text.slice(1)}.`
+  })
   if (completedWorkLines.length > 0) {
     return [...completedWorkLines, ...learningLines].slice(0, 4)
   }
@@ -33,13 +39,6 @@ export function buildMemoryNarrativeLines(
   const timelineLine = buildTimelineNarrativeLine(memorySummary.timeline)
   if (timelineLine && !lines.includes(timelineLine)) {
     lines.push(timelineLine)
-  }
-
-  const topPattern = memorySummary.detected_patterns[0]
-  if (topPattern && !lines.some((line) => line.includes(topPattern.label.slice(0, 24)))) {
-    lines.push(
-      `Over time I've learned that ${topPattern.label.charAt(0).toLowerCase()}${topPattern.label.slice(1)}`,
-    )
   }
 
   return lines.slice(0, 3)
@@ -60,13 +59,7 @@ export function buildMemoryStoryBlocks(
 
 export function buildWhatIveLearnedBullets(memorySummary: AvaMemorySummary | null | undefined): string[] {
   if (!memorySummary) return []
-  const fromKnowledge = (memorySummary.organizational_knowledge ?? [])
-    .filter((row) => row.active)
-    .sort((left, right) => right.confidence - left.confidence)
-    .slice(0, 3)
-    .map((row) => row.finding.replace(/\.$/, "") + ".")
-  if (fromKnowledge.length > 0) return fromKnowledge
-  return memorySummary.learned_insights.slice(0, 3)
+  return buildValidatedInstitutionalLearningBullets(memorySummary.organizational_knowledge ?? [], 3)
 }
 
 export const AVA_MEMORY_WHAT_IVE_LEARNED_TITLE = "What I've Learned" as const

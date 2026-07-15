@@ -1,7 +1,7 @@
 /** GE-AIOS-12A / GE-AIOS-17C — Deterministic period summaries from memory events. */
 
 import type { OrganizationalKnowledgeItem } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
-import { buildKnowledgeInsightBullets } from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
+import { buildValidatedInstitutionalLearningBullets } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 
 import type { AvaMemoryEvent, AvaMemoryTimelinePeriod } from "@/lib/growth/memory/types"
 import { SALES_SPECIALIST_MEMORY_SOURCE } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
@@ -71,33 +71,5 @@ export function buildLearnedInsights(input: {
   corrections: Array<{ summary: string }>
   organizationalKnowledge?: OrganizationalKnowledgeItem[]
 }): string[] {
-  const knowledgeBullets = buildKnowledgeInsightBullets(input.organizationalKnowledge ?? [])
-  if (knowledgeBullets.length > 0) {
-    return knowledgeBullets.slice(0, 3)
-  }
-
-  const insights: string[] = []
-
-  for (const pattern of input.patterns.slice(0, 2)) {
-    insights.push(pattern.label)
-  }
-
-  for (const preference of input.preferences.slice(0, 2)) {
-    if (!insights.includes(preference.statement)) {
-      insights.push(preference.statement)
-    }
-  }
-
-  if (insights.length < 3) {
-    const risk = input.events.find((row) => row.category === "risk")
-    if (risk && !insights.includes(risk.summary)) {
-      insights.push(risk.summary.replace(/\.$/, "") + ".")
-    }
-  }
-
-  if (insights.length < 3 && input.corrections[0]) {
-    insights.push(input.corrections[0].summary)
-  }
-
-  return insights.slice(0, 3)
+  return buildValidatedInstitutionalLearningBullets(input.organizationalKnowledge ?? [], 3)
 }

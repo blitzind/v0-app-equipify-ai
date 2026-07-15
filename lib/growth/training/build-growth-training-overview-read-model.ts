@@ -2,6 +2,10 @@
 
 import type { BusinessProfileRecord } from "@/lib/growth/business-profile/business-profile-types"
 import type { GrowthHomeOrganizationalKnowledgePayload } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+import {
+  filterValidatedInstitutionalLearnings,
+  GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE,
+} from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import type { GrowthHomeLaunchMissionSetupViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-synthesizer"
 import { evaluateBusinessStrategyCompleteness } from "@/lib/growth/training/evaluate-business-strategy-completeness"
 import {
@@ -133,17 +137,16 @@ function buildRunbookArea(launchSetup: GrowthHomeLaunchMissionSetupViewModel | n
 }
 
 function buildLearnedArea(organizationalKnowledge: GrowthHomeOrganizationalKnowledgePayload | null) {
-  const count =
-    organizationalKnowledge?.store.items.filter((item) => item.active && !item.superseded_by).length ?? 0
+  const count = filterValidatedInstitutionalLearnings(organizationalKnowledge?.store.items).length
 
   if (count === 0) {
     return {
       id: "learned" as const,
       label: "What I've Learned",
       status: "not_started" as const,
-      summary: "I haven't earned validated learnings yet.",
+      summary: GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE,
       href: GROWTH_TRAINING_LEARNED_ROUTE,
-      coachingHint: "Learnings appear here as I observe outcomes and patterns.",
+      coachingHint: "Validated learnings appear here after outcomes and approved intelligence.",
     }
   }
 

@@ -12,6 +12,7 @@ import type {
   OrganizationalKnowledgeSource,
 } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import { GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+import { filterValidatedInstitutionalLearnings } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { SALES_SPECIALIST_MEMORY_SOURCE } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
 import type { SalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-types"
 
@@ -465,21 +466,17 @@ export function buildOrganizationalKnowledge(input: {
 }
 
 export function buildKnowledgeInsightBullets(items: OrganizationalKnowledgeItem[]): string[] {
-  return items
-    .filter((row) => row.active && row.finding.trim())
-    .sort((left, right) => right.confidence - left.confidence)
+  return filterValidatedInstitutionalLearnings(items)
     .slice(0, 3)
     .map((row) => row.finding.replace(/\.$/, "") + ".")
 }
 
 export function buildKnowledgeNarrativeLines(items: OrganizationalKnowledgeItem[]): string[] {
-  const top = items
-    .filter((row) => row.active)
-    .sort((left, right) => right.confidence - left.confidence)
+  return filterValidatedInstitutionalLearnings(items)
     .slice(0, 2)
-  return top.map((row) => {
-    const finding = row.finding.replace(/\.$/, "")
-    if (/^operator-confirmed/i.test(finding)) return finding + "."
-    return `I also learned that ${finding.charAt(0).toLowerCase()}${finding.slice(1)}.`
-  })
+    .map((row) => {
+      const finding = row.finding.replace(/\.$/, "")
+      if (/^operator-confirmed/i.test(finding)) return finding + "."
+      return `I also learned that ${finding.charAt(0).toLowerCase()}${finding.slice(1)}.`
+    })
 }

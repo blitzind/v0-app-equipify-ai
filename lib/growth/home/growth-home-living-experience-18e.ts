@@ -3,6 +3,7 @@
 import type { AvaDailyActivityNarrative } from "@/lib/growth/ava-home/narrative/narrative-types"
 import { extractFirstNameFromGreeting } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
+import { GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 
 export const GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER =
   "ge-aios-18e-living-home-v1" as const
@@ -10,8 +11,7 @@ export const GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER =
 export const HOME_LIVING_EMPTY_WORK_MESSAGE =
   "I don't have companies in today's queue yet. Finish your Company Profile in Training and add leads — then I'll start researching and preparing outreach for your review." as const
 
-export const HOME_LIVING_EMPTY_MEMORY_MESSAGE =
-  "I haven't earned validated learnings yet. As I research accounts and you approve outreach, patterns will appear here and in Training." as const
+export const HOME_LIVING_EMPTY_MEMORY_MESSAGE = GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE
 
 export const HOME_LIVING_EMPTY_PROGRESS_MESSAGE =
   "I'm planning today's priorities as work comes in." as const

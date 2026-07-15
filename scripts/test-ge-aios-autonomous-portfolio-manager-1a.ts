@@ -152,6 +152,7 @@ const healthySnapshot = buildGrowthPortfolioManagerSnapshot({
 })
 assert.equal(healthySnapshot.health.healthState, "healthy")
 assert.equal(healthySnapshot.replenishment.shouldReplenish, false)
+assert.equal(healthySnapshot.marketIntelligence, null)
 console.log("  ✓ Phase 3 — portfolio healthy state")
 
 const lowSnapshot = buildGrowthPortfolioManagerSnapshot({
@@ -258,5 +259,29 @@ console.log("  ✓ Phase 13 — Home portfolio section wired")
 
 assert.doesNotMatch(outboundSource, /portfolio-manager/)
 console.log("  ✓ Phase 14 — no outbound changes in portfolio manager path")
+
+const portfolioManagerModules = [
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a.ts",
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types.ts",
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-scheduler-tick-1a.ts",
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a.ts",
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a.ts",
+]
+for (const modulePath of portfolioManagerModules) {
+  assert.doesNotMatch(
+    readSource(modulePath),
+    /@\/lib\/growth\/market-intelligence\//,
+    `${modulePath} must not import deferred Market Intelligence modules`,
+  )
+}
+assert.doesNotMatch(
+  readSource("components/growth/workspace/executive-briefing/growth-home-portfolio-manager-section.tsx"),
+  /@\/lib\/growth\/market-intelligence\//,
+)
+assert.doesNotMatch(
+  readSource("lib/growth/objectives/growth-objective-runtime-scheduler.ts"),
+  /tickMarketIntelligenceLoopForScheduler|@\/lib\/growth\/market-intelligence\//,
+)
+console.log("  ✓ Phase 15 — Portfolio Manager decoupled from Market Intelligence")
 
 console.log(`\n[${GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER}] READY_FOR_AUTONOMOUS_PORTFOLIO_MANAGEMENT`)

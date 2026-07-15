@@ -21,7 +21,6 @@ import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/
 import { tickAutonomousSalesLoopForScheduler } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
 import { tickDraftFactoryDueStatesForScheduler } from "@/lib/growth/draft-factory/draft-factory-due-scheduler-tick"
 import { tickAutonomousPortfolioManagerForScheduler } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-scheduler-tick-1a"
-import { tickMarketIntelligenceLoopForScheduler } from "@/lib/growth/market-intelligence/growth-market-intelligence-scheduler-tick-1a"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
   classifySchedulerFailure,
@@ -264,13 +263,6 @@ export async function runGrowthObjectiveRuntimeScheduler(
   if (autonomousPortfolioManager) {
     telemetry.portfolioReplenishmentsAttempted = autonomousPortfolioManager.organizationsAttempted
     telemetry.portfolioReplenishmentsCompleted = autonomousPortfolioManager.organizationsReplenished
-  }
-
-  if (killSwitches.autonomy_enabled && budget.mayBeginWork(2_000)) {
-    await tickMarketIntelligenceLoopForScheduler(admin, {
-      organizationIds: orgsWithBudget,
-      maxOrganizations: MAX_ORGS_PER_TICK,
-    }).catch(() => null)
   }
 
   const draftFactoryBudgetMs = Math.min(
