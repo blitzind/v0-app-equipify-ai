@@ -93,6 +93,9 @@ export type GrowthPortfolioManagerOperatorProjection = {
   healthLabel: string
   discoveryRunning: boolean
   discoveryRunningCount: number
+  discoveryStatusDisplay: string
+  nextBatchSize: number | null
+  showEstimatedHealthy: boolean
   researchRunning: boolean
   researchRunningCount: number
   admissionsPending: number

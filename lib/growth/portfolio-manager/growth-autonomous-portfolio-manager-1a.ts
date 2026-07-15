@@ -14,6 +14,7 @@ import {
 import { buildPortfolioManagerOperatorProjection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a"
 import { evaluatePortfolioReplenishmentDecision } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
 import { resolvePortfolioTargetFromBusinessProfile } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-target-1a"
+import type { DatamoonAutonomousDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
   type GrowthPortfolioManagerSnapshot,
@@ -32,6 +33,8 @@ export function buildGrowthPortfolioManagerSnapshot(input: {
   validatedLearnings?: OrganizationalKnowledgeItem[]
   /** Reserved for deferred Market Intelligence Loop — ignored by Portfolio Manager 1A. */
   salesOutcomes?: SalesOutcome[]
+  datamoonDiscovery?: DatamoonAutonomousDiscoveryOperatorState | null
+  discoveryAlreadyRunning?: boolean
 }): GrowthPortfolioManagerSnapshot {
   const target = resolvePortfolioTargetFromBusinessProfile(input.approvedProfile)
   const memory = input.organizationalMemory
@@ -53,13 +56,15 @@ export function buildGrowthPortfolioManagerSnapshot(input: {
     health,
     memory,
     generatedAt: input.generatedAt,
-    discoveryAlreadyRunning: health.discoveryRunning,
+    discoveryAlreadyRunning:
+      input.discoveryAlreadyRunning === true || input.datamoonDiscovery?.jobActive === true,
   })
 
   const operator = buildPortfolioManagerOperatorProjection({
     target,
     health,
     replenishment,
+    datamoonDiscovery: input.datamoonDiscovery,
     generatedAt: input.generatedAt,
   })
 

@@ -8,6 +8,7 @@ import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/
 import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
+import { loadPortfolioDatamoonDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a"
 import { tickAutonomousPortfolioDiscoveryReplenishment } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a"
 import type { AutonomousPortfolioDiscoveryTickResult } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a"
 import { GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
@@ -67,13 +68,33 @@ export async function tickAutonomousPortfolioManagerForScheduler(
         missionDiscovery,
       })
 
+      const datamoonDiscovery = await loadPortfolioDatamoonDiscoveryOperatorState(admin, {
+        organizationId,
+        memory: portfolioManager.memory,
+        nextBatchSize: portfolioManager.replenishment.batchSize,
+        maximumDailyDiscovery: portfolioManager.target.maximumDailyDiscovery,
+      })
+
+      const portfolioManagerWithDatamoon = buildGrowthPortfolioManagerSnapshot({
+        organizationId,
+        generatedAt,
+        leads: snapshot.portfolioLeads,
+        eligibleLeadCount: snapshot.eligibleLeadCount,
+        approvedProfile: approvedProfileRow?.profile ?? null,
+        organizationalMemory: snapshot.organizationalMemory.store,
+        missionDiscovery,
+        datamoonDiscovery,
+        discoveryAlreadyRunning: datamoonDiscovery.jobActive,
+      })
+
       return tickAutonomousPortfolioDiscoveryReplenishment(admin, {
         organizationId,
         approvedProfile: approvedProfileRow?.profile ?? null,
         companyName: approvedProfileRow?.companyName ?? null,
-        replenishment: portfolioManager.replenishment,
-        memory: portfolioManager.memory,
+        replenishment: portfolioManagerWithDatamoon.replenishment,
+        memory: portfolioManagerWithDatamoon.memory,
         generatedAt,
+        maximumDailyDiscovery: portfolioManagerWithDatamoon.target.maximumDailyDiscovery,
       })
     } catch (error) {
       logGrowthEngine("autonomous_portfolio_manager_tick_failed", {

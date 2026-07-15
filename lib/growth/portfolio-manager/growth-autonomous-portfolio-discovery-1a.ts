@@ -30,6 +30,9 @@ export type AutonomousPortfolioDiscoveryTickResult = {
   alreadyExists: number
   suppressed: number
   failed: number
+  datamoonJobActive?: boolean
+  datamoonJobCreated?: boolean
+  datamoonStopReason?: string | null
 }
 
 export function buildProspectSearchQueryFromBusinessProfile(
@@ -75,6 +78,7 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     generatedAt: string
     memory: GrowthPortfolioManagerMemory
     createdBy?: string | null
+    maximumDailyDiscovery?: number
   },
 ): Promise<AutonomousPortfolioDiscoveryTickResult> {
   const batchSize = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
@@ -85,11 +89,41 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     query,
     filters,
     discovery_mode: "discover_external",
+    discovery_authority: "autonomous_portfolio",
+    organization_id: input.organizationId,
+    approved_profile: input.approvedProfile,
+    company_name: input.companyName,
+    discoveries_today: input.memory.discoveriesToday,
+    maximum_daily_discovery: input.maximumDailyDiscovery,
+    generated_at: input.generatedAt,
     limit: batchSize,
     page_size: batchSize,
     result_mode: "queue",
     created_by: input.createdBy ?? null,
   })
+
+  const datamoonJobActive =
+    (search as { datamoon_autonomous_discovery_job_active?: boolean }).datamoon_autonomous_discovery_job_active ===
+    true
+  const datamoonStopReason =
+    (search as { datamoon_autonomous_discovery_stop_reason?: string | null })
+      .datamoon_autonomous_discovery_stop_reason ?? null
+
+  if (datamoonJobActive) {
+    return {
+      qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+      organizationId: input.organizationId,
+      ran: true,
+      skippedReason: "DataMoon discovery job active — awaiting provider results.",
+      searched: 0,
+      pushed: 0,
+      alreadyExists: 0,
+      suppressed: 0,
+      failed: 0,
+      datamoonJobActive: true,
+      datamoonStopReason,
+    }
+  }
 
   const selected = search.companies.slice(0, batchSize).map((company) => ({
     source_type: company.source_type,
@@ -172,6 +206,7 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
     memory: GrowthPortfolioManagerMemory
     generatedAt: string
     createdBy?: string | null
+    maximumDailyDiscovery?: number
   },
 ): Promise<AutonomousPortfolioDiscoveryTickResult> {
   if (!input.approvedProfile) {
@@ -210,5 +245,6 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
     generatedAt: input.generatedAt,
     memory: input.memory,
     createdBy: input.createdBy,
+    maximumDailyDiscovery: input.maximumDailyDiscovery,
   })
 }

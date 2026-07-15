@@ -8,6 +8,7 @@ import {
   type GrowthPortfolioReplenishmentDecision,
   type GrowthPortfolioTargetProjection,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+import type { DatamoonAutonomousDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 
 export const GROWTH_PORTFOLIO_MANAGER_MANUAL_FIND_OPTIONS = [10, 25, 50, 100] as const
 
@@ -22,15 +23,24 @@ export function buildPortfolioManagerOperatorProjection(input: {
   target: GrowthPortfolioTargetProjection
   health: GrowthPortfolioHealthReadModel
   replenishment: GrowthPortfolioReplenishmentDecision
-  discoveryRunningCount?: number
+  datamoonDiscovery?: DatamoonAutonomousDiscoveryOperatorState | null
   generatedAt?: string
 }): GrowthPortfolioManagerOperatorProjection {
-  const discoveryRunningCount =
-    input.discoveryRunningCount ??
-    (input.replenishment.shouldReplenish ? input.replenishment.batchSize : 0)
+  const datamoon = input.datamoonDiscovery
+  const nextBatchSize =
+    input.replenishment.batchSize > 0 ? input.replenishment.batchSize : datamoon?.nextBatchSize ?? null
+  const discoveryJobActive = datamoon?.jobActive === true
+  const discoveryStatusDisplay =
+    datamoon?.statusDisplay ??
+    (discoveryJobActive ? "Searching" : nextBatchSize ? `Next batch: ${nextBatchSize}` : "Idle")
 
   let projectedCompletionLabel: string | null = null
-  if (input.health.healthState !== "healthy" && input.replenishment.batchSize > 0) {
+  const showEstimatedHealthy = datamoon?.showEstimatedHealthy === true
+  if (
+    showEstimatedHealthy &&
+    input.health.healthState !== "healthy" &&
+    input.replenishment.batchSize > 0
+  ) {
     const batchesRemaining = Math.ceil(
       input.health.needsCount / Math.max(1, input.target.replenishBatchSize),
     )
@@ -42,8 +52,6 @@ export function buildPortfolioManagerOperatorProjection(input: {
       hour: "numeric",
       minute: "2-digit",
     })
-  } else if (input.health.healthState === "healthy") {
-    projectedCompletionLabel = null
   }
 
   return {
@@ -54,8 +62,11 @@ export function buildPortfolioManagerOperatorProjection(input: {
     needsCount: input.health.needsCount,
     healthState: input.health.healthState,
     healthLabel: HEALTH_LABELS[input.health.healthState],
-    discoveryRunning: input.health.discoveryRunning || input.replenishment.shouldReplenish,
-    discoveryRunningCount: input.health.discoveryRunning ? discoveryRunningCount : input.replenishment.batchSize,
+    discoveryRunning: discoveryJobActive || input.health.discoveryRunning,
+    discoveryRunningCount: discoveryJobActive ? 0 : nextBatchSize ?? 0,
+    discoveryStatusDisplay,
+    nextBatchSize,
+    showEstimatedHealthy,
     researchRunning: input.health.researchRunning,
     researchRunningCount: input.health.counts.researching,
     admissionsPending: input.health.admissionsPending,
@@ -66,5 +77,5 @@ export function buildPortfolioManagerOperatorProjection(input: {
 
 export function buildManualProspectSearchDiscoverHref(batchSize: number): string {
   const clamped = Math.max(1, Math.min(100, Math.floor(batchSize)))
-  return `/growth/leads/prospect-search/discover?limit=${clamped}`
+  return `/growth/leads/prospect-search/discover?limit=${clamped}&authority=portfolio_manual&discovery_mode=discover_external`
 }

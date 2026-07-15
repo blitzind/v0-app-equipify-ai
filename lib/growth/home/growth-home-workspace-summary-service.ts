@@ -64,6 +64,7 @@ import {
   sanitizeResearchLoopSummaryForPortfolio,
 } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
+import { loadPortfolioDatamoonDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
@@ -592,7 +593,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       })
     : null
 
-  const portfolioManager =
+  const portfolioManagerBase =
     organizationId
       ? buildGrowthPortfolioManagerSnapshot({
           organizationId,
@@ -606,6 +607,33 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
           salesOutcomes: salesOutcomes.outcomes,
         })
       : null
+
+  const datamoonDiscoveryState =
+    organizationId && portfolioManagerBase
+      ? await loadPortfolioDatamoonDiscoveryOperatorState(input.admin, {
+          organizationId,
+          memory: portfolioManagerBase.memory,
+          nextBatchSize: portfolioManagerBase.replenishment.batchSize,
+          maximumDailyDiscovery: portfolioManagerBase.target.maximumDailyDiscovery,
+        })
+      : null
+
+  const portfolioManager =
+    organizationId && portfolioManagerBase && datamoonDiscoveryState
+      ? buildGrowthPortfolioManagerSnapshot({
+          organizationId,
+          generatedAt,
+          leads,
+          eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
+          approvedProfile: approvedBusinessProfile?.profile ?? null,
+          organizationalMemory: organizationalMemory?.store ?? null,
+          missionDiscovery,
+          validatedLearnings: organizationalKnowledge?.store.items ?? [],
+          salesOutcomes: salesOutcomes.outcomes,
+          datamoonDiscovery: datamoonDiscoveryState,
+          discoveryAlreadyRunning: datamoonDiscoveryState.jobActive,
+        })
+      : portfolioManagerBase
 
   const durationMs = Date.now() - startedAt
   logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })

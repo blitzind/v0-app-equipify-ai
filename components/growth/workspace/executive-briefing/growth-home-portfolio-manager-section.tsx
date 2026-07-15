@@ -54,14 +54,17 @@ export function GrowthHomePortfolioManagerSection({ portfolio }: Props) {
         <StatusRow label="Needs" value={portfolio.needsCount} />
         <StatusRow
           label="Discovery"
-          value={portfolio.discoveryRunning ? `Running (${portfolio.discoveryRunningCount})` : "Idle"}
+          value={portfolio.discoveryStatusDisplay}
         />
+        {portfolio.nextBatchSize != null && !portfolio.discoveryRunning ? (
+          <StatusRow label="Next batch" value={portfolio.nextBatchSize} />
+        ) : null}
         <StatusRow
           label="Research"
           value={portfolio.researchRunning ? `Running (${portfolio.researchRunningCount})` : "Idle"}
         />
         <StatusRow label="Admissions pending" value={portfolio.admissionsPending} />
-        {portfolio.projectedCompletionLabel ? (
+        {portfolio.projectedCompletionLabel && portfolio.showEstimatedHealthy ? (
           <StatusRow label="Estimated healthy" value={portfolio.projectedCompletionLabel} />
         ) : null}
       </div>

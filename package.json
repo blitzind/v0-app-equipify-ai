@@ -935,6 +935,7 @@
     "test:ge-aios-authority-proof-audit-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-authority-proof-audit-1a.ts",
     "test:ge-aios-execution-authority-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-execution-authority-closure-1a.ts",
     "test:ge-aios-portfolio-eligibility-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-portfolio-eligibility-closure-1a.ts",
+    "test:ge-aios-datamoon-autonomous-discovery-cutover-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-datamoon-autonomous-discovery-cutover-1a.ts",
     "test:ge-aios-autonomous-portfolio-manager-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-autonomous-portfolio-manager-1a.ts",
     "test:ge-aios-institutional-learning-truthfulness-1a": "tsx scripts/test-ge-aios-institutional-learning-truthfulness-1a.ts",
     "test:ge-aios-market-intelligence-loop-1a": "tsx scripts/test-ge-aios-market-intelligence-loop-1a.ts",

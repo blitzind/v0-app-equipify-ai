@@ -25,6 +25,11 @@ import {
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
+import {
+  isAutonomousProspectDiscoveryAuthority,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
+import { runProspectSearchDatamoonAutonomousDiscovery } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-1a"
+import { GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { mapProspectSearchCompaniesToDiscoverResults } from "@/lib/growth/prospect-search/prospect-search-discover-results"
 import { applyProspectSearchContactFirstHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-contact-first-orchestration"
 import { attachReachableHumanToCompanies } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
@@ -75,6 +80,14 @@ export type RunProspectSearchInput = {
   sort_by?: GrowthProspectSearchSortBy
   created_by?: string | null
   result_mode?: import("@/lib/growth/prospect-search/prospect-search-contact-discovery").ProspectSearchResultMode
+  discovery_authority?: import("@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a").ProspectSearchDiscoveryAuthority
+  organization_id?: string
+  approved_profile?: import("@/lib/growth/business-profile/business-profile-types").BusinessProfileDraftContent
+  company_name?: string | null
+  read_only_proof?: boolean
+  discoveries_today?: number
+  maximum_daily_discovery?: number
+  generated_at?: string
 }
 
 
@@ -114,6 +127,172 @@ export async function runProspectSearch(
   const peopleFirstMode = result_mode === "people" || result_mode === "queue"
 
   if (discovery_mode === "discover_external") {
+    if (isAutonomousProspectDiscoveryAuthority(input.discovery_authority)) {
+      if (!input.organization_id || !input.approved_profile) {
+        const emptyDiagnostics = buildProspectSearchProviderRuntimeDiagnostics({
+          provider_diagnostics: [
+            {
+              provider_name: "DataMoon",
+              provider_type: "datamoon",
+              provider_executed: false,
+              provider_latency_ms: 0,
+              provider_result_count: 0,
+              provider_fallback_reason: "business_profile_missing",
+            },
+          ],
+          query_expansion: [],
+          raw_result_count: 0,
+          normalized_result_count: 0,
+          filtered_result_count: 0,
+          filter_diagnostics: {
+            normalized_result_count: 0,
+            dropped_result_count: 0,
+            dropped_reasons: {},
+          },
+          used_relaxed_filters: false,
+          fixture_active: false,
+        })
+
+        return attachTerritoryIntelligenceToSearchResult(admin, {
+          qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+          discovery_mode,
+          sort_by,
+          signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+          query: input.query,
+          parsed_query: parsed,
+          filters: mergedFilters,
+          companies: [],
+          raw_provider_companies: [],
+          discover_results: [],
+          filtered_discover_results: [],
+          people: [],
+          people_rows: [],
+          total_companies: 0,
+          total_people: 0,
+          page: 1,
+          page_size: external_limit,
+          has_next_page: false,
+          people_cursor: null,
+          people_next_cursor: null,
+          source_counts: buildSourceCounts([]),
+          provider_status_label: emptyDiagnostics.provider_status_label,
+          provider_status_message: "Approved Business Profile required for autonomous DataMoon discovery.",
+          provider_runtime_diagnostics: emptyDiagnostics,
+          provider_runtime_diagnostics_qa_marker: GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+          datamoon_autonomous_discovery_qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+        }, [])
+      }
+
+      const datamoonDiscovery = await runProspectSearchDatamoonAutonomousDiscovery(admin, {
+        organizationId: input.organization_id,
+        approvedProfile: input.approved_profile,
+        companyName: input.company_name,
+        query: input.query,
+        filters: mergedFilters,
+        limit: external_limit,
+        generatedAt: input.generated_at ?? new Date().toISOString(),
+        createdBy: input.created_by,
+        authority: input.discovery_authority ?? "autonomous_portfolio",
+        readOnlyProof: input.read_only_proof,
+        discoveriesToday: input.discoveries_today,
+        maximumDailyDiscovery: input.maximum_daily_discovery,
+      })
+
+      const externalEnrichment = await enrichProspectSearchExternalCompanies(
+        admin,
+        datamoonDiscovery.companies,
+        {
+          query: input.query,
+          filters: mergedFilters,
+          parsed,
+        },
+      )
+
+      const enrichedCompanies = externalEnrichment.companies
+      const provider_runtime_diagnostics = buildProspectSearchProviderRuntimeDiagnostics({
+        provider_diagnostics: [
+          {
+            provider_name: "DataMoon",
+            provider_type: "datamoon",
+            provider_executed: datamoonDiscovery.jobCreated || datamoonDiscovery.jobReused,
+            provider_latency_ms: 0,
+            provider_result_count: datamoonDiscovery.rawCompanyCount,
+            provider_fallback_reason: datamoonDiscovery.stopReason,
+          },
+        ],
+        query_expansion: [],
+        raw_result_count: datamoonDiscovery.rawCompanyCount,
+        normalized_result_count: datamoonDiscovery.normalizedCompanyCount,
+        filtered_result_count: enrichedCompanies.length,
+        filter_diagnostics: externalEnrichment.filter_diagnostics,
+        used_relaxed_filters: externalEnrichment.used_relaxed_filters,
+        fixture_active: false,
+      })
+
+      const { companies: companiesWithSignals, hydration: contact_first_hydration } =
+        await applyProspectSearchContactFirstHydrationLayers(admin, {
+          companies: enrichedCompanies,
+          query: input.query,
+          filters: mergedFilters,
+          parsed,
+          sort_by,
+          operator_intent: peopleFirstMode,
+          pdl_augmentation: peopleFirstMode,
+        })
+
+      return attachTerritoryIntelligenceToSearchResult(
+        admin,
+        {
+          qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+          discovery_mode,
+          sort_by,
+          signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+          query: input.query,
+          parsed_query: parsed,
+          filters: mergedFilters,
+          companies: companiesWithSignals,
+          raw_provider_companies: externalEnrichment.raw_companies,
+          discover_results: mapProspectSearchCompaniesToDiscoverResults(externalEnrichment.raw_companies),
+          filtered_discover_results: mapProspectSearchCompaniesToDiscoverResults(companiesWithSignals),
+          people: [],
+          people_rows: [],
+          total_companies: companiesWithSignals.length,
+          total_people: 0,
+          page: 1,
+          page_size: external_limit,
+          has_next_page: false,
+          people_cursor: null,
+          people_next_cursor: null,
+          source_counts: buildSourceCounts(companiesWithSignals),
+          real_world_built_query: datamoonDiscovery.built_query,
+          provider_messages: [datamoonDiscovery.providerStatusMessage],
+          provider_status_label: provider_runtime_diagnostics.provider_status_label,
+          provider_status_message: datamoonDiscovery.providerStatusMessage,
+          provider_diagnostics: provider_runtime_diagnostics.provider_diagnostics,
+          provider_runtime_diagnostics,
+          used_relaxed_external_filters: externalEnrichment.used_relaxed_filters,
+          provider_runtime_diagnostics_qa_marker: GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+          external_filter_diagnostics: externalEnrichment.filter_diagnostics,
+          datamoon_autonomous_discovery_qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+          datamoon_autonomous_discovery_run_id: datamoonDiscovery.runId,
+          datamoon_autonomous_discovery_job_active: datamoonDiscovery.jobActive,
+          datamoon_autonomous_discovery_stop_reason: datamoonDiscovery.stopReason,
+          discovery_hydration: {
+            qa_marker: contact_first_hydration.qa_marker,
+            hydration_complete: contact_first_hydration.hydration_complete,
+            partial_intelligence: contact_first_hydration.partial_intelligence,
+            diagnostics: contact_first_hydration.diagnostics,
+            summary: contact_first_hydration.summary,
+          },
+          contact_first_hydration,
+          contact_first_qa_marker: GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+          scalable_search_qa_marker: GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
+          discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+        },
+        companiesWithSignals,
+      )
+    }
+
     const realWorld = await runProspectSearchRealWorldDiscovery(admin, {
       query: input.query,
       filters: mergedFilters,
