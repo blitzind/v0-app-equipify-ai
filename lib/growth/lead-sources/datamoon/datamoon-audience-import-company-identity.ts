@@ -33,3 +33,38 @@ export function resolveDatamoonCompanyWebsite(
   if (!domain || isConsumerEmailDomain(domain)) return null
   return `https://${domain}`
 }
+
+export function resolveDatamoonCompanyGeography(normalized: DatamoonNormalizedLeadRecord): {
+  city: string | null
+  state: string | null
+  country: string | null
+  location: string | null
+} {
+  const city = normalized.company_city?.trim() || null
+  const state = normalized.company_state?.trim() || null
+  const country = normalized.company_country?.trim() || null
+  const location = [city, state, country].filter(Boolean).join(", ") || null
+  return { city, state, country, location }
+}
+
+export function resolveDatamoonProspectCompanyIdentityKey(
+  normalized: DatamoonNormalizedLeadRecord,
+): string | null {
+  const domain = normalized.company_domain?.trim().toLowerCase() ?? null
+  if (domain && !isConsumerEmailDomain(domain)) {
+    return `domain:${domain}`
+  }
+
+  const providerCompanyId = normalized.provider_company_id?.trim()
+  if (providerCompanyId) {
+    return `provider_company:${providerCompanyId}`
+  }
+
+  const companyName = normalizeCompanyName(normalized.company_name)
+  if (companyName) {
+    const geo = [normalized.company_state, normalized.company_city].filter(Boolean).join("|")
+    return geo ? `name:${companyName}|${geo.toLowerCase()}` : `name:${companyName.toLowerCase()}`
+  }
+
+  return null
+}

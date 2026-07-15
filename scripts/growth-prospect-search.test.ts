@@ -1409,6 +1409,26 @@ async function main(): Promise<void> {
   const parsedMetro = parseTerritoryInput("Nashville metro")
   assert.deepEqual(parsedMetro.metros, ["nashville"])
 
+  const parsedUs = parseTerritoryInput("US")
+  assert.equal(parsedUs.country, "US")
+  assert.equal(parsedUs.cities, undefined)
+  const parsedUnitedStates = parseTerritoryInput("United States")
+  assert.equal(parsedUnitedStates.country, "US")
+  const parsedCanada = parseTerritoryInput("Canada")
+  assert.equal(parsedCanada.country, "CA")
+  const parsedCalifornia = parseTerritoryInput("CA")
+  assert.deepEqual(parsedCalifornia.states, ["CA"])
+
+  const nationwideFilters = normalizeProspectSearchFilters({ location: "US" })
+  assert.equal(nationwideFilters.territory_filter?.country, "US")
+  assert.ok(!nationwideFilters.territory_filter?.cities?.includes("us"))
+
+  const usTerritory = normalizeTerritoryFilter(nationwideFilters.territory_filter)!
+  for (const state of ["TX", "FL", "CA", "OH", "TN"]) {
+    assert.ok(rowMatchesTerritoryFilter({ state, country: "US" }, usTerritory))
+  }
+  assert.equal(rowMatchesTerritoryFilter({ state: "ON", country: "CA" }, usTerritory), false)
+
   const row = {
     city: "Greeneville",
     state: "TN",

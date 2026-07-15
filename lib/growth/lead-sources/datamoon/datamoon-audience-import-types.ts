@@ -75,12 +75,23 @@ export type DatamoonNormalizedLeadRecord = {
   linkedin_url: string | null
   address_line1: string | null
   address_line2: string | null
+  /** Personal/contact geography — not company headquarters. */
   city: string | null
   state: string | null
   postal_code: string | null
   country: string | null
   company_name: string | null
   company_domain: string | null
+  company_city: string | null
+  company_state: string | null
+  company_country: string | null
+  company_linkedin_url: string | null
+  provider_company_id: string | null
+  primary_industry: string | null
+  job_title: string | null
+  department: string | null
+  naics_codes: string[]
+  sic_codes: string[]
   source: "datamoon"
   source_confidence: "provider" | "default"
 }

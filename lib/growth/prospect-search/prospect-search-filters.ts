@@ -71,17 +71,47 @@ function normalizeKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+type ProspectSearchIndustryEvidenceRow = {
+  industry: string | null
+  subindustry?: string | null
+  keywords?: string[]
+  company_name: string
+  notes?: string | null
+  signals: string[]
+  match_reasoning?: string[]
+}
+
 function matchesProspectSearchIndustryFilter(
-  row: Pick<
-    GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
-    "industry" | "subindustry" | "keywords" | "company_name" | "notes"
-  >,
+  row: ProspectSearchIndustryEvidenceRow,
   filterIndustry: string,
 ): boolean {
   if (includesFold(row.industry, filterIndustry)) return true
-  const blob = [row.industry, row.subindustry, ...row.keywords, row.company_name, row.notes].join(" ")
+  const blob = [
+    row.industry,
+    row.subindustry,
+    ...(row.keywords ?? []),
+    row.company_name,
+    row.notes,
+    ...row.signals,
+    ...(row.match_reasoning ?? []),
+  ].join(" ")
   if (includesFold(blob, filterIndustry)) return true
   return industryFilterAliasMatch(blob, filterIndustry)
+}
+
+function buildExternalDiscoveryKeywordBlob(row: ProspectSearchIndustryEvidenceRow & { website?: string | null }): string {
+  return [
+    row.company_name,
+    row.website,
+    row.industry,
+    row.subindustry,
+    row.notes,
+    ...(row.keywords ?? []),
+    ...row.signals,
+    ...(row.match_reasoning ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
 }
 
 export type ProspectSearchFilterOptions = {
@@ -143,7 +173,9 @@ export function explainProspectSearchFilterDrop<
     }
   }
   if (filters.keywords?.length) {
-    const blob = [row.company_name, row.website, row.industry, row.notes, ...row.keywords].join(" ")
+    const blob = options?.external_discovery
+      ? buildExternalDiscoveryKeywordBlob(row)
+      : [row.company_name, row.website, row.industry, row.notes, ...(row.keywords ?? [])].join(" ")
     const keywordMatch = options?.external_discovery
       ? filters.keywords.some((kw) => includesFold(blob, kw))
       : filters.keywords.every((kw) => includesFold(blob, kw))

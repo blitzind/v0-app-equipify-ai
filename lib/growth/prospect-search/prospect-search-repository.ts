@@ -281,6 +281,7 @@ export async function runProspectSearch(
           datamoon_autonomous_discovery_stop_reason: datamoonDiscovery.stopReason,
           datamoon_autonomous_discovery_raw_company_count: datamoonDiscovery.rawCompanyCount,
           datamoon_autonomous_discovery_normalized_company_count: datamoonDiscovery.normalizedCompanyCount,
+          datamoon_autonomous_discovery_normalization_stats: datamoonDiscovery.normalizationStats,
           discovery_hydration: {
             qa_marker: contact_first_hydration.qa_marker,
             hydration_complete: contact_first_hydration.hydration_complete,

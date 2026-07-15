@@ -6,8 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
 import {
+  resolveDatamoonCompanyGeography,
   resolveDatamoonCompanyName,
   resolveDatamoonCompanyWebsite,
+  resolveDatamoonProspectCompanyIdentityKey,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
 import { normalizeDatamoonAudienceRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-normalizer"
 import { pollDatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
@@ -51,6 +53,14 @@ export type RunProspectSearchDatamoonAutonomousDiscoveryInput = {
   maximumDailyDiscovery?: number
 }
 
+export type DatamoonProspectSearchNormalizationStats = {
+  raw_record_count: number
+  normalized_company_count: number
+  unique_company_count: number
+  duplicate_contacts_consolidated: number
+  company_identity_missing_count: number
+}
+
 export type RunProspectSearchDatamoonAutonomousDiscoveryResult = {
   qaMarker: typeof GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER
   companies: GrowthProspectSearchCompanyResult[]
@@ -61,12 +71,23 @@ export type RunProspectSearchDatamoonAutonomousDiscoveryResult = {
   jobCreated: boolean
   rawCompanyCount: number
   normalizedCompanyCount: number
+  normalizationStats: DatamoonProspectSearchNormalizationStats | null
   providerStatusLabel: string
   providerStatusMessage: string
   runId: string | null
   targetingSummary: ReturnType<
     typeof buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile
   >["targetingSummary"] | null
+}
+
+function buildProviderEvidenceKeywords(normalized: ReturnType<typeof normalizeDatamoonAudienceRecord>): string[] {
+  return [
+    normalized.primary_industry,
+    normalized.job_title,
+    normalized.department,
+    ...normalized.naics_codes.map((code) => `naics ${code}`),
+    ...normalized.sic_codes.map((code) => `sic ${code}`),
+  ].filter((value): value is string => Boolean(value?.trim()))
 }
 
 function datamoonRecordToProspectCompany(
@@ -77,21 +98,27 @@ function datamoonRecordToProspectCompany(
   const normalized = record.normalized
   const companyName = resolveDatamoonCompanyName(normalized)
   const website = resolveDatamoonCompanyWebsite(normalized)
-  const id = record.dedupeKey?.trim() || `datamoon-${record.id}`
+  const companyGeo = resolveDatamoonCompanyGeography(normalized)
+  const id =
+    resolveDatamoonProspectCompanyIdentityKey(normalized) ??
+    record.dedupeKey?.trim() ??
+    `datamoon-${record.id}`
+  const providerKeywords = buildProviderEvidenceKeywords(normalized)
+  const industry = normalized.primary_industry ?? filterIndustry ?? null
 
   return {
     id,
     source_type: "external_discovered",
     company_name: companyName,
     website,
-    industry: filterIndustry ?? null,
-    subindustry: null,
-    city: normalized.city,
-    state: normalized.state,
-    country: normalized.country,
+    industry,
+    subindustry: normalized.department,
+    city: companyGeo.city,
+    state: companyGeo.state,
+    country: companyGeo.country,
     employees: null,
     revenue_range: null,
-    location: [normalized.city, normalized.state, normalized.country].filter(Boolean).join(", ") || null,
+    location: companyGeo.location,
     intent_score: null,
     buying_stage: null,
     lead_score: null,
@@ -99,7 +126,11 @@ function datamoonRecordToProspectCompany(
     company_match_confidence: null,
     decision_maker_coverage: null,
     verification_status: "external_unverified",
-    signals: ["Discovered via DataMoon audience search"],
+    signals: [
+      "Discovered via DataMoon audience search",
+      ...(normalized.job_title ? [`Contact role: ${normalized.job_title}`] : []),
+      ...(normalized.primary_industry ? [`Provider industry: ${normalized.primary_industry}`] : []),
+    ],
     search_intent_category: null,
     growth_lead_id: record.matchedLeadId,
     prospect_id: null,
@@ -108,22 +139,91 @@ function datamoonRecordToProspectCompany(
     match_reasoning: [
       "Discovered via DataMoon — routed through canonical Prospect Search.",
       normalized.contact_name ? `Contact signal: ${normalized.contact_name}` : "Company-level discovery record.",
+      ...(companyGeo.location ? [`Company geography: ${companyGeo.location}`] : []),
+      ...(normalized.company_domain ? [`Company domain: ${normalized.company_domain}`] : []),
     ],
     discovery_provider_type: "datamoon",
     discovery_provider_name: "DataMoon",
     discovery_source_badge: "DataMoon",
-    keywords: [],
-    notes: null,
+    keywords: providerKeywords,
+    notes: [
+      normalized.provider_company_id ? `Provider company id: ${normalized.provider_company_id}` : null,
+      normalized.company_linkedin_url ? `Company LinkedIn: ${normalized.company_linkedin_url}` : null,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" | ") || null,
   }
+}
+
+function consolidateDatamoonAudienceImportRecords(
+  records: DatamoonAudienceImportRecord[],
+): { records: DatamoonAudienceImportRecord[]; duplicateContactsConsolidated: number } {
+  const eligible = records.filter((record) => record.status === "preview" || record.status === "duplicate")
+  const grouped = new Map<string, DatamoonAudienceImportRecord[]>()
+
+  for (const record of eligible) {
+    const key =
+      resolveDatamoonProspectCompanyIdentityKey(record.normalized) ??
+      record.dedupeKey?.trim() ??
+      record.id
+    const bucket = grouped.get(key) ?? []
+    bucket.push(record)
+    grouped.set(key, bucket)
+  }
+
+  const consolidated: DatamoonAudienceImportRecord[] = []
+  let duplicateContactsConsolidated = 0
+
+  for (const bucket of grouped.values()) {
+    const [primary, ...duplicates] = bucket
+    if (!primary) continue
+    duplicateContactsConsolidated += Math.max(0, bucket.length - 1)
+
+    const contactNames = bucket
+      .map((record) => record.normalized.contact_name?.trim())
+      .filter((value): value is string => Boolean(value))
+    const mergedContacts = [...new Set(contactNames)]
+
+    consolidated.push({
+      ...primary,
+      message:
+        mergedContacts.length > 1
+          ? `Consolidated ${mergedContacts.length} contacts at the same company.`
+          : primary.message,
+      normalized: {
+        ...primary.normalized,
+        contact_name: mergedContacts[0] ?? primary.normalized.contact_name,
+      },
+    })
+  }
+
+  return { records: consolidated, duplicateContactsConsolidated }
 }
 
 function recordsToProspectCompanies(
   records: DatamoonAudienceImportRecord[],
   filterIndustry?: string | null,
-): GrowthProspectSearchCompanyResult[] {
-  return records
-    .filter((record) => record.status === "preview" || record.status === "duplicate")
-    .map((record, index) => datamoonRecordToProspectCompany(record, index, filterIndustry))
+): { companies: GrowthProspectSearchCompanyResult[]; stats: DatamoonProspectSearchNormalizationStats } {
+  const consolidated = consolidateDatamoonAudienceImportRecords(records)
+  const companies = consolidated.records.map((record, index) =>
+    datamoonRecordToProspectCompany(record, index, filterIndustry),
+  )
+
+  const company_identity_missing_count = companies.filter(
+    (company) => !company.company_name?.trim() && !company.website?.trim(),
+  ).length
+
+  return {
+    companies,
+    stats: {
+      raw_record_count: records.filter((record) => record.status === "preview" || record.status === "duplicate")
+        .length,
+      normalized_company_count: companies.length,
+      unique_company_count: companies.length,
+      duplicate_contacts_consolidated: consolidated.duplicateContactsConsolidated,
+      company_identity_missing_count,
+    },
+  }
 }
 
 function providerBlockedResult(
@@ -140,6 +240,7 @@ function providerBlockedResult(
     jobCreated: false,
     rawCompanyCount: 0,
     normalizedCompanyCount: 0,
+    normalizationStats: null,
     providerStatusLabel: stopReason,
     providerStatusMessage: autonomousDiscoveryStopReasonMessage(stopReason),
     runId: null,
@@ -188,6 +289,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
         jobCreated: false,
         rawCompanyCount: run.loadingCount,
         normalizedCompanyCount: 0,
+        normalizationStats: null,
         providerStatusLabel: "datamoon_request_active",
         providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
         runId: run.id,
@@ -200,23 +302,30 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     }
 
     if (isDatamoonAutonomousDiscoveryRunCompleted(run)) {
-      const companies = recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
-      const stopReason = companies.length === 0 ? "datamoon_zero_results" : null
+      const mapped = recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
+      const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
+      logGrowthEngine("prospect_search_datamoon_autonomous_discovery_normalized", {
+        qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+        organization_id: input.organizationId,
+        run_id: run.id,
+        ...mapped.stats,
+      })
       return {
         qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-        companies,
+        companies: mapped.companies,
         built_query: input.query,
         stopReason,
         jobActive: false,
         jobReused: true,
         jobCreated: false,
         rawCompanyCount: polled.records.length,
-        normalizedCompanyCount: companies.length,
+        normalizedCompanyCount: mapped.companies.length,
+        normalizationStats: mapped.stats,
         providerStatusLabel: stopReason ?? "datamoon_completed",
         providerStatusMessage:
           stopReason != null
             ? autonomousDiscoveryStopReasonMessage(stopReason)
-            : `DataMoon returned ${companies.length} company candidate(s).`,
+            : `DataMoon returned ${mapped.companies.length} company candidate(s).`,
         runId: run.id,
         targetingSummary: projection.targetingSummary,
       }
@@ -234,6 +343,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
       jobCreated: false,
       rawCompanyCount: activeRun.loadingCount,
       normalizedCompanyCount: 0,
+      normalizationStats: null,
       providerStatusLabel: "datamoon_request_active",
       providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
       runId: activeRun.id,
@@ -282,23 +392,24 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
   if (input.readOnlyProof) {
     const polled = await pollDatamoonAudienceImportRun(admin, started.run.id)
     const rawCount = polled.ok ? polled.records.length : 0
-    const companies = polled.ok
+    const mapped = polled.ok
       ? recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
-      : []
+      : { companies: [], stats: null }
 
     return {
       qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
       companies: [],
       built_query: input.query,
-      stopReason: companies.length === 0 && rawCount === 0 ? "datamoon_zero_results" : null,
+      stopReason: mapped.companies.length === 0 && rawCount === 0 ? "datamoon_zero_results" : null,
       jobActive: polled.ok ? isDatamoonAutonomousDiscoveryRunActive(polled.run) : true,
       jobReused: false,
       jobCreated: true,
       rawCompanyCount: rawCount,
-      normalizedCompanyCount: companies.length,
+      normalizedCompanyCount: mapped.companies.length,
+      normalizationStats: mapped.stats,
       providerStatusLabel: polled.ok ? polled.run.status : "datamoon_provider_error",
       providerStatusMessage: polled.ok
-        ? `Read-only proof: ${rawCount} raw, ${companies.length} normalized.`
+        ? `Read-only proof: ${rawCount} raw, ${mapped.companies.length} normalized.`
         : "Read-only proof poll failed.",
       runId: started.run.id,
       targetingSummary: projection.targetingSummary,
@@ -315,6 +426,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     jobCreated: true,
     rawCompanyCount: 0,
     normalizedCompanyCount: 0,
+    normalizationStats: null,
     providerStatusLabel: "datamoon_queued",
     providerStatusMessage: "DataMoon discovery job queued — results will arrive on a future scheduler tick.",
     runId: started.run.id,
@@ -336,6 +448,7 @@ export function summarizeDatamoonProspectSearchProof(input: {
     provider_status: input.result.providerStatusLabel,
     raw_company_count: input.result.rawCompanyCount,
     normalized_count: input.result.normalizedCompanyCount,
+    normalization_stats: input.result.normalizationStats,
     icp_filter_pass_count: input.icpPassCount,
     duplicate_count: input.duplicateCount,
     projected_admission_count: input.projectedAdmissionCount,
@@ -348,14 +461,14 @@ export function summarizeDatamoonProspectSearchProof(input: {
 export function normalizeDatamoonProviderRecordsForProspectSearch(
   rawRecords: Record<string, unknown>[],
 ): GrowthProspectSearchCompanyResult[] {
-  return rawRecords.map((raw, index) => {
-    const normalized = normalizeDatamoonAudienceRecord(raw)
-    return datamoonRecordToProspectCompany(
-      {
+  return recordsToProspectCompanies(
+    rawRecords.map((raw, index) => {
+      const normalized = normalizeDatamoonAudienceRecord(raw)
+      return {
         id: `proof-${index}`,
         runId: "proof",
         recordIndex: index,
-        status: "preview",
+        status: "preview" as const,
         normalized,
         dedupeRule: null,
         dedupeKey: normalized.company_domain ?? normalized.company_name,
@@ -364,9 +477,8 @@ export function normalizeDatamoonProviderRecordsForProspectSearch(
         message: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      },
-      index,
-      null,
-    )
-  })
+      }
+    }),
+    null,
+  ).companies
 }

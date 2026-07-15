@@ -337,6 +337,10 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     searched: selected.length,
     pushed: push.pushed,
     already_exists: push.already_exists,
+    external_filter_diagnostics: search.external_filter_diagnostics ?? null,
+    datamoon_normalization_stats:
+      (search as { datamoon_autonomous_discovery_normalization_stats?: unknown })
+        .datamoon_autonomous_discovery_normalization_stats ?? null,
   })
 
   return buildPortfolioDiscoveryTickResult({

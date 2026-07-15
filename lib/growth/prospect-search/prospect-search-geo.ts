@@ -145,9 +145,33 @@ export function inferMetroFromText(value: string | null | undefined): string | n
   return null
 }
 
+const COUNTRY_ONLY_TERRITORY_INPUTS: Record<string, string> = {
+  us: "US",
+  usa: "US",
+  "u.s.": "US",
+  "u.s": "US",
+  "united states": "US",
+  canada: "CA",
+  mexico: "MX",
+  mx: "MX",
+  uk: "GB",
+  gb: "GB",
+  "united kingdom": "GB",
+}
+
 export function parseTerritoryInput(raw: string): Partial<GrowthProspectSearchTerritoryFilter> {
   const text = asString(raw)
   if (!text) return {}
+
+  const state = normalizeState(text)
+  if (state && (US_STATE_ABBRS.has(state) || US_STATE_NAME_TO_ABBR[text.toLowerCase()])) {
+    return { states: [state] }
+  }
+
+  const countryOnly = COUNTRY_ONLY_TERRITORY_INPUTS[text.toLowerCase()]
+  if (countryOnly) {
+    return { country: countryOnly }
+  }
 
   const postal = normalizePostalCode(text)
   if (postal && text.replace(/\D/g, "").length >= 5 && !text.includes(",")) {
@@ -159,17 +183,12 @@ export function parseTerritoryInput(raw: string): Partial<GrowthProspectSearchTe
 
   if (text.includes(",")) {
     const [cityPart, statePart] = text.split(",").map((part) => part.trim())
-    const state = normalizeState(statePart)
+    const parsedState = normalizeState(statePart)
     const city = normalizeCity(cityPart)
     const patch: Partial<GrowthProspectSearchTerritoryFilter> = {}
-    if (state) patch.states = [state]
+    if (parsedState) patch.states = [parsedState]
     if (city) patch.cities = [city]
     return patch
-  }
-
-  const state = normalizeState(text)
-  if (state && (US_STATE_ABBRS.has(state) || US_STATE_NAME_TO_ABBR[text.toLowerCase()])) {
-    return { states: [state] }
   }
 
   const city = normalizeCity(text)

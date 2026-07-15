@@ -1,13 +1,16 @@
 /** GE-DATAMOON-1B — Normalize Datamoon audience records into Growth lead shape. Client-safe. */
 
 import {
+  isConsumerEmailDomain,
+  normalizeDomain,
+} from "@/lib/growth/company-identification/company-identification-normalize"
+import {
   normalizeEmail,
   normalizeLinkedIn,
   normalizePhone,
   parseEmailDomain,
   trimOrNull,
 } from "@/lib/growth/import/normalize"
-import { isConsumerEmailDomain } from "@/lib/growth/company-identification/company-identification-normalize"
 import {
   DATAMOON_EXT_OUTPUT_FIELDS,
   type DatamoonExtOutputField,
@@ -22,9 +25,51 @@ function pickString(record: Record<string, unknown>, key: string): string | null
   return null
 }
 
+function pickStringList(record: Record<string, unknown>, key: string): string[] {
+  const value = record[key]
+  if (typeof value === "string") {
+    const trimmed = trimOrNull(value)
+    return trimmed ? [trimmed] : []
+  }
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry) => (typeof entry === "string" ? trimOrNull(entry) : null))
+    .filter((entry): entry is string => Boolean(entry))
+}
+
 function joinAddress(line1: string | null, line2: string | null): string | null {
   const parts = [line1, line2].filter(Boolean)
   return parts.length > 0 ? parts.join(", ") : null
+}
+
+function resolveCompanyDomain(raw: Record<string, unknown>, businessEmail: string | null, personalEmail: string | null): string | null {
+  const providerDomain = normalizeDomain(pickString(raw, "company_domain"))
+  if (providerDomain && !isConsumerEmailDomain(providerDomain)) {
+    return providerDomain
+  }
+
+  const websiteDomain = normalizeDomain(pickString(raw, "website"))
+  if (websiteDomain && !isConsumerEmailDomain(websiteDomain)) {
+    return websiteDomain
+  }
+
+  const programmaticEmails = pickString(raw, "programmatic_business_emails")
+  for (const candidate of (programmaticEmails ?? "").split(/[,;|]/)) {
+    const domain = parseEmailDomain(normalizeEmail(candidate) ?? "")
+    if (domain && !isConsumerEmailDomain(domain)) return domain
+  }
+
+  const businessDomain = parseEmailDomain(businessEmail ?? "")
+  if (businessDomain && !isConsumerEmailDomain(businessDomain)) {
+    return businessDomain
+  }
+
+  const personalDomain = parseEmailDomain(personalEmail ?? "")
+  if (personalDomain && !isConsumerEmailDomain(personalDomain)) {
+    return personalDomain
+  }
+
+  return null
 }
 
 export function filterDatamoonRecordToExtFields(
@@ -52,7 +97,6 @@ export function normalizeDatamoonAudienceRecord(
   const lastName = pickString(raw, "last_name")
   const businessEmail = normalizeEmail(pickString(raw, "business_email"))
   const personalEmailsRaw = pickString(raw, "personal_emails")
-  // Support comma-separated personal_emails by normalizing the first valid address.
   const personalEmailCandidates = (personalEmailsRaw ?? "")
     .split(/[,;|]/)
     .map((part) => normalizeEmail(part))
@@ -89,18 +133,22 @@ export function normalizeDatamoonAudienceRecord(
   const postalCode = pickString(raw, "personal_zip") ?? pickString(raw, "personal_zip4")
   const country = pickString(raw, "contact_country") ?? "US"
 
-  const businessDomain = parseEmailDomain(businessEmail ?? "")
-  const personalDomain = parseEmailDomain(personalEmail ?? "")
-  const companyDomain =
-    businessDomain && !isConsumerEmailDomain(businessDomain)
-      ? businessDomain
-      : personalDomain && !isConsumerEmailDomain(personalDomain)
-        ? personalDomain
-        : null
+  const companyDomain = resolveCompanyDomain(raw, businessEmail, personalEmail)
+  const companyLinkedInRaw =
+    pickString(raw, "company_linkedin_url") ?? pickString(raw, "company_linkedin")
+  const companyLinkedInSlug = normalizeLinkedIn(companyLinkedInRaw)
+  const companyLinkedinUrl = companyLinkedInSlug
+    ? companyLinkedInSlug.includes("linkedin.com")
+      ? companyLinkedInSlug
+      : `https://www.linkedin.com/company/${companyLinkedInSlug}`
+    : companyLinkedInRaw
 
-  const contactName =
-    [firstName, lastName].filter(Boolean).join(" ").trim() || null
+  const providerCompanyId =
+    pickString(raw, "company_id") ??
+    pickString(raw, "employer_id") ??
+    (typeof raw.id === "number" || typeof raw.id === "string" ? String(raw.id) : null)
 
+  const contactName = [firstName, lastName].filter(Boolean).join(" ").trim() || null
   const hasProviderIdentity = Boolean(email || phone || linkedinSlug || contactName)
 
   return {
@@ -121,6 +169,16 @@ export function normalizeDatamoonAudienceRecord(
     country,
     company_name: pickString(raw, "company_name"),
     company_domain: companyDomain,
+    company_city: pickString(raw, "company_city"),
+    company_state: pickString(raw, "company_state"),
+    company_country: pickString(raw, "company_country") ?? pickString(raw, "company_country_code"),
+    company_linkedin_url: companyLinkedinUrl,
+    provider_company_id: providerCompanyId,
+    primary_industry: pickString(raw, "primary_industry"),
+    job_title: pickString(raw, "job_title"),
+    department: pickString(raw, "department"),
+    naics_codes: pickStringList(raw, "company_naics"),
+    sic_codes: pickStringList(raw, "company_sic"),
     source: "datamoon",
     source_confidence: hasProviderIdentity ? "provider" : "default",
   }
