@@ -921,6 +921,7 @@
     "test:ge-aios-decision-engine-1c": "tsx scripts/test-ge-aios-decision-engine-1c.ts",
     "test:ge-aios-decision-engine-1d": "tsx scripts/test-ge-aios-decision-engine-1d.ts",
     "test:ge-aios-live-autonomy-tick-proof-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-live-autonomy-tick-proof-1a.ts",
+    "test:ge-aios-live-autonomy-tick-proof-1b": "tsx scripts/test-ge-aios-live-autonomy-tick-proof-1b.ts",
     "test:ge-aios-live-runtime-config-proof-1a": "tsx scripts/test-ge-aios-live-runtime-config-proof-1a.ts",
     "test:ge-aios-live-internal-autonomy-activation-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-live-internal-autonomy-activation-1b.ts",
     "test:ge-aios-production-validation-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-production-validation-1b.ts",

@@ -3,53 +3,37 @@
  *
  * Run: pnpm test:ge-aios-live-autonomy-tick-proof-1a
  * Requires Vercel Production env via vercel-production-env-run.ts wrapper.
+ *
+ * GE-AIOS-LIVE-AUTONOMY-TICK-PROOF-1B corrects misleading local-secret and legacy Home-path conclusions.
  */
 import assert from "node:assert/strict"
 import { execSync } from "node:child_process"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
-import { isCommunicationStrategyEnabled } from "@/lib/growth/contact-verification/communication-strategy-feature"
-import { isNativeRevenueDecisionEngineEnabled } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
-import { resolveLeadCommunicationStrategyBundle } from "@/lib/growth/contact-verification/lead-communication-strategy-resolver"
-import { isDailyRevenueWorkQueueEnabled } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
-import {
-  resolveDailyRevenueWorkQueueForLeads,
-} from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
-import { flattenDecisionCandidates } from "@/lib/growth/decision-engine/context/build-decision-context"
-import { runDecisionEngine } from "@/lib/growth/decision-engine/engine/run-decision-engine"
+import { buildGrowthAiosAutonomyTickHealthSnapshot } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a"
+import { resolveGrowthAiosAutonomyTickProofVerdict } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
 import { buildGrowthHomeWorkspaceSummary } from "@/lib/growth/home/growth-home-workspace-summary-service"
-import { fetchGrowthHomeLeadPoolPage } from "@/lib/growth/lead-repository"
+import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { EQUIPIFY_PRODUCTION_ORG_ID } from "@/lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
+import { fetchDeployedGrowthAiosAutonomyTickHealth } from "@/lib/growth/qa/growth-aios-autonomy-tick-health-deployed-probe"
+import { fetchDeployedGrowthAiosRuntimeConfigHealth } from "@/lib/growth/qa/growth-aios-runtime-config-health-deployed-probe"
+import { mintGrowthPlatformAdminBearerToken } from "@/lib/growth/qa/growth-platform-admin-bearer-probe"
 import { listActiveRunningGrowthObjectiveOrganizationIds } from "@/lib/growth/objectives/growth-objective-repository"
-import { isAvaOutreachExecutionRequestEnabled } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-service"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
-import { evaluateCanonicalExecutionAuthorityForLead } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
-import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import { runWorkManager } from "@/lib/growth/work-manager/manager/run-work-manager"
 import { isExecutableWorkItem } from "@/lib/growth/work-manager/state/work-item-state"
 import { selectNextExecutableWorkItem } from "@/lib/growth/specialists/execution/select-next-executable-work-item"
-import { runAutonomousSalesLoop } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
-import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
-import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
-import type { GrowthLead } from "@/lib/growth/types"
+import { inspectAutonomousSalesLoopDryRun } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
+import { runMemoryEngine } from "@/lib/growth/memory/engine/run-memory-engine"
+import { classifyBooleanFromDeployedOrLocal } from "@/lib/growth/aios/runtime/growth-aios-runtime-config-health-1a-classifiers"
+import type { GrowthAiosRuntimeConfigHealthSnapshot } from "@/lib/growth/aios/runtime/growth-aios-runtime-config-health-1a-types"
+import type { GrowthAiosAutonomyTickProofVerdict } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 export const GE_AIOS_LIVE_AUTONOMY_TICK_PROOF_1A_QA_MARKER =
   "ge-aios-live-autonomy-tick-proof-1a-v1" as const
 
-export const GE_AIOS_LIVE_AUTONOMY_TICK_PROOF_1A_VERDICT = {
-  READY_TO_ACTIVATE_INTERNAL_AUTONOMY: "READY_TO_ACTIVATE_INTERNAL_AUTONOMY",
-  READY_AFTER_TARGETED_CONFIGURATION: "READY_AFTER_TARGETED_CONFIGURATION",
-  BLOCKED_BY_UNDEPLOYED_RUNTIME_BATCH: "BLOCKED_BY_UNDEPLOYED_RUNTIME_BATCH",
-  BLOCKED_BY_OBSOLETE_FEATURE_GATE: "BLOCKED_BY_OBSOLETE_FEATURE_GATE",
-  BLOCKED_BY_ORGANIZATION_RESOLUTION: "BLOCKED_BY_ORGANIZATION_RESOLUTION",
-  BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO: "BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO",
-  BLOCKED_BY_BROKEN_RUNTIME_BRANCH: "BLOCKED_BY_BROKEN_RUNTIME_BRANCH",
-  BLOCKED_BY_CODE_DEFECT: "BLOCKED_BY_CODE_DEFECT",
-} as const
-
-const BLOCK_IMAGING_LEAD_ID = "6d9220f0-2960-468c-b4be-5d7595d292c3"
 const CODE_BATCH_MARKERS = [
   "lib/growth/aios/runtime/growth-aios-runtime-context-1a.ts",
   "lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot.ts",
@@ -65,7 +49,6 @@ type BranchRow = {
   output: string
   status: string
   reason: string
-  elapsedMs?: number
 }
 
 function gitDeployedSha(): string {
@@ -91,114 +74,126 @@ function codeBatchPresent(deployedSha: string): Record<string, boolean> {
   return result
 }
 
-function classifyLead(lead: GrowthLead, runtimeOrgId: string | null): string {
-  if (lead.archivedAt) return "archived"
-  if (lead.status === "disqualified") return "disqualified"
-  const admission = resolveLeadAdmissionStateFromMetadata(lead.metadata)
-  if (admission.state === "invalid") return "invalid"
-  if (admission.state === "rejected") return "admission_rejected"
-  if (admission.state === "review") {
-    if (!lead.website?.trim()) return "admission_review"
-    return "admission_review"
-  }
-  if (lead.organizationId && runtimeOrgId && lead.organizationId !== runtimeOrgId) {
-    return "excluded_by_organization"
-  }
-  if (
-    lead.lastProspectResearchedAt &&
-    lead.latestProspectResearchRunId &&
-    !isProspectResearchStale(lead.lastProspectResearchedAt)
-  ) {
-    return "research_current"
-  }
-  if (!lead.website?.trim()) return "missing_website"
-  if (!isNativeRevenueDecisionEngineEnabled()) return "excluded_by_feature_gate"
-  return "eligible_now"
+async function resolveDeployedBearer(boot: { url: string; jwt: string }): Promise<string | null> {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  if (!anonKey) return null
+  const minted = await mintGrowthPlatformAdminBearerToken({
+    supabase_url: boot.url,
+    service_role_key: boot.jwt,
+    anon_key: anonKey,
+  })
+  return minted.access_token
 }
 
-/** Mirrors deployed aa8a5e33 ASL context path (buildGrowthHomeWorkspaceSummary). */
-async function traceDeployedAslPath(admin: SupabaseClient, organizationId: string): Promise<{
+/** Deployed ASL path: portfolio snapshot → Work Manager → selected work. */
+export async function tracePortfolioAslPath(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<{
   branchTrace: BranchRow[]
-  workResult: ReturnType<typeof runWorkManager> | null
+  leadCount: number
+  candidateCount: number
+  executableCount: number
+  selectedWorkId: string | null
+  selectedWorkType: string | null
   stopReason: string
-  firstZeroStage: string | null
 }> {
   const branchTrace: BranchRow[] = []
-  let firstZeroStage: string | null = null
+  const generatedAt = new Date().toISOString()
 
-  const markZero = (stage: string) => {
-    if (!firstZeroStage) firstZeroStage = stage
+  const snapshot = await buildGrowthAutonomousPortfolioWorkSnapshot(admin, {
+    organizationId,
+    generatedAt,
+  }).catch(() => null)
+
+  branchTrace.push({
+    stage: "buildGrowthAutonomousPortfolioWorkSnapshot",
+    input: organizationId.slice(0, 8),
+    output: snapshot ? "ok" : "null",
+    status: snapshot ? "executing" : "blocked",
+    reason: snapshot ? "portfolio_snapshot_built" : "portfolio_snapshot_unavailable",
+  })
+  if (!snapshot) {
+    return {
+      branchTrace,
+      leadCount: 0,
+      candidateCount: 0,
+      executableCount: 0,
+      selectedWorkId: null,
+      selectedWorkType: null,
+      stopReason: "portfolio_snapshot_unavailable",
+    }
   }
 
-  const envOrg = getGrowthEngineAiOrgId()
-  branchTrace.push({
-    stage: "getGrowthEngineAiOrgId",
-    input: "process.env",
-    output: envOrg ?? "null",
-    status: envOrg ? "ok" : "empty",
-    reason: envOrg ? "uuid_configured" : "GROWTH_ENGINE_AI_ORG_ID unset or invalid",
+  const { summary: memorySummary } = runMemoryEngine({
+    organizationId,
+    generatedAt,
+    workspaceSummary: snapshot.workManagerInput.workspaceSummary,
+    waitingOnYou: snapshot.workManagerInput.waitingOnYou,
+    dailyWorkQueue: snapshot.workManagerInput.dailyWorkQueue,
+    accomplishments: snapshot.workManagerInput.accomplishments,
+    timeline: snapshot.workManagerInput.timeline,
+    persistedStore: snapshot.organizationalMemory.store,
+    salesOutcomes: snapshot.salesOutcomes.outcomes,
+    organizationalKnowledge: snapshot.organizationalKnowledge.store.items,
   })
 
-  if (envOrg && organizationId !== envOrg) {
-    branchTrace.push({
-      stage: "loadAutonomousSalesLoopContext.org_gate",
-      input: organizationId,
-      output: "null",
-      status: "blocked",
-      reason: "context_unavailable — org mismatch when env org set",
-    })
-    markZero("loadAutonomousSalesLoopContext.org_gate")
-    return { branchTrace, workResult: null, stopReason: "context_unavailable", firstZeroStage }
-  }
+  branchTrace.push({
+    stage: "runMemoryEngine",
+    input: String(snapshot.leadCount),
+    output: "ok",
+    status: "executing",
+    reason: "runtime_context_memory_resolved",
+  })
 
-  const summaryStart = Date.now()
+  const workResult = runWorkManager({
+    ...snapshot.workManagerInput,
+    memorySummary,
+  })
+
+  const candidateCount = workResult.all_work_items.length
+  const executable = workResult.all_work_items.filter(isExecutableWorkItem)
+  branchTrace.push({
+    stage: "runWorkManager",
+    input: String(candidateCount),
+    output: String(executable.length),
+    status: executable.length > 0 ? "executing" : "empty",
+    reason: "decision_engine_work_manager_ranking",
+  })
+
+  const selected = selectNextExecutableWorkItem(workResult)
+  branchTrace.push({
+    stage: "selectNextExecutableWorkItem",
+    input: String(executable.length),
+    output: selected?.id ?? "null",
+    status: selected ? "selected" : "blocked",
+    reason: selected ? selected.type : "no_executable_work",
+  })
+
+  return {
+    branchTrace,
+    leadCount: snapshot.leadCount,
+    candidateCount,
+    executableCount: executable.length,
+    selectedWorkId: selected?.id ?? null,
+    selectedWorkType: selected?.type ?? null,
+    stopReason: selected ? "would_execute" : "no_executable_work",
+  }
+}
+
+/** Historical comparison only — not the deployed ASL path after portfolio snapshot batch. */
+export async function traceLegacyHomeSummaryComparison(
+  admin: SupabaseClient,
+): Promise<{ dailyWorkQueueCount: number; selectedWorkId: string | null }> {
   const summary = await buildGrowthHomeWorkspaceSummary({
     admin,
     operatorEmail: "ava-autonomous@equipify.ai",
     actorUserId: "autonomous-sales-loop",
   }).catch(() => null)
-
-  branchTrace.push({
-    stage: "buildGrowthHomeWorkspaceSummary",
-    input: "admin",
-    output: summary?.ok ? "ok" : "null",
-    status: summary?.ok ? "executing" : "blocked",
-    reason: summary?.ok ? "summary_loaded" : "summary_failed_or_null",
-    elapsedMs: Date.now() - summaryStart,
-  })
   if (!summary?.ok) {
-    markZero("buildGrowthHomeWorkspaceSummary")
-    return { branchTrace, workResult: null, stopReason: "context_unavailable", firstZeroStage }
+    return { dailyWorkQueueCount: 0, selectedWorkId: null }
   }
-
-  const drqEnabled = isDailyRevenueWorkQueueEnabled()
-  const drqItems = summary.dashboard.dailyRevenueWorkQueueDisplay?.top_items?.length ?? 0
-  branchTrace.push({
-    stage: "isDailyRevenueWorkQueueEnabled",
-    input: "env flags",
-    output: String(drqEnabled),
-    status: drqEnabled ? "enabled" : "disabled",
-    reason: drqEnabled
-      ? "DRQ feature on"
-      : "GROWTH_DAILY_REVENUE_WORK_QUEUE / GROWTH_COMMUNICATION_STRATEGY / GROWTH_NATIVE_DECISION_ENGINE not true",
-  })
-
   const briefing = synthesizeGrowthHomeExecutiveBriefing({ dashboard: summary.dashboard })
-  const dailyWorkQueueCount = briefing.aiOsUx.dailyWorkQueue.length
-  branchTrace.push({
-    stage: "synthesizeGrowthHomeExecutiveBriefing.dailyWorkQueue",
-    input: `drq_enabled=${drqEnabled}`,
-    output: String(dailyWorkQueueCount),
-    status: dailyWorkQueueCount > 0 ? "executing" : "empty",
-    reason:
-      dailyWorkQueueCount > 0
-        ? "queue_items_materialized"
-        : "buildDailyWorkQueueItems returned [] — DRQ disabled or no strategy bundles",
-  })
-  if (dailyWorkQueueCount === 0) {
-    markZero("synthesizeGrowthHomeExecutiveBriefing.dailyWorkQueue")
-  }
-
   const wmInput = {
     workspaceSummary: {
       kpis: summary.kpis,
@@ -217,60 +212,17 @@ async function traceDeployedAslPath(admin: SupabaseClient, organizationId: strin
     generatedAt: new Date().toISOString(),
     leadSnapshotsById: summary.relationshipSnapshots.byLeadId,
   }
-
-  const decisionStart = Date.now()
-  const decisionResult = runDecisionEngine({ ...wmInput, memorySummary: null })
-  const candidates = flattenDecisionCandidates(decisionResult.context)
-  branchTrace.push({
-    stage: "runDecisionEngine.flattenDecisionCandidates",
-    input: `dailyWorkQueue=${dailyWorkQueueCount}`,
-    output: String(candidates.length),
-    status: candidates.length > 0 ? "executing" : "empty",
-    reason: candidates.map((c) => `${c.kind}:${c.id}`).slice(0, 8).join(", ") || "none",
-    elapsedMs: Date.now() - decisionStart,
-  })
-
   const workResult = runWorkManager({ ...wmInput, memorySummary: null })
-  const allItems = workResult.all_work_items
-  const executable = allItems.filter(isExecutableWorkItem)
-  branchTrace.push({
-    stage: "runWorkManager.all_work_items",
-    input: String(allItems.length),
-    output: String(executable.length),
-    status: executable.length > 0 ? "executing" : "empty",
-    reason: allItems
-      .slice(0, 6)
-      .map((i) => `${i.type}:${i.can_execute_autonomously}:${i.blocked_by.join("|")}`)
-      .join("; "),
-  })
-  if (executable.length === 0 && !firstZeroStage) {
-    markZero("runWorkManager.all_work_items")
-  }
-
   const selected = selectNextExecutableWorkItem(workResult)
-  branchTrace.push({
-    stage: "selectNextExecutableWorkItem",
-    input: String(executable.length),
-    output: selected?.id ?? "null",
-    status: selected ? "selected" : "blocked",
-    reason: selected ? selected.title : "no_executable_work",
-  })
-  if (!selected && !firstZeroStage) {
-    markZero("selectNextExecutableWorkItem")
-  }
-
   return {
-    branchTrace,
-    workResult,
-    stopReason: selected ? "would_execute" : "no_executable_work",
-    firstZeroStage: firstZeroStage ?? (selected ? null : "selectNextExecutableWorkItem"),
+    dailyWorkQueueCount: briefing.aiOsUx.dailyWorkQueue.length,
+    selectedWorkId: selected?.id ?? null,
   }
 }
 
 async function main(): Promise<void> {
   console.log("GE-AIOS-LIVE-AUTONOMY-TICK-PROOF-1A\n")
-
-  assert.equal(process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN, "1", "Run via vercel-production-env-run.ts")
+  assert.equal(process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN, "1")
 
   const boot = bootstrapGrowthOperatorNotificationsCertEnv({ requireVercelProductionEnvRun: true })
   if (!boot) {
@@ -278,25 +230,58 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const admin = boot.admin
+  const vercelProductionEnvRun = true
 
   const deployedSha = gitDeployedSha()
   const batchPresent = codeBatchPresent(deployedSha)
   const batchAllPresent = Object.values(batchPresent).every(Boolean)
-  const runtimeOrgId = getGrowthEngineAiOrgId()
 
-  console.log("=== Phase 1 — Deployed runtime identity ===")
+  const bearer = await resolveDeployedBearer(boot)
+  const deployedConfigProbe = bearer
+    ? await fetchDeployedGrowthAiosRuntimeConfigHealth({ bearerToken: bearer })
+    : null
+  const deployedConfig: GrowthAiosRuntimeConfigHealthSnapshot | null =
+    deployedConfigProbe?.ok ? deployedConfigProbe.snapshot : null
+
+  const nativeDecisionClassification = classifyBooleanFromDeployedOrLocal({
+    deployedValue: deployedConfig?.nativeDecisionEngineEnabled,
+    localValue: false,
+    localEnvPresent: Boolean(process.env.GROWTH_NATIVE_DECISION_ENGINE?.trim()),
+    vercelProductionEnvRun,
+  })
+  const drqClassification = classifyBooleanFromDeployedOrLocal({
+    deployedValue: deployedConfig?.dailyRevenueWorkQueueEnabled,
+    localValue: false,
+    localEnvPresent:
+      Boolean(process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE?.trim()) ||
+      Boolean(process.env.GROWTH_NATIVE_DECISION_ENGINE?.trim()),
+    vercelProductionEnvRun,
+  })
+
+  console.log("=== Phase 1 — Deployed runtime identity + config health ===")
   console.log(
     JSON.stringify(
       {
         deployment_sha: deployedSha,
-        project: "v0-app-equipify-ai-53",
-        scope: "blitzify",
-        hostname: "https://app.equipify.ai",
-        runtime_org_id: runtimeOrgId,
-        documented_production_org: EQUIPIFY_PRODUCTION_ORG_ID,
-        code_batch_present: batchPresent,
         code_batch_all_present: batchAllPresent,
-        local_head: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim().slice(0, 12),
+        deployed_runtime_config_probe: deployedConfigProbe
+          ? { probed: deployedConfigProbe.probed, ok: deployedConfigProbe.ok, status: deployedConfigProbe.status }
+          : { probed: false },
+        deployed_runtime_config: deployedConfig
+          ? {
+              organizationConfigured: deployedConfig.organizationConfigured,
+              nativeDecisionEngineEnabled: deployedConfig.nativeDecisionEngineEnabled,
+              dailyRevenueWorkQueueEnabled: deployedConfig.dailyRevenueWorkQueueEnabled,
+              schedulerMigrationReady: deployedConfig.schedulerMigrationReady,
+              outboundEnabled: deployedConfig.outboundEnabled,
+            }
+          : null,
+        configuration_classifications: {
+          native_decision_engine: nativeDecisionClassification,
+          daily_revenue_work_queue: drqClassification,
+        },
+        local_env_org_present: Boolean(process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()),
+        local_env_org_resolved: getGrowthEngineAiOrgId() != null,
       },
       null,
       2,
@@ -308,315 +293,130 @@ async function main(): Promise<void> {
   const aslOrgId =
     orgIds.find((id) => id === EQUIPIFY_PRODUCTION_ORG_ID) ?? orgIds[0] ?? EQUIPIFY_PRODUCTION_ORG_ID
 
-  const { data: objectives } = await admin
-    .schema("growth")
-    .from("organization_growth_objectives")
-    .select("id, organization_id, status, objective_type, runtime_state, emergency_stop_active, updated_at")
-    .eq("status", "active")
-
-  const latestSchedulerTouch = (objectives ?? [])
-    .map((o) => ({
-      id: o.id,
-      org: o.organization_id,
-      lastScheduler: (o.runtime_state as { lastSchedulerAt?: string })?.lastSchedulerAt ?? null,
-      lastTick: (o.runtime_state as { lastTickAt?: string })?.lastTickAt ?? null,
-      running: (o.runtime_state as { running?: boolean })?.running ?? false,
-      stage: (o.runtime_state as { currentStageId?: string })?.currentStageId ?? null,
-    }))
-    .sort((a, b) => Date.parse(b.lastScheduler ?? "0") - Date.parse(a.lastScheduler ?? "0"))
-
-  console.log("\n=== Phase 2 — Captured scheduler invocation (DB touch evidence) ===")
+  console.log("\n=== Phase 2 — Scheduler DB evidence ===")
   console.log(
     JSON.stringify(
       {
-        latest_scheduler_touch: latestSchedulerTouch[0] ?? null,
         organization_candidates: orgIds.length,
-        organizations_selected: orgIds.slice(0, 5),
-        objectives_active: objectives?.length ?? 0,
-        objectives_running: latestSchedulerTouch.filter((o) => o.running).length,
+        objectives_running_orgs: orgIds.slice(0, 5).map((id) => id.slice(0, 8)),
         kill_switches: {
-          autonomy_enabled: killSwitches.autonomy_enabled,
-          autonomy_objective_mode_enabled: killSwitches.autonomy_objective_mode_enabled,
-          autonomy_generation_enabled: killSwitches.autonomy_generation_enabled,
           autonomy_outbound_enabled: killSwitches.autonomy_outbound_enabled,
         },
-        note: "Cron telemetry duration/stop_reason not persisted to DB — inferred from objective runtime_state touches",
+        deployed_active_objectives: deployedConfig?.activeObjectiveCount ?? null,
+        deployed_due_running_objectives: deployedConfig?.dueRunningObjectiveCount ?? null,
       },
       null,
       2,
     ),
   )
 
-  console.log("\n=== Phase 3 — ASL branch trace (deployed path replay) ===")
-  const aslTrace = await traceDeployedAslPath(admin, aslOrgId)
-  console.log("first_zero_stage:", aslTrace.firstZeroStage)
-  console.log("stop_reason:", aslTrace.stopReason)
-  console.table(aslTrace.branchTrace)
+  console.log("\n=== Phase 3 — Deployed ASL path (portfolio snapshot trace) ===")
+  const portfolioTrace = await tracePortfolioAslPath(admin, aslOrgId)
+  console.table(portfolioTrace.branchTrace)
+  console.log(JSON.stringify({ stop_reason: portfolioTrace.stopReason, ...portfolioTrace }, null, 2))
 
-  const dryLoop = await runAutonomousSalesLoop({
-    admin,
-    organizationId: aslOrgId,
-    dryRun: true,
-    maxIterations: 1,
-  })
-  console.log("\nLocal ASL dry-run (current workspace code):", {
-    stop_reason: dryLoop.stop_reason,
-    selected_work: dryLoop.selected_work?.length ?? 0,
-    note: batchAllPresent
-      ? "matches deployed portfolio snapshot path"
-      : "LOCAL differs from deployed — deployed uses buildGrowthHomeWorkspaceSummary",
-  })
-
-  console.log("\n=== Phase 4 — Feature-gate authority audit ===")
-  const flagAudit = [
-    {
-      flag: "GROWTH_DAILY_REVENUE_WORK_QUEUE",
-      canonical: "yes — primary DRQ gate for ASL candidate generation on deployed path",
-      runtime: process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE ?? "unset",
-      effect: isDailyRevenueWorkQueueEnabled() ? "DRQ on" : "dailyWorkQueue=[] → no queue candidates",
-      action: "set true OR enable GROWTH_NATIVE_DECISION_ENGINE / GROWTH_COMMUNICATION_STRATEGY",
-    },
-    {
-      flag: "GROWTH_COMMUNICATION_STRATEGY",
-      canonical: "yes — enables DRQ via communication strategy chain",
-      runtime: process.env.GROWTH_COMMUNICATION_STRATEGY ?? "unset",
-      effect: isCommunicationStrategyEnabled() ? "on" : "DRQ remains off unless other flags set",
-      action: "set true if using comm strategy path",
-    },
-    {
-      flag: "GROWTH_NATIVE_DECISION_ENGINE",
-      canonical: "yes — required for strategy bundle resolution AND DRQ enablement",
-      runtime: process.env.GROWTH_NATIVE_DECISION_ENGINE ?? "unset",
-      effect: isNativeRevenueDecisionEngineEnabled() ? "bundles resolve" : "resolveLeadCommunicationStrategyBundle returns disabled",
-      action: "set true — minimum for portfolio ranking on deployed runtime",
-    },
-    {
-      flag: "GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_ENABLED",
-      canonical: "post-approval only — not ASL entry",
-      runtime: process.env.GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_ENABLED ?? "unset",
-      effect: isAvaOutreachExecutionRequestEnabled() ? "HAC approve→sequence" : "approval cannot enroll sequence",
-      action: "enable after first package approved; not required for research/qualification",
-    },
-  ]
-  console.table(flagAudit)
-
-  console.log("\n=== Phase 5 — Organization resolution ===")
+  console.log("\n=== Phase 4 — Deployed autonomy tick dry-run diagnostic ===")
+  const deployedTickProbe = bearer
+    ? await fetchDeployedGrowthAiosAutonomyTickHealth({ bearerToken: bearer })
+    : null
+  const localTickHealth = await buildGrowthAiosAutonomyTickHealthSnapshot(admin)
   console.log(
     JSON.stringify(
       {
-        scheduler_asl_org_source: "listActiveRunningGrowthObjectiveOrganizationIds from running objectives",
-        scheduler_org_candidates: orgIds,
-        asl_org_used_for_trace: aslOrgId,
-        runtime_env_org: runtimeOrgId,
-        documented_equipify_org: EQUIPIFY_PRODUCTION_ORG_ID,
-        conclusion:
-          runtimeOrgId === null
-            ? "environment variable is not required for ASL org selection (objective org used) BUT required for DRQ org learning, home summary scoping, and operator surfaces"
-            : runtimeOrgId === EQUIPIFY_PRODUCTION_ORG_ID
-              ? "environment variable matches documented production org"
-              : "runtime organization mapping is inconsistent",
+        deployed_probe: deployedTickProbe
+          ? {
+              probed: deployedTickProbe.probed,
+              ok: deployedTickProbe.ok,
+              status: deployedTickProbe.status,
+              error: deployedTickProbe.ok ? null : deployedTickProbe.error,
+            }
+          : { probed: false, error: "bearer_unavailable" },
+        deployed_tick_health: deployedTickProbe?.ok ? deployedTickProbe.snapshot : null,
+        local_deterministic_replay: localTickHealth,
       },
       null,
       2,
     ),
   )
 
-  console.log("\n=== Phase 6 — Portfolio eligibility ===")
-  const leadPool = await fetchGrowthHomeLeadPoolPage(admin, { limit: 250 })
-  const leads = leadPool.leads
-  const eligibilityCounts: Record<string, number> = {}
-  const leadRows: Array<{ id: string; company: string; org: string; reason: string }> = []
-  for (const lead of leads) {
-    const reason = classifyLead(lead, runtimeOrgId)
-    eligibilityCounts[reason] = (eligibilityCounts[reason] ?? 0) + 1
-    if (!lead.archivedAt && lead.status !== "archived") {
-      leadRows.push({
-        id: lead.id,
-        company: lead.companyName ?? "?",
-        org: lead.organizationId ?? "?",
-        reason,
-      })
-    }
-  }
-  console.log("aggregate:", eligibilityCounts)
-  console.table(leadRows.slice(0, 20))
-
-  const blockImaging = leads.find((l) => l.id === BLOCK_IMAGING_LEAD_ID)
-  if (blockImaging) {
-    console.log("\nBlock Imaging detail:", {
-      leadId: blockImaging.id,
-      org: blockImaging.organizationId,
-      admission: resolveLeadAdmissionStateFromMetadata(blockImaging.metadata).state,
-      website: Boolean(blockImaging.website?.trim()),
-      researchFresh: Boolean(
-        blockImaging.lastProspectResearchedAt &&
-          !isProspectResearchStale(blockImaging.lastProspectResearchedAt),
-      ),
-    })
-  } else {
-    console.log("\nBlock Imaging not in lead pool window (250 most recent)")
-  }
-
-  console.log("\n=== Phase 7 — DRQ materialization (Scenario A vs B) ===")
-  const scenarioA = {
-    drqEnabled: isDailyRevenueWorkQueueEnabled(),
-    queueItems: 0,
-    bundlesProduced: 0,
-  }
-  if (isDailyRevenueWorkQueueEnabled()) {
-    const q = await resolveDailyRevenueWorkQueueForLeads({ admin, leads: leads.slice(0, 50) })
-    scenarioA.queueItems = q?.items?.length ?? 0
-  }
-  let bundlesA = 0
-  for (const lead of leads.slice(0, 10)) {
-    try {
-      const b = await resolveLeadCommunicationStrategyBundle(lead, {
-        organizationId: runtimeOrgId ?? aslOrgId,
-        admin,
-      })
-      if (b.bundle) bundlesA += 1
-    } catch {
-      // strategy resolver may fail when native engine disabled
-    }
-  }
-  scenarioA.bundlesProduced = bundlesA
-
-  const prevNative = process.env.GROWTH_NATIVE_DECISION_ENGINE
-  const prevDrq = process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE
-  process.env.GROWTH_NATIVE_DECISION_ENGINE = "true"
-  process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE = "true"
-  const scenarioB: Record<string, unknown> = {
-    drqEnabled: isDailyRevenueWorkQueueEnabled(),
-    queueItems: 0,
-    bundlesProduced: 0,
-  }
-  let bundlesB = 0
-  for (const lead of leads.slice(0, 10)) {
-    try {
-      const b = await resolveLeadCommunicationStrategyBundle(lead, {
-        organizationId: runtimeOrgId ?? aslOrgId,
-        admin,
-      })
-      if (b.bundle) bundlesB += 1
-    } catch (e) {
-      scenarioB.strategyError = e instanceof Error ? e.message : String(e)
-    }
-  }
-  scenarioB.bundlesProduced = bundlesB
-  if (prevNative === undefined) delete process.env.GROWTH_NATIVE_DECISION_ENGINE
-  else process.env.GROWTH_NATIVE_DECISION_ENGINE = prevNative
-  if (prevDrq === undefined) delete process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE
-  else process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE = prevDrq
-
-  console.log(JSON.stringify({ scenarioA_current_production_env: scenarioA, scenarioB_in_memory_override: scenarioB }, null, 2))
-
-  console.log("\n=== Phase 8 — Work Manager replay (Scenario B if A empty) ===")
-  if (aslTrace.workResult) {
-    const items = aslTrace.workResult.all_work_items
-    console.table(
-      items.slice(0, 10).map((i) => ({
-        id: i.id,
-        type: i.type,
-        can_execute: i.can_execute_autonomously,
-        blocked_by: i.blocked_by.join(","),
-        score: i.decision_score,
-      })),
-    )
-  }
-
-  console.log("\n=== Phase 9 — Execution Authority secondary blockers (Scenario B leads) ===")
-  process.env.GROWTH_NATIVE_DECISION_ENGINE = "true"
-  const authorityRows: Array<{ leadId: string; disposition: string; reason: string }> = []
-  for (const lead of leads.filter((l) => l.organizationId === EQUIPIFY_PRODUCTION_ORG_ID).slice(0, 5)) {
-    try {
-      const auth = await evaluateCanonicalExecutionAuthorityForLead(admin, {
-        organizationId: lead.organizationId ?? aslOrgId,
-        leadId: lead.id,
-        actionKind: "persisted_research_run",
-        generatedAt: new Date().toISOString(),
-      })
-      authorityRows.push({
-        leadId: lead.id.slice(0, 8),
-        disposition: auth.disposition,
-        reason: auth.reasonCode,
-      })
-    } catch (e) {
-      authorityRows.push({
-        leadId: lead.id.slice(0, 8),
-        disposition: "error",
-        reason: e instanceof Error ? e.message : String(e),
-      })
-    }
-  }
-  if (prevNative === undefined) delete process.env.GROWTH_NATIVE_DECISION_ENGINE
-  else process.env.GROWTH_NATIVE_DECISION_ENGINE = prevNative
-  console.table(authorityRows)
-
-  console.log("\n=== Phase 10 — Draft Factory tenant ownership ===")
-  const [{ count: dfTotal }, { count: dfEquipify }, { data: dfSample }] = await Promise.all([
-    admin.schema("growth").from("draft_factory_lead_states").select("*", { count: "exact", head: true }),
-    admin
-      .schema("growth")
-      .from("draft_factory_lead_states")
-      .select("*", { count: "exact", head: true })
-      .eq("organization_id", EQUIPIFY_PRODUCTION_ORG_ID),
-    admin
-      .schema("growth")
-      .from("draft_factory_lead_states")
-      .select("organization_id, state, paused_reason")
-      .limit(30),
-  ])
-  const dfByOrg: Record<string, number> = {}
-  for (const row of dfSample ?? []) {
-    const org = String((row as { organization_id: string }).organization_id)
-    dfByOrg[org] = (dfByOrg[org] ?? 0) + 1
-  }
-  console.log(JSON.stringify({ dfTotal, dfEquipify, dfSampleOrgCounts: dfByOrg }, null, 2))
-
-  console.log("\n=== Phase 11 — Objective contribution ===")
-  console.table(
-    latestSchedulerTouch.map((o) => ({
-      id: String(o.id).slice(0, 8),
-      org: String(o.org).slice(0, 8),
-      running: o.running,
-      stage: o.stage,
-      lastScheduler: o.lastScheduler,
-      contributes_to_asl: orgIds.includes(String(o.org)),
-    })),
+  console.log("\n=== Phase 5 — Local ASL dry-run replay (current workspace code) ===")
+  const dryLoop = await inspectAutonomousSalesLoopDryRun(admin, { organizationId: aslOrgId })
+  console.log(
+    JSON.stringify(
+      {
+        stop_reason: dryLoop.stop_reason,
+        selected_work_count: dryLoop.selected_work?.length ?? 0,
+        selected_work_types: dryLoop.selected_work?.map((row) => row.workflow_agent) ?? [],
+        dry_run: dryLoop.dry_run,
+      },
+      null,
+      2,
+    ),
   )
 
-  let verdict: keyof typeof GE_AIOS_LIVE_AUTONOMY_TICK_PROOF_1A_VERDICT =
-    "READY_AFTER_TARGETED_CONFIGURATION"
+  console.log("\n=== Phase 6 — Legacy Home summary comparison (historical only) ===")
+  const legacy = await traceLegacyHomeSummaryComparison(admin)
+  console.log(
+    JSON.stringify(
+      {
+        label: "historical_comparison_not_deployed_asl_path",
+        daily_work_queue_count: legacy.dailyWorkQueueCount,
+        selected_work_id_prefix: legacy.selectedWorkId?.slice(0, 12) ?? null,
+      },
+      null,
+      2,
+    ),
+  )
+
+  const tickHealth = deployedTickProbe?.ok
+    ? deployedTickProbe.snapshot
+    : {
+        ...localTickHealth,
+        organizationResolved:
+          deployedConfig?.organizationConfigured ??
+          localTickHealth.organizationResolved ??
+          portfolioTrace.branchTrace[0]?.status === "executing",
+        portfolioSnapshotBuilt: portfolioTrace.branchTrace[0]?.status === "executing",
+        leadCount: portfolioTrace.leadCount,
+        candidateCount: portfolioTrace.candidateCount,
+        selectedWork: Boolean(portfolioTrace.selectedWorkId),
+        selectedWorkType: portfolioTrace.selectedWorkType,
+        workflowAgent: dryLoop.selected_work?.[0]?.workflow_agent ?? null,
+        wouldExecute:
+          Boolean(portfolioTrace.selectedWorkId) &&
+          (dryLoop.selected_work?.length ?? 0) > 0 &&
+          (localTickHealth.authorityDisposition === "allowed" ||
+            localTickHealth.authorityDisposition == null),
+        outboundEnabled: deployedConfig?.outboundEnabled ?? localTickHealth.outboundEnabled,
+        authorityDisposition: localTickHealth.authorityDisposition,
+        decisionResolved: localTickHealth.decisionResolved,
+        admissionBlocked: localTickHealth.admissionBlocked,
+      }
+
+  let verdict: GrowthAiosAutonomyTickProofVerdict = resolveGrowthAiosAutonomyTickProofVerdict({
+    tickHealth,
+    runtimeCodeDefect: !batchAllPresent,
+    activeLeadCount: tickHealth.leadCount,
+  })
 
   if (!batchAllPresent) {
-    verdict = "BLOCKED_BY_UNDEPLOYED_RUNTIME_BATCH"
-  } else if (runtimeOrgId === null && aslTrace.firstZeroStage?.includes("dailyWorkQueue")) {
-    verdict = "BLOCKED_BY_OBSOLETE_FEATURE_GATE"
-  } else if (
-    aslTrace.firstZeroStage === "synthesizeGrowthHomeExecutiveBriefing.dailyWorkQueue" ||
-    aslTrace.firstZeroStage === "isDailyRevenueWorkQueueEnabled"
-  ) {
-    verdict = "READY_AFTER_TARGETED_CONFIGURATION"
-  } else if (leadRows.length === 0) {
-    verdict = "BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO"
-  } else if (scenarioB.queueItems === 0 && scenarioB.bundlesProduced === 0) {
-    verdict = "BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO"
-  } else if (scenarioB.queueItems > 0 && authorityRows.every((r) => r.disposition === "blocked")) {
-    verdict = "BLOCKED_BY_BROKEN_RUNTIME_BRANCH"
+    verdict = "BLOCKED_BY_RUNTIME_CODE_DEFECT"
   }
 
   console.log("\n=== PRIMARY ANSWER ===")
   console.log(
-    `Why did the latest ASL tick return no_executable_work?\n` +
-      `FIRST BLOCKER: ${aslTrace.firstZeroStage ?? "unknown"} — ${aslTrace.stopReason}\n` +
-      `SECONDARY (after DRQ enabled): admission_review on active leads; empty Equipify DF states; outbound remains disabled`,
+    `Deployed configuration: nativeDecision=${deployedConfig?.nativeDecisionEngineEnabled ?? "unverified"}, DRQ=${deployedConfig?.dailyRevenueWorkQueueEnabled ?? "unverified"}\n` +
+      `Deployed ASL path: portfolio snapshot → Work Manager → ${portfolioTrace.selectedWorkType ?? "none"}\n` +
+      `Authority disposition: ${tickHealth.authorityDisposition ?? "unknown"}\n` +
+      `Would execute (dry-run): ${tickHealth.wouldExecute}\n` +
+      `Legacy Home path (historical): dailyWorkQueue=${legacy.dailyWorkQueueCount}`,
   )
 
   console.log(`\nQA marker: ${GE_AIOS_LIVE_AUTONOMY_TICK_PROOF_1A_QA_MARKER}`)
   console.log(`VERDICT: ${verdict}`)
 
-  if (verdict !== "READY_TO_ACTIVATE_INTERNAL_AUTONOMY") {
-    process.exit(verdict === "BLOCKED_BY_UNDEPLOYED_RUNTIME_BATCH" ? 2 : 1)
+  if (verdict !== "READY_FOR_FIRST_INTERNAL_AUTONOMY_TICK") {
+    process.exit(verdict === "BLOCKED_BY_RUNTIME_CODE_DEFECT" ? 2 : 1)
   }
 }
 
