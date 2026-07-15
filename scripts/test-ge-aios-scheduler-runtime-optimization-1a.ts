@@ -132,7 +132,22 @@ assert.match(
 assert.match(migrationSource, /scheduler_runtime_running/)
 assert.match(migrationSource, /scheduler_wake_at/)
 assert.match(migrationSource, /idx_growth_objectives_scheduler_eligible_wake/)
-console.log("  ✓ Phase 1 — scheduler call graph + indexed eligibility migration")
+assert.doesNotMatch(migrationSource, /generated always as/i)
+assert.match(migrationSource, /before insert or update of runtime_state/i)
+assert.match(migrationSource, /sync_organization_growth_objective_scheduler_eligibility/)
+assert.match(migrationSource, /trg_organization_growth_objectives_sync_scheduler_eligibility/)
+assert.match(migrationSource, /try_parse_runtime_timestamptz/)
+assert.match(migrationSource, /exception\s+when others/)
+assert.match(migrationSource, /runtime_state\s*->>\s*'lastSchedulerAt'/)
+assert.match(migrationSource, /runtime_state\s*->>\s*'lastTickAt'/)
+assert.match(migrationSource, /runtime_state\s*->>\s*'startedAt'/)
+assert.match(migrationSource, /runtime_state\s*->>\s*'running'/)
+assert.match(migrationSource, /update growth\.organization_growth_objectives/)
+assert.match(
+  repoSource,
+  /\.eq\("scheduler_runtime_running", true\)[\s\S]*\.order\("scheduler_wake_at", \{ ascending: true \}\)/,
+)
+console.log("  ✓ Phase 1 — scheduler call graph + trigger-synced eligibility migration")
 
 // Phase 2 — DB-bounded selection contract
 assert.match(repoSource, /scheduler_runtime_running/)

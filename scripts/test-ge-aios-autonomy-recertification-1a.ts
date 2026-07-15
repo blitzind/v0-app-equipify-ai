@@ -488,11 +488,14 @@ const migration = readSource(
   "supabase/migrations/20270722120000_growth_scheduler_runtime_optimization_1a.sql",
 )
 const objectiveRepo = readSource("lib/growth/objectives/growth-objective-repository.ts")
-assert.match(migration, /runtime_state->>'running'/)
-assert.match(migration, /runtime_state->>'lastSchedulerAt'/)
+assert.match(migration, /runtime_state\s*->>\s*'running'/)
+assert.match(migration, /runtime_state\s*->>\s*'lastSchedulerAt'/)
 assert.match(migration, /scheduler_runtime_running/)
 assert.match(migration, /scheduler_wake_at/)
 assert.match(migration, /create index if not exists idx_growth_objectives_scheduler_eligible_wake/)
+assert.doesNotMatch(migration, /generated always as/i)
+assert.match(migration, /sync_organization_growth_objective_scheduler_eligibility/)
+assert.match(migration, /try_parse_runtime_timestamptz/)
 assert.match(objectiveRepo, /schedulerEligibilityColumnsReady/)
 assert.match(objectiveRepo, /scheduler_runtime_running/)
 let migrationReadiness: "ready_to_apply" | "needs_repair" | "no_longer_required" = "ready_to_apply"
