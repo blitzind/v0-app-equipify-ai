@@ -368,6 +368,11 @@ export function resetSchedulerEligibilityColumnProbe(): void {
   schedulerEligibilityColumnsReady = null
 }
 
+/** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — whether indexed scheduler eligibility columns exist. */
+export async function isSchedulerEligibilityMigrationReady(admin: SupabaseClient): Promise<boolean> {
+  return probeSchedulerEligibilityColumns(admin)
+}
+
 /** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — DB-bounded eligible objective fetch for scheduler tick. */
 export async function listEligibleGrowthObjectivesForSchedulerTick(
   admin: SupabaseClient,

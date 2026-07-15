@@ -8,11 +8,17 @@ import assert from "node:assert/strict"
 import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import {
+  classifyBooleanFromDeployedOrLocal,
+  classifySensitiveEnvPresence,
+  classificationBlocksConfiguration,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-config-health-1a-classifiers"
 import { isNativeRevenueDecisionEngineEnabled } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
 import { isDailyRevenueWorkQueueEnabled } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
 import { EQUIPIFY_PRODUCTION_ORG_ID } from "@/lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
+import { fetchDeployedGrowthAiosRuntimeConfigHealth } from "@/lib/growth/qa/growth-aios-runtime-config-health-deployed-probe"
+import { mintGrowthPlatformAdminBearerToken } from "@/lib/growth/qa/growth-platform-admin-bearer-probe"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { GROWTH_AUTONOMOUS_PORTFOLIO_WORK_SNAPSHOT_QA_MARKER } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { GROWTH_AIOS_RUNTIME_CONTEXT_1A_QA_MARKER } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a-types"
@@ -31,6 +37,7 @@ export const GE_AIOS_LIVE_INTERNAL_AUTONOMY_ACTIVATION_1B_VERDICT = {
   BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO: "BLOCKED_BY_EMPTY_OR_INELIGIBLE_PORTFOLIO",
   BLOCKED_BY_RUNTIME_CODE_DEFECT: "BLOCKED_BY_RUNTIME_CODE_DEFECT",
   BLOCKED_BY_CROSS_TENANT_STATE: "BLOCKED_BY_CROSS_TENANT_STATE",
+  CONFIGURATION_UNVERIFIED_FROM_LOCAL_SECRET_CONTEXT: "CONFIGURATION_UNVERIFIED_FROM_LOCAL_SECRET_CONTEXT",
 } as const
 
 const ROOT = process.cwd()
@@ -62,6 +69,23 @@ function batchOnSha(sha: string): boolean {
   })
 }
 
+async function resolveDeployedRuntimeConfigHealth(boot: {
+  url: string
+  jwt: string
+}): Promise<Awaited<ReturnType<typeof fetchDeployedGrowthAiosRuntimeConfigHealth>> | null> {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  if (!anonKey) return null
+
+  const minted = await mintGrowthPlatformAdminBearerToken({
+    supabase_url: boot.url,
+    service_role_key: boot.jwt,
+    anon_key: anonKey,
+  })
+  if (!minted.access_token) return null
+
+  return fetchDeployedGrowthAiosRuntimeConfigHealth({ bearerToken: minted.access_token })
+}
+
 async function main(): Promise<void> {
   console.log("GE-AIOS-LIVE-INTERNAL-AUTONOMY-ACTIVATION-1B\n")
   assert.equal(process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN, "1")
@@ -82,8 +106,51 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const admin = boot.admin
-  const runtimeOrg = getGrowthEngineAiOrgId()
   const killSwitches = await getRuntimeKillSwitchStates(admin)
+  const vercelProductionEnvRun = process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1"
+
+  const deployedHealth = await resolveDeployedRuntimeConfigHealth(boot)
+  const deployedSnapshot = deployedHealth?.ok ? deployedHealth.snapshot : null
+
+  const organizationConfiguredClassification = deployedSnapshot
+    ? deployedSnapshot.organizationConfigured
+      ? "verified_true"
+      : "verified_false"
+    : classifySensitiveEnvPresence("GROWTH_ENGINE_AI_ORG_ID")
+
+  const organizationValidUuidClassification = deployedSnapshot
+    ? deployedSnapshot.organizationValidUuid
+      ? "verified_true"
+      : "verified_false"
+    : organizationConfiguredClassification === "unverified_sensitive_value"
+      ? "unverified_sensitive_value"
+      : organizationConfiguredClassification === "verified_true"
+        ? "verified_true"
+        : organizationConfiguredClassification
+
+  const organizationProfileClassification = deployedSnapshot
+    ? deployedSnapshot.organizationMatchesApprovedBusinessProfile
+      ? "verified_true"
+      : "verified_false"
+    : organizationValidUuidClassification === "unverified_sensitive_value"
+      ? "unverified_sensitive_value"
+      : "not_configured"
+
+  const nativeDecisionClassification = classifyBooleanFromDeployedOrLocal({
+    deployedValue: deployedSnapshot?.nativeDecisionEngineEnabled,
+    localValue: isNativeRevenueDecisionEngineEnabled(),
+    localEnvPresent: process.env.GROWTH_NATIVE_DECISION_ENGINE?.trim() === "true",
+    vercelProductionEnvRun,
+  })
+
+  const drqClassification = classifyBooleanFromDeployedOrLocal({
+    deployedValue: deployedSnapshot?.dailyRevenueWorkQueueEnabled,
+    localValue: isDailyRevenueWorkQueueEnabled(),
+    localEnvPresent:
+      process.env.GROWTH_DAILY_REVENUE_WORK_QUEUE?.trim() === "true" ||
+      process.env.GROWTH_NATIVE_DECISION_ENGINE?.trim() === "true",
+    vercelProductionEnvRun,
+  })
 
   const [{ count: equipifyLeads }, { count: equipifyDf }, { count: legacyDf }] = await Promise.all([
     admin
@@ -112,29 +179,60 @@ async function main(): Promise<void> {
     .eq("status", "completed")
     .gte("completed_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
 
-  let schedulerColumns = false
-  try {
-    const { error } = await admin
-      .schema("growth")
-      .from("organization_growth_objectives")
-      .select("scheduler_wake_at, scheduler_runtime_running")
-      .limit(1)
-    schedulerColumns = !error?.message?.includes("scheduler_wake_at")
-  } catch {
-    schedulerColumns = false
+  const schedulerMigrationReady =
+    deployedSnapshot?.schedulerMigrationReady ??
+    (await (async () => {
+      try {
+        const { error } = await admin
+          .schema("growth")
+          .from("organization_growth_objectives")
+          .select("scheduler_wake_at, scheduler_runtime_running")
+          .limit(1)
+        return !error?.message?.includes("scheduler_wake_at")
+      } catch {
+        return false
+      }
+    })())
+
+  const configurationClassifications = {
+    organization_configured: organizationConfiguredClassification,
+    organization_valid_uuid: organizationValidUuidClassification,
+    organization_matches_approved_business_profile: organizationProfileClassification,
+    native_decision_engine: nativeDecisionClassification,
+    daily_revenue_work_queue: drqClassification,
   }
+
+  const configurationVerifiedFromDeployedRuntime = deployedSnapshot != null
+  const configurationUnverifiedLocally = Object.values(configurationClassifications).some(
+    (value) => value === "unverified_sensitive_value",
+  )
+  const configurationBlockerPresent = [
+    organizationConfiguredClassification,
+    organizationValidUuidClassification,
+    organizationProfileClassification,
+    nativeDecisionClassification,
+  ].some(classificationBlocksConfiguration)
 
   const report = {
     qa_marker: GE_AIOS_LIVE_INTERNAL_AUTONOMY_ACTIVATION_1B_QA_MARKER,
     deployment_sha: sha,
     runtime_batch_on_deployed_sha: batchOnSha(sha),
     local_asl_portfolio_snapshot_path: localPortfolioPath,
-    runtime_org_id: runtimeOrg,
-    documented_org: EQUIPIFY_PRODUCTION_ORG_ID,
-    native_decision_enabled: isNativeRevenueDecisionEngineEnabled(),
-    drq_enabled: isDailyRevenueWorkQueueEnabled(),
-    outbound_disabled: !killSwitches.autonomy_outbound_enabled,
-    scheduler_migration_columns: schedulerColumns,
+    configuration_verified_from_deployed_runtime: configurationVerifiedFromDeployedRuntime,
+    deployed_runtime_config_probe: deployedHealth
+      ? {
+          probed: deployedHealth.probed,
+          ok: deployedHealth.ok,
+          status: deployedHealth.status,
+          error: deployedHealth.ok ? null : deployedHealth.error,
+        }
+      : { probed: false, ok: false, status: null, error: "deployed_probe_unavailable" },
+    configuration_classifications: configurationClassifications,
+    configuration_unverified_from_local_secret_context: configurationUnverifiedLocally,
+    outbound_disabled: deployedSnapshot ? !deployedSnapshot.outboundEnabled : !killSwitches.autonomy_outbound_enabled,
+    scheduler_migration_ready: schedulerMigrationReady,
+    active_objective_count: deployedSnapshot?.activeObjectiveCount ?? null,
+    due_running_objective_count: deployedSnapshot?.dueRunningObjectiveCount ?? null,
     equipify_active_leads: equipifyLeads,
     equipify_draft_factory_states: equipifyDf,
     legacy_org_draft_factory_states: legacyDf,
@@ -153,13 +251,18 @@ async function main(): Promise<void> {
 
   if (!report.runtime_batch_on_deployed_sha) {
     verdict = "BLOCKED_BY_UNDEPLOYED_RUNTIME"
-  } else if (runtimeOrg !== EQUIPIFY_PRODUCTION_ORG_ID) {
+  } else if (configurationUnverifiedLocally && !configurationVerifiedFromDeployedRuntime) {
+    verdict = "CONFIGURATION_UNVERIFIED_FROM_LOCAL_SECRET_CONTEXT"
+  } else if (configurationBlockerPresent) {
     verdict = "BLOCKED_BY_ORGANIZATION_CONFIGURATION"
-  } else if (!isNativeRevenueDecisionEngineEnabled()) {
+  } else if (
+    nativeDecisionClassification === "verified_false" ||
+    drqClassification === "verified_false"
+  ) {
     verdict = "BLOCKED_BY_PORTFOLIO_RANKING_CONFIGURATION"
   } else if ((equipifyLeads ?? 0) < 3) {
     verdict = "READY_AFTER_PORTFOLIO_ADMISSION"
-  } else if ((research24h ?? 0) > 0 && killSwitches.autonomy_outbound_enabled === false) {
+  } else if ((research24h ?? 0) > 0 && report.outbound_disabled) {
     verdict = "INTERNAL_AUTONOMY_ACTIVE"
   } else if ((equipifyLeads ?? 0) >= 3 && (research24h ?? 0) === 0) {
     verdict = "READY_AFTER_PORTFOLIO_ADMISSION"
