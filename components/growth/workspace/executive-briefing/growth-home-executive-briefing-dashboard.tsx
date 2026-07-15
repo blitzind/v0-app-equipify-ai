@@ -50,6 +50,7 @@ import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { GrowthHomeAvaHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-hero-section"
 import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
 import { GrowthHomeAvaWorkSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-work-section"
+import { GrowthHomePortfolioManagerSection } from "@/components/growth/workspace/executive-briefing/growth-home-portfolio-manager-section"
 import { GrowthHomeAvaOperatingRhythmSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section"
 import { GrowthHomeAvaMemorySection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-memory-section"
 import { GrowthHomeBriefingCrossLinks } from "@/components/growth/workspace/executive-briefing/growth-home-briefing-cross-links"
@@ -345,6 +346,11 @@ export function GrowthHomeExecutiveBriefingDashboard({
           aiOsUx={aiOsUx}
           relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
           waitingCompanyByLeadId={waitingCompanyByLeadId}
+        />
+
+        <GrowthHomePortfolioManagerSection
+          portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
+          marketIntelligence={workspaceSummary?.portfolioManager?.marketIntelligence ?? null}
         />
 
         <GrowthHomeAvaWorkSection

@@ -2,7 +2,12 @@
 
 import type { GrowthHomeOrganizationalKnowledgePayload } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import { ORGANIZATIONAL_KNOWLEDGE_CATEGORIES } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
-import { HOME_RUNTIME_EMPTY_MEMORY_MESSAGE } from "@/lib/growth/home/growth-home-runtime-presenter"
+import {
+  filterValidatedInstitutionalLearnings,
+  GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE,
+  GROWTH_INSTITUTIONAL_LEARNING_TRUTHFULNESS_1A_QA_MARKER,
+  GROWTH_INSTITUTIONAL_LEARNING_VALIDATED_LABEL,
+} from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { GrowthTrainingSectionCard } from "@/components/growth/training/growth-training-section-card"
 import { GROWTH_TRAINING_LEARNED_TITLE } from "@/lib/growth/training/growth-training-workspace-types"
 
@@ -23,8 +28,7 @@ const CATEGORY_LABELS: Record<(typeof ORGANIZATIONAL_KNOWLEDGE_CATEGORIES)[numbe
 }
 
 export function GrowthTrainingLearnedSection({ organizationalKnowledge }: Props) {
-  const items =
-    organizationalKnowledge?.store.items.filter((item) => item.active && !item.superseded_by) ?? []
+  const items = filterValidatedInstitutionalLearnings(organizationalKnowledge?.store.items)
 
   const grouped = ORGANIZATIONAL_KNOWLEDGE_CATEGORIES.map((category) => ({
     category,
@@ -35,13 +39,17 @@ export function GrowthTrainingLearnedSection({ organizationalKnowledge }: Props)
   return (
     <GrowthTrainingSectionCard
       title={GROWTH_TRAINING_LEARNED_TITLE}
-      description="What I've learned from outcomes and patterns. Read-only — knowledge is earned, not edited here."
+      description="Validated learnings from your organization's outcomes and approved intelligence. Read-only — knowledge is earned, not edited here."
       qaSection="training-learned"
     >
+      <div data-qa-marker-institutional-learning-1a={GROWTH_INSTITUTIONAL_LEARNING_TRUTHFULNESS_1A_QA_MARKER}>
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{HOME_RUNTIME_EMPTY_MEMORY_MESSAGE}</p>
+        <p className="text-sm text-muted-foreground">{GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE}</p>
       ) : (
         <div className="space-y-5">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {GROWTH_INSTITUTIONAL_LEARNING_VALIDATED_LABEL}
+          </p>
           {grouped.map((group) => (
             <div key={group.category}>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -61,6 +69,7 @@ export function GrowthTrainingLearnedSection({ organizationalKnowledge }: Props)
           ))}
         </div>
       )}
+      </div>
     </GrowthTrainingSectionCard>
   )
 }

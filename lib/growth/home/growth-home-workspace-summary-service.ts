@@ -63,6 +63,8 @@ import {
   buildPortfolioEligibilityContext,
   sanitizeResearchLoopSummaryForPortfolio,
 } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
+import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
+import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
@@ -578,6 +580,33 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       })
     : null
 
+  const approvedBusinessProfile = organizationId
+    ? await withGrowthHomeLoaderBudget({
+        label: "approved_business_profile",
+        budgetMs: loaderBudgetMs,
+        fn: () => getActiveApprovedBusinessProfile(input.admin, organizationId),
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
+    : null
+
+  const portfolioManager =
+    organizationId
+      ? buildGrowthPortfolioManagerSnapshot({
+          organizationId,
+          generatedAt,
+          leads,
+          eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
+          approvedProfile: approvedBusinessProfile?.profile ?? null,
+          organizationalMemory: organizationalMemory?.store ?? null,
+          missionDiscovery,
+          validatedLearnings: organizationalKnowledge?.store.items ?? [],
+          salesOutcomes: salesOutcomes.outcomes,
+        })
+      : null
+
   const durationMs = Date.now() - startedAt
   logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })
 
@@ -744,6 +773,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     canonicalOperatorFocus,
     portfolioLeads: leads,
     eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
+    portfolioManager,
   }
 }
 

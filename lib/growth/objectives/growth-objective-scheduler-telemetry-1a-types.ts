@@ -50,6 +50,8 @@ export type GrowthObjectiveSchedulerTickTelemetry = {
   prospectWaits: number
   draftFactoryAdvances: number
   packagesGenerated: number
+  portfolioReplenishmentsAttempted?: number
+  portfolioReplenishmentsCompleted?: number
   elapsedMs: number
   remainingMsAtStop: number
   stopReason: string | null

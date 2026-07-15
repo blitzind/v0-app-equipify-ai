@@ -72,6 +72,16 @@ export type BusinessProfileSalesMarketingSection = {
   qualificationCriteria: string[]
 }
 
+/** GE-AIOS-AUTONOMOUS-PORTFOLIO-MANAGER-1A — operator portfolio targets (canonical owner: Business Profile). */
+export type BusinessProfilePortfolioManagementSection = {
+  targetActiveCompanies: number
+  minimumHealthyCompanies: number
+  replenishBatchSize: number
+  maximumDailyDiscovery: number
+  maximumConcurrentResearch: number
+  maximumQueuedAdmissions: number
+}
+
 export type BusinessProfileConfidenceSection = {
   score: number
   assumptions: string[]
@@ -89,6 +99,8 @@ export type BusinessProfileDraftContent = {
   canonicalSellerKnowledge?: EquipifyCanonicalSellerKnowledge
   /** GE-AIOS-EQUIPIFY-MASTER-KNOWLEDGE-1A — MCD ingestion metadata (ingestion-only, not runtime SoT). */
   masterKnowledgeIngestion?: EquipifyMasterKnowledgeIngestionMeta
+  /** GE-AIOS-AUTONOMOUS-PORTFOLIO-MANAGER-1A — autonomous portfolio targets for Ava. */
+  portfolioManagement?: BusinessProfilePortfolioManagementSection
   confidence: BusinessProfileConfidenceSection
   draftSource?: BusinessProfileDraftSource
   websiteContextSummary?: string | null

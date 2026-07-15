@@ -145,4 +145,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   /** GE-AIOS-PORTFOLIO-ELIGIBILITY-CLOSURE-1A — bounded lead pool for portfolio eligibility */
   portfolioLeads?: import("@/lib/growth/types").GrowthLead[]
   eligibleLeadCount?: number
+  /** GE-AIOS-AUTONOMOUS-PORTFOLIO-MANAGER-1A — autonomous portfolio health + replenishment projection */
+  portfolioManager?: import("@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types").GrowthPortfolioManagerSnapshot | null
 }

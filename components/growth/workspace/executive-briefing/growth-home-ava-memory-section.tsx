@@ -2,7 +2,11 @@
 
 import Link from "next/link"
 import { ArrowRight, Lightbulb } from "lucide-react"
-import { HOME_RUNTIME_EMPTY_MEMORY_MESSAGE } from "@/lib/growth/home/growth-home-runtime-presenter"
+import {
+  GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE,
+  GROWTH_INSTITUTIONAL_LEARNING_TRUTHFULNESS_1A_QA_MARKER,
+  GROWTH_INSTITUTIONAL_LEARNING_VALIDATED_LABEL,
+} from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { GROWTH_HOME_CLEANUP_19C_2G_QA_MARKER } from "@/lib/growth/home/growth-home-cleanup-19c-2g"
 import { GROWTH_TRAINING_LEARNED_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 import { buildWhatIveLearnedBullets } from "@/lib/growth/memory/bridges/narrative-memory"
@@ -24,6 +28,7 @@ export function GrowthHomeAvaMemorySection({ memorySummary }: Props) {
       data-qa-section="home-ava-memory"
       data-qa-marker-12a={GROWTH_MEMORY_ENGINE_QA_MARKER}
       data-qa-marker-19c-2g={GROWTH_HOME_CLEANUP_19C_2G_QA_MARKER}
+      data-qa-marker-institutional-learning-1a={GROWTH_INSTITUTIONAL_LEARNING_TRUTHFULNESS_1A_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card/60 p-5 shadow-sm"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -42,9 +47,13 @@ export function GrowthHomeAvaMemorySection({ memorySummary }: Props) {
         </Link>
       </div>
       {bullets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{HOME_RUNTIME_EMPTY_MEMORY_MESSAGE}</p>
+        <p className="text-sm text-muted-foreground">{GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE}</p>
       ) : (
-        <ul className="space-y-2">
+        <>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {GROWTH_INSTITUTIONAL_LEARNING_VALIDATED_LABEL}
+          </p>
+          <ul className="space-y-2">
           {bullets.slice(0, 2).map((insight) => (
             <li key={insight} className="flex gap-2 text-sm text-foreground">
               <span className="shrink-0 text-muted-foreground" aria-hidden>
@@ -57,7 +66,8 @@ export function GrowthHomeAvaMemorySection({ memorySummary }: Props) {
               </span>
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
     </section>
   )

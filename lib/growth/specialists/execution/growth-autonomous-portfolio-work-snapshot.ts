@@ -17,6 +17,10 @@ import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sale
 import { fetchGrowthHomeLeadPoolPage } from "@/lib/growth/lead-repository"
 import { fetchOrganizationKnowledgeStore } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { fetchOrganizationMemoryStore } from "@/lib/growth/memory/storage/organization-memory-repository"
+import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
+import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
+import type { GrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import { buildRevenueQueueDashboardSectionsFromLeads } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
@@ -49,6 +53,7 @@ export type GrowthAutonomousPortfolioWorkSnapshot = {
   leadCount: number
   eligibleLeadCount: number
   portfolioLeads: import("@/lib/growth/types").GrowthLead[]
+  portfolioManager: GrowthPortfolioManagerSnapshot | null
   durationMs: number
 }
 
@@ -83,7 +88,7 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
   const eligibleLeads = filterPortfolioEligibleLeads(leads, input.organizationId)
   const revenueQueueSections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
 
-  const [dailyWorkQueueBundle, relationshipSnapshots, avaResearchLoopSummaryRaw, organizationalMemory, organizationalKnowledge] =
+  const [dailyWorkQueueBundle, relationshipSnapshots, avaResearchLoopSummaryRaw, organizationalMemory, organizationalKnowledge, missionDiscovery, approvedProfileRow] =
     await Promise.all([
       fetchDailyRevenueWorkQueueFromLeads(admin, eligibleLeads),
       enrichRelationshipLeadSnapshotsBatch(admin, eligibleLeads),
@@ -96,6 +101,11 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
         organizationId: input.organizationId,
         generatedAt,
       }),
+      loadGrowthHomeMissionDiscoverySnapshot(admin, {
+        organizationId: input.organizationId,
+        leadPool: leadPoolPage.leadPool,
+      }).catch(() => null),
+      getActiveApprovedBusinessProfile(admin, input.organizationId).catch(() => null),
     ])
 
   const avaResearchLoopSummary = sanitizeResearchLoopSummaryForPortfolio(
@@ -133,6 +143,18 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
     pendingApprovals: 0,
   })
 
+  const portfolioManager = buildGrowthPortfolioManagerSnapshot({
+    organizationId: input.organizationId,
+    generatedAt,
+    leads,
+    eligibleLeadCount: portfolioEligibility.eligibleCount,
+    approvedProfile: approvedProfileRow?.profile ?? null,
+    organizationalMemory: organizationalMemory.store,
+    missionDiscovery,
+    validatedLearnings: organizationalKnowledge.store.items,
+    salesOutcomes: salesOutcomes.outcomes,
+  })
+
   const workManagerInput: RunWorkManagerInput = {
     workspaceSummary: {
       kpis,
@@ -156,7 +178,7 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
       },
       dashboard,
       leadPool: leadPoolPage.leadPool,
-      missionDiscovery: null,
+      missionDiscovery,
     },
     waitingOnYou,
     dailyWorkQueue,
@@ -178,6 +200,7 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
     leadCount: leads.length,
     eligibleLeadCount: portfolioEligibility.eligibleCount,
     portfolioLeads: leads,
+    portfolioManager,
     durationMs: Date.now() - startedAt,
   }
 }
