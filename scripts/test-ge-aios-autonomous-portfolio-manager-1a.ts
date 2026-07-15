@@ -29,7 +29,7 @@ import {
   emptyPortfolioManagerMemory,
   recordPortfolioDiscoveryMemory,
 } from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
-import { evaluatePortfolioReplenishmentDecision } from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
+import { evaluatePortfolioReplenishmentDecision, resolveAutonomousPortfolioDiscoveryExecutionPlan } from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
 import {
   defaultPortfolioManagementSection,
   resolvePortfolioTargetFromBusinessProfile,
@@ -114,6 +114,12 @@ assert.match(healthSource, /buildPortfolioHealthReadModel/)
 assert.match(discoverySource, /runProspectSearch/)
 assert.match(discoverySource, /executeBulkPushToLeadInbox/)
 assert.match(discoverySource, /discover_external/)
+const replenishmentSource = readSource("lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a.ts")
+assert.match(discoverySource, /resolveAutonomousPortfolioDiscoveryExecutionPlan/)
+assert.match(discoverySource, /resume_active/)
+assert.match(discoverySource, /active_discovery_still_building/)
+assert.match(discoverySource, /autonomousDiscoveryStopReasonMessage/)
+assert.match(replenishmentSource, /shouldResumeActiveDiscovery/)
 assert.match(schedulerSource, /tickAutonomousPortfolioManagerForScheduler/)
 assert.match(snapshotSource, /buildGrowthPortfolioManagerSnapshot/)
 assert.match(snapshotSource, /loadGrowthHomeMissionDiscoverySnapshot/)
@@ -178,7 +184,27 @@ const duplicateBlocked = evaluatePortfolioReplenishmentDecision({
 })
 assert.equal(duplicateBlocked.shouldReplenish, false)
 assert.equal(duplicateBlocked.duplicateDiscoveryPrevented, true)
-console.log("  ✓ Phase 5 — no duplicate discovery while one is running")
+assert.equal(duplicateBlocked.shouldResumeActiveDiscovery, true)
+assert.equal(duplicateBlocked.resumeBatchSize, DEFAULT_PORTFOLIO_REPLENISH_BATCH_SIZE)
+const resumePlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(duplicateBlocked)
+assert.equal(resumePlan.action, "resume_active")
+assert.equal(resumePlan.batchSize, DEFAULT_PORTFOLIO_REPLENISH_BATCH_SIZE)
+console.log("  ✓ Phase 5 — active DataMoon job resumes via Prospect Search without starting a duplicate")
+
+const healthyWithActiveJob = evaluatePortfolioReplenishmentDecision({
+  target: healthySnapshot.target,
+  health: { ...healthySnapshot.health, discoveryRunning: true },
+  memory: emptyPortfolioManagerMemory(),
+  generatedAt: "2026-07-15T12:00:00.000Z",
+  discoveryAlreadyRunning: true,
+})
+assert.equal(healthyWithActiveJob.shouldReplenish, false)
+assert.equal(healthyWithActiveJob.shouldResumeActiveDiscovery, true)
+assert.equal(
+  resolveAutonomousPortfolioDiscoveryExecutionPlan(healthyWithActiveJob).action,
+  "resume_active",
+)
+console.log("  ✓ Phase 5b — healthy portfolio still resumes orphaned active DataMoon jobs")
 
 const profile = approvedProfileFixture()
 const query = buildProspectSearchQueryFromBusinessProfile(profile, "Equipify")

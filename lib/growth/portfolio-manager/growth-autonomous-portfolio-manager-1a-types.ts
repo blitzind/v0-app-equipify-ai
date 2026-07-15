@@ -75,13 +75,30 @@ export type GrowthPortfolioManagerMemory = {
 export type GrowthPortfolioReplenishmentDecision = {
   qaMarker: typeof GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER
   shouldReplenish: boolean
+  /** When true, an active DataMoon job exists and must be polled via Prospect Search — not restarted. */
+  shouldResumeActiveDiscovery: boolean
   batchSize: number
+  /** Batch size used when resuming an active DataMoon job (may differ when portfolio is healthy). */
+  resumeBatchSize: number
   reason: string | null
   blockedByDailyLimit: boolean
   blockedByQueueLimit: boolean
   blockedByResearchLimit: boolean
   duplicateDiscoveryPrevented: boolean
 }
+
+export type AutonomousPortfolioDiscoveryExecutionAction =
+  | "skip"
+  | "start_new"
+  | "resume_active"
+
+export type AutonomousPortfolioDiscoveryDisposition =
+  | "discovery_skipped"
+  | "new_discovery_started"
+  | "active_discovery_polled"
+  | "active_discovery_still_building"
+  | "active_discovery_completed"
+  | "active_discovery_failed"
 
 export type GrowthPortfolioManagerOperatorProjection = {
   qaMarker: typeof GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER

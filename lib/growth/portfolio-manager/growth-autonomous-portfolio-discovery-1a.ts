@@ -12,6 +12,8 @@ import {
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+  type AutonomousPortfolioDiscoveryDisposition,
+  type AutonomousPortfolioDiscoveryExecutionAction,
   type GrowthPortfolioReplenishmentDecision,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import { upsertOrganizationMemoryPreferences } from "@/lib/growth/memory/storage/organization-memory-repository"
@@ -19,6 +21,11 @@ import { executeBulkPushToLeadInbox } from "@/lib/growth/prospect-search/prospec
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthPortfolioManagerMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+import {
+  autonomousDiscoveryStopReasonMessage,
+  type DatamoonAutonomousDiscoveryStopReason,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
+import { resolveAutonomousPortfolioDiscoveryExecutionPlan } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
 
 export type AutonomousPortfolioDiscoveryTickResult = {
   qaMarker: typeof GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER
@@ -30,9 +37,152 @@ export type AutonomousPortfolioDiscoveryTickResult = {
   alreadyExists: number
   suppressed: number
   failed: number
+  disposition?: AutonomousPortfolioDiscoveryDisposition
+  executionAction?: AutonomousPortfolioDiscoveryExecutionAction
   datamoonJobActive?: boolean
   datamoonJobCreated?: boolean
+  datamoonJobReused?: boolean
   datamoonStopReason?: string | null
+  datamoonRunId?: string | null
+  datamoonRawCompanyCount?: number
+  datamoonNormalizedCompanyCount?: number
+  datamoonFilteredCompanyCount?: number
+}
+
+type DatamoonPortfolioSearchSignals = {
+  datamoonJobActive: boolean
+  datamoonJobCreated: boolean
+  datamoonJobReused: boolean
+  datamoonStopReason: string | null
+  datamoonRunId: string | null
+  datamoonRawCompanyCount: number
+  datamoonNormalizedCompanyCount: number
+  providerStatusMessage: string | null
+}
+
+function readDatamoonPortfolioSearchSignals(search: {
+  datamoon_autonomous_discovery_job_active?: boolean
+  datamoon_autonomous_discovery_job_created?: boolean
+  datamoon_autonomous_discovery_job_reused?: boolean
+  datamoon_autonomous_discovery_stop_reason?: string | null
+  datamoon_autonomous_discovery_run_id?: string | null
+  datamoon_autonomous_discovery_raw_company_count?: number
+  datamoon_autonomous_discovery_normalized_company_count?: number
+  provider_status_message?: string | null
+}): DatamoonPortfolioSearchSignals {
+  return {
+    datamoonJobActive: search.datamoon_autonomous_discovery_job_active === true,
+    datamoonJobCreated: search.datamoon_autonomous_discovery_job_created === true,
+    datamoonJobReused: search.datamoon_autonomous_discovery_job_reused === true,
+    datamoonStopReason: search.datamoon_autonomous_discovery_stop_reason ?? null,
+    datamoonRunId: search.datamoon_autonomous_discovery_run_id ?? null,
+    datamoonRawCompanyCount: search.datamoon_autonomous_discovery_raw_company_count ?? 0,
+    datamoonNormalizedCompanyCount:
+      search.datamoon_autonomous_discovery_normalized_company_count ?? 0,
+    providerStatusMessage: search.provider_status_message ?? null,
+  }
+}
+
+function resolvePortfolioDiscoveryDisposition(input: {
+  executionAction: AutonomousPortfolioDiscoveryExecutionAction
+  datamoon: DatamoonPortfolioSearchSignals
+  searched: number
+  pushed: number
+}): AutonomousPortfolioDiscoveryDisposition {
+  if (input.datamoon.datamoonStopReason === "datamoon_job_failed") {
+    return "active_discovery_failed"
+  }
+
+  if (input.datamoon.datamoonJobActive) {
+    return input.executionAction === "resume_active"
+      ? "active_discovery_still_building"
+      : "new_discovery_started"
+  }
+
+  if (input.pushed > 0 || input.searched > 0) {
+    return "active_discovery_completed"
+  }
+
+  if (input.executionAction === "resume_active" && input.datamoon.datamoonJobReused) {
+    return "active_discovery_polled"
+  }
+
+  if (input.executionAction === "start_new" && input.datamoon.datamoonJobCreated) {
+    return "new_discovery_started"
+  }
+
+  if (input.datamoon.datamoonStopReason != null) {
+    return "discovery_skipped"
+  }
+
+  return "discovery_skipped"
+}
+
+function buildPortfolioDiscoverySkippedReason(input: {
+  datamoonStopReason: string | null
+  providerStatusMessage: string | null
+  datamoonJobActive: boolean
+}): string {
+  if (input.datamoonStopReason) {
+    return autonomousDiscoveryStopReasonMessage(
+      input.datamoonStopReason as DatamoonAutonomousDiscoveryStopReason,
+    )
+  }
+
+  if (input.datamoonJobActive) {
+    return "DataMoon discovery job active — awaiting provider results."
+  }
+
+  if (input.providerStatusMessage?.trim()) {
+    return input.providerStatusMessage.trim()
+  }
+
+  return "No matching companies returned from Prospect Search."
+}
+
+function buildPortfolioDiscoveryTickResult(input: {
+  organizationId: string
+  ran: boolean
+  skippedReason: string | null
+  searched: number
+  pushed: number
+  alreadyExists: number
+  suppressed: number
+  failed: number
+  executionAction: AutonomousPortfolioDiscoveryExecutionAction
+  datamoon: DatamoonPortfolioSearchSignals
+  filteredCompanyCount?: number
+}): AutonomousPortfolioDiscoveryTickResult {
+  const disposition = input.ran
+    ? resolvePortfolioDiscoveryDisposition({
+        executionAction: input.executionAction,
+        datamoon: input.datamoon,
+        searched: input.searched,
+        pushed: input.pushed,
+      })
+    : "discovery_skipped"
+
+  return {
+    qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+    organizationId: input.organizationId,
+    ran: input.ran,
+    skippedReason: input.skippedReason,
+    searched: input.searched,
+    pushed: input.pushed,
+    alreadyExists: input.alreadyExists,
+    suppressed: input.suppressed,
+    failed: input.failed,
+    disposition,
+    executionAction: input.executionAction,
+    datamoonJobActive: input.datamoon.datamoonJobActive,
+    datamoonJobCreated: input.datamoon.datamoonJobCreated,
+    datamoonJobReused: input.datamoon.datamoonJobReused,
+    datamoonStopReason: input.datamoon.datamoonStopReason,
+    datamoonRunId: input.datamoon.datamoonRunId,
+    datamoonRawCompanyCount: input.datamoon.datamoonRawCompanyCount,
+    datamoonNormalizedCompanyCount: input.datamoon.datamoonNormalizedCompanyCount,
+    datamoonFilteredCompanyCount: input.filteredCompanyCount ?? 0,
+  }
 }
 
 export function buildProspectSearchQueryFromBusinessProfile(
@@ -79,9 +229,11 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     memory: GrowthPortfolioManagerMemory
     createdBy?: string | null
     maximumDailyDiscovery?: number
+    executionAction?: AutonomousPortfolioDiscoveryExecutionAction
   },
 ): Promise<AutonomousPortfolioDiscoveryTickResult> {
   const batchSize = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
+  const executionAction = input.executionAction ?? "start_new"
   const query = buildProspectSearchQueryFromBusinessProfile(input.approvedProfile, input.companyName)
   const filters = buildProspectSearchFiltersFromBusinessProfile(input.approvedProfile)
 
@@ -102,27 +254,21 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     created_by: input.createdBy ?? null,
   })
 
-  const datamoonJobActive =
-    (search as { datamoon_autonomous_discovery_job_active?: boolean }).datamoon_autonomous_discovery_job_active ===
-    true
-  const datamoonStopReason =
-    (search as { datamoon_autonomous_discovery_stop_reason?: string | null })
-      .datamoon_autonomous_discovery_stop_reason ?? null
+  const datamoon = readDatamoonPortfolioSearchSignals(search)
 
-  if (datamoonJobActive) {
-    return {
-      qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+  if (datamoon.datamoonJobActive) {
+    return buildPortfolioDiscoveryTickResult({
       organizationId: input.organizationId,
       ran: true,
-      skippedReason: "DataMoon discovery job active — awaiting provider results.",
+      skippedReason: buildPortfolioDiscoverySkippedReason(datamoon),
       searched: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
-      datamoonJobActive: true,
-      datamoonStopReason,
-    }
+      executionAction,
+      datamoon,
+    })
   }
 
   const selected = search.companies.slice(0, batchSize).map((company) => ({
@@ -132,17 +278,19 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   }))
 
   if (selected.length === 0) {
-    return {
-      qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+    return buildPortfolioDiscoveryTickResult({
       organizationId: input.organizationId,
       ran: true,
-      skippedReason: "No matching companies returned from Prospect Search.",
+      skippedReason: buildPortfolioDiscoverySkippedReason(datamoon),
       searched: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
-    }
+      executionAction,
+      datamoon,
+      filteredCompanyCount: search.total_companies ?? 0,
+    })
   }
 
   const push = await executeBulkPushToLeadInbox(admin, {
@@ -178,13 +326,20 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     qa_marker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     organization_id: input.organizationId,
     batch_size: batchSize,
+    execution_action: executionAction,
+    disposition: resolvePortfolioDiscoveryDisposition({
+      executionAction,
+      datamoon,
+      searched: selected.length,
+      pushed: push.pushed,
+    }),
+    datamoon_run_id: datamoon.datamoonRunId,
     searched: selected.length,
     pushed: push.pushed,
     already_exists: push.already_exists,
   })
 
-  return {
-    qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+  return buildPortfolioDiscoveryTickResult({
     organizationId: input.organizationId,
     ran: true,
     skippedReason: null,
@@ -193,7 +348,10 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     alreadyExists: push.already_exists,
     suppressed: push.suppressed,
     failed: push.failed,
-  }
+    executionAction,
+    datamoon,
+    filteredCompanyCount: search.total_companies ?? selected.length,
+  })
 }
 
 export async function tickAutonomousPortfolioDiscoveryReplenishment(
@@ -220,20 +378,25 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      disposition: "discovery_skipped",
+      executionAction: "skip",
     }
   }
 
-  if (!input.replenishment.shouldReplenish || input.replenishment.batchSize <= 0) {
+  const executionPlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(input.replenishment)
+  if (executionPlan.action === "skip") {
     return {
       qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
       organizationId: input.organizationId,
       ran: false,
-      skippedReason: input.replenishment.reason,
+      skippedReason: executionPlan.reason,
       searched: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      disposition: "discovery_skipped",
+      executionAction: "skip",
     }
   }
 
@@ -241,10 +404,11 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
     organizationId: input.organizationId,
     approvedProfile: input.approvedProfile,
     companyName: input.companyName,
-    batchSize: input.replenishment.batchSize,
+    batchSize: executionPlan.batchSize,
     generatedAt: input.generatedAt,
     memory: input.memory,
     createdBy: input.createdBy,
     maximumDailyDiscovery: input.maximumDailyDiscovery,
+    executionAction: executionPlan.action,
   })
 }

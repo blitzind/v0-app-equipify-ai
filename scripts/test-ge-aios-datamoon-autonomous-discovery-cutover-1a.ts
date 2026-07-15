@@ -16,6 +16,14 @@ import {
 import { buildDatamoonAutonomousDiscoveryOperatorState } from "../lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-operator-1a"
 import { GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER } from "../lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { defaultPortfolioManagementSection } from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-target-1a"
+import {
+  evaluatePortfolioReplenishmentDecision,
+  resolveAutonomousPortfolioDiscoveryExecutionPlan,
+} from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
+import {
+  buildGrowthPortfolioManagerSnapshot,
+} from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
+import { emptyPortfolioManagerMemory } from "../lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
 import type { BusinessProfileDraftContent } from "../lib/growth/business-profile/business-profile-types"
 
 const ROOT = process.cwd()
@@ -73,12 +81,21 @@ const operatorProjectionSource = readSource(
   "lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a.ts",
 )
 
+const replenishmentSource = readSource("lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a.ts")
+
 assert.match(discoverySource, /discovery_authority:\s*"autonomous_portfolio"/)
 assert.match(discoverySource, /runProspectSearch/)
 assert.match(discoverySource, /executeBulkPushToLeadInbox/)
 assert.doesNotMatch(discoverySource, /startDatamoonAudienceImportRun/)
 assert.doesNotMatch(discoverySource, /importDatamoonAudiencePreviewRecords/)
 console.log("  ✓ Phase 1 — Portfolio Manager routes through Prospect Search only")
+
+assert.match(discoverySource, /resolveAutonomousPortfolioDiscoveryExecutionPlan/)
+assert.match(discoverySource, /resume_active/)
+assert.match(discoverySource, /active_discovery_completed/)
+assert.match(discoverySource, /autonomousDiscoveryStopReasonMessage/)
+assert.match(replenishmentSource, /shouldResumeActiveDiscovery/)
+console.log("  ✓ Phase 1b — portfolio resume eligibility separated from new-job creation")
 
 assert.match(repositorySource, /runProspectSearchDatamoonAutonomousDiscovery/)
 assert.match(repositorySource, /isAutonomousProspectDiscoveryAuthority/)
@@ -128,7 +145,12 @@ console.log("  ✓ Phase 6 — Business Profile → DataMoon request projection"
 assert.match(datamoonDiscoverySource, /findActiveAutonomousProspectSearchDatamoonRun/)
 assert.match(datamoonDiscoverySource, /pollDatamoonAudienceImportRun/)
 assert.match(datamoonDiscoverySource, /datamoon_request_active/)
-console.log("  ✓ Phase 7 — async job lifecycle with dedupe and bounded poll")
+assert.match(datamoonDiscoverySource, /startDatamoonAudienceImportRun/)
+assert.doesNotMatch(
+  readSource("lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a.ts"),
+  /pollDatamoonAudienceImportRun/,
+)
+console.log("  ✓ Phase 7 — async job lifecycle polls only through Prospect Search")
 
 const idleOperator = buildDatamoonAutonomousDiscoveryOperatorState({
   policy: evaluateAutonomousProspectDiscoveryProviderPolicy({
@@ -190,6 +212,75 @@ for (const name of requiredEnvNames) {
 }
 console.log("  ✓ Phase 12 — required Vercel variable names documented in config module")
 
+const deficientSnapshot = buildGrowthPortfolioManagerSnapshot({
+  organizationId: ORG,
+  generatedAt: "2026-07-15T12:00:00.000Z",
+  leads: [],
+  eligibleLeadCount: 1,
+  approvedProfile: approvedProfileFixture(),
+  missionDiscovery: null,
+})
+const startNewPlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(deficientSnapshot.replenishment)
+assert.equal(startNewPlan.action, "start_new")
+assert.ok(startNewPlan.batchSize > 0)
+console.log("  ✓ Phase 14A — deficient portfolio starts one DataMoon job via Prospect Search")
+
+const activeBuildingPlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(
+  evaluatePortfolioReplenishmentDecision({
+    target: deficientSnapshot.target,
+    health: deficientSnapshot.health,
+    memory: emptyPortfolioManagerMemory(),
+    generatedAt: "2026-07-15T12:00:00.000Z",
+    discoveryAlreadyRunning: true,
+  }),
+)
+assert.equal(activeBuildingPlan.action, "resume_active")
+assert.match(
+  datamoonDiscoverySource,
+  /findActiveAutonomousProspectSearchDatamoonRun[\s\S]*pollDatamoonAudienceImportRun/,
+)
+console.log("  ✓ Phase 14B — active building job resumes through Prospect Search without duplicate creation")
+
+assert.match(discoverySource, /executeBulkPushToLeadInbox/)
+assert.match(discoverySource, /active_discovery_completed/)
+assert.doesNotMatch(discoverySource, /growth\.leads/)
+console.log("  ✓ Phase 14C — completed poll continues through intake without direct lead insert")
+
+assert.match(discoverySource, /active_discovery_failed/)
+assert.match(discoverySource, /datamoon_job_failed/)
+console.log("  ✓ Phase 14D — failed active job surfaces canonical failure disposition")
+
+const healthySnapshot = buildGrowthPortfolioManagerSnapshot({
+  organizationId: ORG,
+  generatedAt: "2026-07-15T12:00:00.000Z",
+  leads: Array.from({ length: 50 }, (_, index) => ({
+    id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  })) as never,
+  eligibleLeadCount: 50,
+  approvedProfile: approvedProfileFixture(),
+  missionDiscovery: null,
+})
+const healthyActivePlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(
+  evaluatePortfolioReplenishmentDecision({
+    target: healthySnapshot.target,
+    health: { ...healthySnapshot.health, discoveryRunning: true },
+    memory: emptyPortfolioManagerMemory(),
+    generatedAt: "2026-07-15T12:00:00.000Z",
+    discoveryAlreadyRunning: true,
+  }),
+)
+assert.equal(healthyActivePlan.action, "resume_active")
+console.log("  ✓ Phase 14E — healthy portfolio still polls orphaned active jobs to terminal state")
+
+assert.match(datamoonDiscoverySource, /if \(activeRun && !input\.readOnlyProof\)/)
+assert.match(datamoonDiscoverySource, /const started = await startDatamoonAudienceImportRun/)
+assert.ok(
+  datamoonDiscoverySource.indexOf("findActiveAutonomousProspectSearchDatamoonRun") <
+    datamoonDiscoverySource.indexOf("startDatamoonAudienceImportRun"),
+)
+assert.match(repositorySource, /datamoon_autonomous_discovery_job_reused/)
+console.log("  ✓ Phase 14F — active-run guard precedes new job creation; reuse telemetry exposed")
+
 function isGitTracked(relativePath: string): boolean {
   try {
     execSync(`git ls-files --error-unmatch ${JSON.stringify(relativePath)}`, {
@@ -250,7 +341,7 @@ for (const mod of [...requiredModules].sort()) {
 
 assert.deepEqual(
   untrackedCutoverModules,
-  ["lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a.ts"],
+  [],
   "unexpected untracked DataMoon cutover modules — stage all cutover dependencies before deploy",
 )
 console.log("  ✓ Phase 13 — dependency closure: all prospect-search-datamoon imports exist locally")

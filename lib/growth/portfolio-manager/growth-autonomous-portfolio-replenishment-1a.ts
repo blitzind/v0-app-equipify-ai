@@ -2,6 +2,7 @@
 
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+  type AutonomousPortfolioDiscoveryExecutionAction,
   type GrowthPortfolioHealthReadModel,
   type GrowthPortfolioManagerMemory,
   type GrowthPortfolioReplenishmentDecision,
@@ -46,15 +47,22 @@ export function evaluatePortfolioReplenishmentDecision(input: {
 
   const rawBatch = need > 0 ? Math.min(input.target.replenishBatchSize, need) : 0
   const remainingDaily = Math.max(0, input.target.maximumDailyDiscovery - discoveriesToday)
-  const batchSize = Math.min(rawBatch, remainingDaily)
+  const plannedBatchSize = rawBatch > 0 ? Math.min(rawBatch, remainingDaily) : 0
 
   const shouldReplenish =
     shouldPortfolioManagerTriggerDiscovery(input.health) &&
-    batchSize > 0 &&
+    plannedBatchSize > 0 &&
     !blockedByDailyLimit &&
     !blockedByQueueLimit &&
     !blockedByResearchLimit &&
     !duplicateDiscoveryPrevented
+
+  const shouldResumeActiveDiscovery = duplicateDiscoveryPrevented
+  const resumeBatchSize = shouldResumeActiveDiscovery
+    ? plannedBatchSize > 0
+      ? plannedBatchSize
+      : Math.min(input.target.replenishBatchSize, remainingDaily || input.target.replenishBatchSize)
+    : 0
 
   let reason: string | null = null
   if (!input.health.approvedProfilePresent) {
@@ -70,17 +78,51 @@ export function evaluatePortfolioReplenishmentDecision(input: {
   } else if (blockedByResearchLimit) {
     reason = "Research concurrency limit reached."
   } else if (shouldReplenish) {
-    reason = `Replenish ${batchSize} companies toward target of ${input.target.targetActiveCompanies}.`
+    reason = `Replenish ${plannedBatchSize} companies toward target of ${input.target.targetActiveCompanies}.`
+  } else if (shouldResumeActiveDiscovery) {
+    reason = "Resume active DataMoon discovery job."
   }
 
   return {
     qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     shouldReplenish,
-    batchSize: shouldReplenish ? batchSize : 0,
+    shouldResumeActiveDiscovery,
+    batchSize: shouldReplenish ? plannedBatchSize : 0,
+    resumeBatchSize,
     reason,
     blockedByDailyLimit,
     blockedByQueueLimit,
     blockedByResearchLimit,
     duplicateDiscoveryPrevented,
+  }
+}
+
+export function resolveAutonomousPortfolioDiscoveryExecutionPlan(
+  replenishment: GrowthPortfolioReplenishmentDecision,
+): {
+  action: AutonomousPortfolioDiscoveryExecutionAction
+  batchSize: number
+  reason: string | null
+} {
+  if (replenishment.shouldResumeActiveDiscovery && replenishment.resumeBatchSize > 0) {
+    return {
+      action: "resume_active",
+      batchSize: replenishment.resumeBatchSize,
+      reason: replenishment.reason,
+    }
+  }
+
+  if (replenishment.shouldReplenish && replenishment.batchSize > 0) {
+    return {
+      action: "start_new",
+      batchSize: replenishment.batchSize,
+      reason: replenishment.reason,
+    }
+  }
+
+  return {
+    action: "skip",
+    batchSize: 0,
+    reason: replenishment.reason,
   }
 }

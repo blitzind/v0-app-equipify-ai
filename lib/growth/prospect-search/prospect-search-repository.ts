@@ -276,7 +276,11 @@ export async function runProspectSearch(
           datamoon_autonomous_discovery_qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
           datamoon_autonomous_discovery_run_id: datamoonDiscovery.runId,
           datamoon_autonomous_discovery_job_active: datamoonDiscovery.jobActive,
+          datamoon_autonomous_discovery_job_created: datamoonDiscovery.jobCreated,
+          datamoon_autonomous_discovery_job_reused: datamoonDiscovery.jobReused,
           datamoon_autonomous_discovery_stop_reason: datamoonDiscovery.stopReason,
+          datamoon_autonomous_discovery_raw_company_count: datamoonDiscovery.rawCompanyCount,
+          datamoon_autonomous_discovery_normalized_company_count: datamoonDiscovery.normalizedCompanyCount,
           discovery_hydration: {
             qa_marker: contact_first_hydration.qa_marker,
             hydration_complete: contact_first_hydration.hydration_complete,
