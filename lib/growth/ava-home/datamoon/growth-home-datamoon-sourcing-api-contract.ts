@@ -105,6 +105,12 @@ export const growthHomeDatamoonBusinessProfileMissingCopy = (teammate: AiTeammat
   `${teammate.name} needs a Growth Profile before ${teammate.subjectPronoun.toLowerCase()} can search accurately.`
 export const growthHomeDatamoonProfileIncompleteCopy = (teammate: AiTeammatePresentation) =>
   `${teammate.name} needs a few more Growth Profile details before ${teammate.subjectPronoun.toLowerCase()} can run an accurate search.`
+/** @deprecated Use growthHomeDatamoonBusinessProfileMissingCopy with the resolved teammate. */
+export const GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY =
+  "Ava needs a Growth Profile before she can search accurately." as const
+/** @deprecated Use growthHomeDatamoonProfileIncompleteCopy with the resolved teammate. */
+export const GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY =
+  "Ava needs a few more Growth Profile details before she can run an accurate search." as const
 export const GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL = "Update Growth Profile" as const
 export const GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL = "Continue Manually" as const
 export const GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR = '[data-qa-section="home-business-profile"]' as const

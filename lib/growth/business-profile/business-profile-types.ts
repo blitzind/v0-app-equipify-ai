@@ -43,8 +43,15 @@ export type BusinessProfileCompanySection = {
   primaryValueProposition: string
 }
 
+export type BusinessProfileSupportedServiceVerticalRef = {
+  id: string
+  label: string
+}
+
 export type BusinessProfileIdealCustomersSection = {
   targetIndustries: string[]
+  /** GE-AIOS-SUPPORTED-SERVICE-VERTICALS-PROJECTION-1B — optional explicit vertical refs (profile_json SoT). */
+  supportedServiceVerticals?: BusinessProfileSupportedServiceVerticalRef[]
   companySizeRanges: string[]
   geography: string[]
   buyerPersonas: string[]

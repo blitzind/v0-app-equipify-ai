@@ -4,8 +4,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
-import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
 import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
+import {
+  buildProspectSearchFiltersFromBusinessProfile,
+  buildProspectSearchQueryFromBusinessProfile,
+} from "@/lib/growth/business-profile/business-profile-prospect-search-projection-1b"
 import {
   portfolioManagerMemoryPreferencePayload,
   recordPortfolioDiscoveryMemory,
@@ -19,7 +22,6 @@ import {
 import { upsertOrganizationMemoryPreferences } from "@/lib/growth/memory/storage/organization-memory-repository"
 import { executeBulkPushToLeadInbox } from "@/lib/growth/prospect-search/prospect-search-push-to-inbox"
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
-import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthPortfolioManagerMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import {
   autonomousDiscoveryStopReasonMessage,
@@ -185,38 +187,10 @@ function buildPortfolioDiscoveryTickResult(input: {
   }
 }
 
-export function buildProspectSearchQueryFromBusinessProfile(
-  profile: BusinessProfileDraftContent,
-  companyName?: string | null,
-): string {
-  const projection = projectApprovedBusinessProfileToLeadDiscovery(profile, companyName)
-  const industry = projection.industries[0] ?? projection.topics[0] ?? "companies"
-  const geo = projection.geography.state
-    ? `${projection.geography.state} United States`
-    : "United States"
-  return `Find ${industry} companies in ${geo}`
-}
-
-export function buildProspectSearchFiltersFromBusinessProfile(
-  profile: BusinessProfileDraftContent,
-): GrowthProspectSearchFilters {
-  const projection = projectApprovedBusinessProfileToLeadDiscovery(profile)
-  const persona = projection.buyerPersonas[0] ?? projection.jobTitles[0] ?? null
-  return {
-    industry: projection.industries[0] ?? null,
-    location: projection.geography.state ?? projection.geography.country ?? null,
-    keywords: projection.keywords.slice(0, 8),
-    naics_codes: profile.idealCustomers.preferredNaicsCodes ?? [],
-    excluded_naics_codes: profile.idealCustomers.excludedNaicsCodes ?? [],
-    sic_codes: profile.idealCustomers.preferredSicCodes ?? [],
-    excluded_sic_codes: profile.idealCustomers.excludedSicCodes ?? [],
-    decision_maker_role: persona,
-    title_contains: persona,
-    employee_size_bands: undefined,
-    suppression_mode: "hide_suppressed",
-    existing_account_mode: "exclude_existing",
-  }
-}
+export {
+  buildProspectSearchFiltersFromBusinessProfile,
+  buildProspectSearchQueryFromBusinessProfile,
+} from "@/lib/growth/business-profile/business-profile-prospect-search-projection-1b"
 
 export async function runAutonomousPortfolioDiscoveryBatch(
   admin: SupabaseClient,

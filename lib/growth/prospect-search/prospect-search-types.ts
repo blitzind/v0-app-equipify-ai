@@ -200,6 +200,14 @@ export type GrowthProspectSearchFilters = {
   prioritization_tiers?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchPrioritizationTier[]
   /** Phase 7.PS-D — research completeness filter (post-hydration). */
   research_completeness?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchResearchCompleteness[]
+  /** GE-AIOS-SUPPORTED-SERVICE-VERTICALS-PROJECTION-1B — approved vertical IDs from Business Profile projection. */
+  supported_service_vertical_ids?: string[]
+  /** GE-AIOS-SUPPORTED-SERVICE-VERTICALS-PROJECTION-1B — OR-match industry aliases (replaces single-industry collapse). */
+  industry_aliases?: string[]
+  /** GE-AIOS-SUPPORTED-SERVICE-VERTICALS-PROJECTION-1B — admission-aligned qualification criteria (metadata for ICP). */
+  qualification_criteria?: string[]
+  /** GE-AIOS-SUPPORTED-SERVICE-VERTICALS-PROJECTION-1B — operational evidence requirements from approved profile. */
+  operational_evidence_requirements?: string[]
 }
 
 export type GrowthProspectSearchParsedQuery = {

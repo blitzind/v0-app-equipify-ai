@@ -87,8 +87,16 @@ export function buildLeadDiscoveryPresetOptions(
   }
 
   const topicPresets = Array.from(
-    new Set([...projection.industries, ...projection.topics].map((v) => v.trim()).filter(Boolean)),
-  ).slice(0, 8)
+    new Set(
+      [
+        ...projection.supportedServiceVerticals.map((vertical) => vertical.label),
+        ...projection.industryAliases,
+        ...projection.topics,
+      ]
+        .map((v) => v.trim())
+        .filter(Boolean),
+    ),
+  )
 
   const jobTitlePresets = Array.from(
     new Set(
@@ -111,7 +119,7 @@ export function buildAudienceDraftFromLeadDiscoveryProjection(
 ): AvaDatamoonAudienceDraft {
   return createMinimalAvaDatamoonAudienceDraft({
     audienceName: projection.audienceNameSuggestion,
-    topics: projection.topics.length > 0 ? projection.topics : projection.industries.slice(0, 3),
+    topics: projection.topics.length > 0 ? projection.topics : projection.industryAliases,
     jobTitles: projection.jobTitles,
     geography: projection.geography,
     companySize: projection.companySize,
@@ -137,7 +145,7 @@ export function buildAvaLedSearchNarrative(input: {
   const industries =
     input.draft.topics.length > 0
       ? input.draft.topics.join(", ")
-      : "companies that match your Growth Profile"
+      : "companies that match your supported service verticals"
   const roles =
     input.draft.jobTitles.length > 0
       ? input.draft.jobTitles.join(", ")
@@ -148,7 +156,7 @@ export function buildAvaLedSearchNarrative(input: {
 
   return (
     `I'll look for companies that match your Growth Profile:\n` +
-    `• Target industries: ${industries}\n` +
+    `• Supported service verticals: ${industries}\n` +
     `• Buyer roles: ${roles}\n` +
     `• Geography: ${formatGeographyLabel(input.draft.geography)}\n` +
     `• Company size: ${formatCompanySizeLabel(input.draft.companySize)}` +
@@ -164,11 +172,11 @@ export function buildLeadDiscoveryExplainability(input: {
   const lines: LeadDiscoveryExplainabilityLine[] = []
 
   if (input.projection) {
-    if (input.projection.industries.length > 0 || input.projection.topics.length > 0) {
+    if (input.projection.supportedServiceVerticals.length > 0 || input.projection.topics.length > 0) {
       lines.push({
         id: "industries",
-        label: "Industries & topics",
-        detail: "These come from your Growth Profile target industries and keywords.",
+        label: "Supported service verticals",
+        detail: "These come from your Growth Profile supported service verticals, target industries, and operational keywords.",
         source: "approved_business_profile",
       })
     }

@@ -720,6 +720,7 @@
     "test:ge-aios-8a-8-bi-lead-discovery-context": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-8a-8-bi-lead-discovery-context.ts",
     "test:ge-aios-business-profile-1b": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-business-profile-1b.ts",
     "test:ge-aios-business-profile-1c-lead-discovery-projection": "tsx scripts/test-ge-aios-business-profile-1c-lead-discovery-projection.ts",
+    "test:ge-aios-supported-service-verticals-projection-1b": "tsx scripts/test-ge-aios-supported-service-verticals-projection-1b.ts",
     "test:ge-aios-growth-ux-rename-1a": "tsx scripts/test-ge-aios-growth-ux-rename-1a.ts",
     "test:ge-aios-find-leads-ux-2a": "tsx scripts/test-ge-aios-find-leads-ux-2a.ts",
     "test:ge-aios-home-premium-ux-1a": "tsx scripts/test-ge-aios-home-premium-ux-1a.ts",

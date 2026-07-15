@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     "components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section.tsx",
   )
   assert.match(ui, /GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL/)
-  assert.match(ui, /GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY/)
+  assert.match(ui, /growthHomeDatamoonBusinessProfileMissingCopy/)
   assert.match(ui, /GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL/)
   assert.match(ui, /GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL/)
   assert.equal(GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL, "Using approved Growth Profile")
@@ -135,9 +135,9 @@ async function main(): Promise<void> {
   )
 
   const serviceSource = readSource("lib/growth/business-profile/business-profile-lead-discovery-projection.ts")
-  assert.match(serviceSource, /targetIndustries/)
-  assert.match(serviceSource, /buyerPersonas/)
-  assert.match(serviceSource, /negativeKeywords/)
+  assert.match(serviceSource, /projectApprovedBusinessProfileToSupportedServiceVerticals/)
+  assert.match(serviceSource, /supportedServiceVerticals/)
+  assert.match(serviceSource, /qualificationCriteria/)
   assertNoForbiddenProviderCalls(serviceSource, "lead-discovery-projection")
 
   console.log(`[${PHASE}] PASS — Business Profile lead discovery projection certified (local)`)

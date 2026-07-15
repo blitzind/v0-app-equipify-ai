@@ -40,8 +40,8 @@ import {
   GROWTH_HOME_DATAMOON_RUNS_API_PATH,
   GROWTH_HOME_DATAMOON_SOURCING_DRAFT_API_PATH,
   GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL,
-  GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY,
-  GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY,
+  growthHomeDatamoonBusinessProfileMissingCopy,
+  growthHomeDatamoonProfileIncompleteCopy,
   GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL,
   GROWTH_HOME_AVA_LED_SEARCH_EXPLAIN_TITLE,
   GROWTH_HOME_AVA_LED_SEARCH_TITLE,
@@ -338,7 +338,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
     if (!avaLedContext) return
     if (!avaLedContext.profileReady) {
       setError(
-        `${GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
+        `${growthHomeDatamoonProfileIncompleteCopy(teammate)} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
       )
       return
     }
@@ -497,7 +497,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
     }
     if (mode === "ava_draft" && avaLedContext && !avaLedContext.profileReady) {
       setError(
-        `${GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
+        `${growthHomeDatamoonProfileIncompleteCopy(teammate)} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
       )
       return
     }
@@ -773,7 +773,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 <CardContent className="space-y-4 px-6">
                   {!hasApprovedBusinessProfile ? (
                     <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-5 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-                      <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
+                      <p>{growthHomeDatamoonBusinessProfileMissingCopy(teammate)}</p>
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
                           {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
@@ -785,7 +785,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                     </div>
                   ) : avaLedContext && !avaLedContext.profileReady ? (
                     <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-5 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-                      <p>{GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY}</p>
+                      <p>{growthHomeDatamoonProfileIncompleteCopy(teammate)}</p>
                       <p className="text-muted-foreground">
                         Missing: {avaLedContext.missingProfileFields.join(", ")}
                       </p>

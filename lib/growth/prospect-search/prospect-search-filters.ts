@@ -156,14 +156,31 @@ export type ProspectSearchFilterOptions = {
   external_discovery?: boolean
 }
 
+function matchesProspectSearchIndustryGate(
+  row: ProspectSearchIndustryEvidenceRow,
+  filters: GrowthProspectSearchFilters,
+): boolean {
+  const aliases =
+    filters.industry_aliases?.map((alias) => alias.trim()).filter(Boolean) ??
+    (filters.industry?.trim() ? [filters.industry.trim()] : [])
+
+  if (aliases.length === 0) return true
+  return aliases.some((alias) => matchesProspectSearchIndustryFilter(row, alias))
+}
+
 export function explainProspectSearchFilterDrop<
   T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
 >(row: T, filters: GrowthProspectSearchFilters, options?: ProspectSearchFilterOptions): string | null {
   if (filters.source_types?.length && !filters.source_types.includes(row.source_type)) {
     return "source_type"
   }
-  if (filters.industry && !matchesProspectSearchIndustryFilter(row, filters.industry)) {
-    return "industry"
+  if (
+    (filters.industry_aliases?.length ?? 0) > 0 ||
+    Boolean(filters.industry?.trim())
+  ) {
+    if (!matchesProspectSearchIndustryGate(row, filters)) {
+      return "industry"
+    }
   }
   if (filters.subindustry && !includesFold(row.subindustry ?? row.industry, filters.subindustry)) {
     return "subindustry"
@@ -494,6 +511,18 @@ export function normalizeProspectSearchFilters(
               value as GrowthProspectSearchResearchCompleteness,
             ),
         )
+      : undefined,
+    supported_service_vertical_ids: Array.isArray(raw.supported_service_vertical_ids)
+      ? raw.supported_service_vertical_ids.map((value) => asString(value)).filter(Boolean)
+      : undefined,
+    industry_aliases: Array.isArray(raw.industry_aliases)
+      ? raw.industry_aliases.map((value) => asString(value)).filter(Boolean)
+      : undefined,
+    qualification_criteria: Array.isArray(raw.qualification_criteria)
+      ? raw.qualification_criteria.map((value) => asString(value)).filter(Boolean)
+      : undefined,
+    operational_evidence_requirements: Array.isArray(raw.operational_evidence_requirements)
+      ? raw.operational_evidence_requirements.map((value) => asString(value)).filter(Boolean)
       : undefined,
   }
 }

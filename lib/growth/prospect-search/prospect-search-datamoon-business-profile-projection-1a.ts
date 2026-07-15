@@ -23,6 +23,7 @@ export type DatamoonAutonomousDiscoveryRequestProjection = {
     buyerPersonaCount: number
     negativeKeywordCount: number
     equipmentServiceFocus: boolean
+    supportedServiceVerticalCount?: number
   }
 }
 
@@ -71,6 +72,8 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
 
   const fingerprint = hashFingerprint([
     input.organizationId,
+    projection.supportedServiceVerticals.map((vertical) => vertical.id).join("|"),
+    projection.qualificationCriteria.join("|"),
     projection.industries.join("|"),
     projection.keywords.join("|"),
     projection.geography.state ?? projection.geography.country,
@@ -86,6 +89,7 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     fingerprint,
     targetingSummary: {
       industryCount: projection.industries.length,
+      supportedServiceVerticalCount: projection.supportedServiceVerticals.length,
       keywordCount: projection.keywords.length,
       naicsCount: input.profile.idealCustomers.preferredNaicsCodes?.length ?? 0,
       excludedNaicsCount: input.profile.idealCustomers.excludedNaicsCodes?.length ?? 0,
