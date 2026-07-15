@@ -421,6 +421,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
             prospect_search_query: input.query,
             targeting_summary: projection.targetingSummary,
             targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
+            firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
           },
         ),
       },
@@ -462,6 +463,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     prospect_search_query: input.query,
     targeting_summary: projection.targetingSummary,
     targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
+    firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
   })
 
   logGrowthEngine("prospect_search_datamoon_autonomous_discovery_started", {

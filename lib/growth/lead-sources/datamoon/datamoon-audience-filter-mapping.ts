@@ -2,8 +2,14 @@
 
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import { DATAMOON_EXT_OUTPUT_FIELDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { DATAMOON_PROVIDER_FIRMOGRAPHIC_FILTER_FIELDS } from "@/lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a"
 import type { DatamoonResolvedB2bTopic } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
+
+export {
+  DATAMOON_PROVIDER_FIRMOGRAPHIC_FILTER_FIELDS,
+  type DatamoonProviderFirmographicFilterField,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a"
 
 export const GROWTH_DATAMOON_FILTER_MAPPING_FIX_1_QA_MARKER =
   "ge-datamoon-filter-mapping-fix-1-v1" as const
@@ -32,6 +38,7 @@ export const DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS = [
   ...DATAMOON_PROVIDER_FILTER_FIELDS_FROM_CERT_EXAMPLES,
   ...DATAMOON_PROVIDER_FILTER_FIELDS_FROM_422_FIXTURE,
   ...DATAMOON_PROVIDER_B2B_INTENT_FILTER_FIELDS,
+  ...DATAMOON_PROVIDER_FIRMOGRAPHIC_FILTER_FIELDS,
 ] as const
 
 export type DatamoonProviderSupportedFilterField = (typeof DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS)[number]

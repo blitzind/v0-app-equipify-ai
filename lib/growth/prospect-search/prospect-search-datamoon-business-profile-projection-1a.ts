@@ -6,6 +6,12 @@ import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/busi
 import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
+  buildDatamoonFirmographicFilterStrategyMetadata,
+  buildDatamoonFirmographicFiltersFromCanonicalProjection,
+  mergeDatamoonAudienceFiltersPreservingProviderFields,
+  type DatamoonFirmographicFilterStrategyMetadata,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a"
+import {
   buildDatamoonOperationalTargetingStrategyMetadata,
   translateDatamoonOperationalModelTargeting,
   type DatamoonOperationalTargetingStrategyMetadata,
@@ -30,6 +36,7 @@ export type DatamoonAutonomousDiscoveryRequestProjection = {
     equipmentServiceFocus: boolean
     supportedServiceVerticalCount?: number
     targetingStrategy?: DatamoonOperationalTargetingStrategyMetadata
+    firmographicStrategy?: DatamoonFirmographicFilterStrategyMetadata
   }
 }
 
@@ -73,6 +80,16 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     audienceOrdinal: input.audienceOrdinal ?? 0,
   })
   const targetingStrategy = buildDatamoonOperationalTargetingStrategyMetadata(operationalTargeting)
+  const firmographicStrategy = buildDatamoonFirmographicFilterStrategyMetadata({
+    projection,
+    operationalTargeting,
+    companySizeRanges: input.profile.idealCustomers.companySizeRanges,
+  })
+  const firmographicFilters = buildDatamoonFirmographicFiltersFromCanonicalProjection({
+    projection,
+    operationalTargeting,
+    companySizeRanges: input.profile.idealCustomers.companySizeRanges,
+  })
 
   const draft = buildAudienceDraftFromLeadDiscoveryProjection(projection, {
     audienceName: projection.audienceNameSuggestion,
@@ -82,6 +99,10 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
   })
 
   const request = buildDatamoonImportRequestFromAudienceDraft(draft)
+  request.filters = mergeDatamoonAudienceFiltersPreservingProviderFields(
+    request.filters,
+    firmographicFilters,
+  )
   request.run_name = `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:${input.generatedAt.slice(0, 10)}`
   request.limit = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
   request.workbench_context = {
@@ -106,6 +127,9 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     (input.profile.idealCustomers.excludedNaicsCodes ?? []).join("|"),
     projection.buyerPersonas.join("|"),
     projection.negativeKeywords.join("|"),
+    firmographicStrategy.primaryIndustryValues.join("|"),
+    firmographicStrategy.companyEmployeeCountBands.join("|"),
+    firmographicStrategy.companyRevenueBands.join("|"),
   ])
 
   return {
@@ -123,6 +147,7 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
       negativeKeywordCount: projection.negativeKeywords.length,
       equipmentServiceFocus: equipmentServiceFocus(input.profile),
       targetingStrategy,
+      firmographicStrategy,
     },
   }
 }
