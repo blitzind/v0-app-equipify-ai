@@ -70,6 +70,8 @@ import {
 } from "@/lib/growth/providers/datamoon/datamoon-client"
 import { resolveDatamoonAudienceMode } from "@/lib/growth/providers/datamoon/datamoon-config"
 import type { DatamoonFetchImpl } from "@/lib/growth/providers/datamoon/datamoon-http"
+import { findActiveAutonomousProspectSearchDatamoonRun } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
+import { DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 
 export { GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER }
 
@@ -78,6 +80,10 @@ type Actor = { userId: string | null; email?: string | null }
 type ServiceOptions = {
   env?: NodeJS.ProcessEnv
   fetchImpl?: DatamoonFetchImpl
+  autonomousProspectSearchReservation?: {
+    organizationId: string
+    providerMetadata: Record<string, unknown>
+  }
 }
 
 function resolveCompanyName(normalized: ReturnType<typeof normalizeDatamoonAudienceRecord>): string {
@@ -216,7 +222,7 @@ export async function startDatamoonAudienceImportRun(
   const providerMode = providerInput.provider_mode ?? resolveDatamoonAudienceMode(env)
   const dryRun = isDatamoonDryRunOnly(env)
 
-  const run = await createDatamoonAudienceImportRun(admin, {
+  const runCreate = await createDatamoonAudienceImportRun(admin, {
     runName: providerInput.run_name.trim(),
     providerMode,
     audienceType: providerInput.audience_type,
@@ -227,9 +233,26 @@ export async function startDatamoonAudienceImportRun(
     websiteId: providerInput.website_id?.trim() ?? null,
     dryRun,
     createdBy: actor.userId,
+    providerMetadata: options?.autonomousProspectSearchReservation?.providerMetadata,
   })
 
-  if (!run) return { ok: false, error: "run_create_failed" }
+  if (!runCreate.ok) {
+    if (
+      runCreate.error === "unique_violation" &&
+      options?.autonomousProspectSearchReservation?.organizationId
+    ) {
+      const existingActive = await findActiveAutonomousProspectSearchDatamoonRun(
+        admin,
+        options.autonomousProspectSearchReservation.organizationId,
+      )
+      if (existingActive) {
+        return { ok: false, error: DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR }
+      }
+    }
+    return { ok: false, error: "run_create_failed" }
+  }
+
+  const run = runCreate.run
 
   try {
     const providerFilters = resolveDatamoonProviderFiltersForImport(providerInput)
@@ -280,6 +303,7 @@ export async function startDatamoonAudienceImportRun(
       status: "building",
       loadingCount: typeof build.data?.record_count === "number" ? build.data.record_count : 0,
       providerMetadata: sanitizeDatamoonProviderMetadata({
+        ...run.providerMetadata,
         qa_marker: GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER,
         build_status: build.status,
         build_message: build.message,

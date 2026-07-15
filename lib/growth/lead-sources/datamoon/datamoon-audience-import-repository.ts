@@ -120,6 +120,10 @@ export async function isDatamoonAudienceImportSchemaReady(admin: SupabaseClient)
   return !error
 }
 
+export type CreateDatamoonAudienceImportRunResult =
+  | { ok: true; run: DatamoonAudienceImportRun }
+  | { ok: false; error: "insert_failed" | "unique_violation" }
+
 export async function createDatamoonAudienceImportRun(
   admin: SupabaseClient,
   input: {
@@ -133,8 +137,9 @@ export async function createDatamoonAudienceImportRun(
     websiteId: string | null
     dryRun: boolean
     createdBy: string | null
+    providerMetadata?: Record<string, unknown>
   },
-): Promise<DatamoonAudienceImportRun | null> {
+): Promise<CreateDatamoonAudienceImportRunResult> {
   const { data, error } = await runsTable(admin)
     .insert({
       run_name: input.runName,
@@ -147,14 +152,23 @@ export async function createDatamoonAudienceImportRun(
       website_id: input.websiteId,
       dry_run: input.dryRun,
       created_by: input.createdBy,
-      provider_metadata: { qa_marker: GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER },
+      provider_metadata: {
+        qa_marker: GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER,
+        ...(input.providerMetadata ?? {}),
+      },
       status: "pending_build",
     })
     .select("*")
     .single()
 
-  if (error || !data) return null
-  return mapRun(data as RunRow)
+  if (error) {
+    if (error.code === "23505" || error.message?.includes("duplicate key")) {
+      return { ok: false, error: "unique_violation" }
+    }
+    return { ok: false, error: "insert_failed" }
+  }
+  if (!data) return { ok: false, error: "insert_failed" }
+  return { ok: true, run: mapRun(data as RunRow) }
 }
 
 export async function fetchDatamoonAudienceImportRunById(

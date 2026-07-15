@@ -21,12 +21,14 @@ import {
 import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "@/lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a"
 import {
   attachAutonomousProspectSearchDatamoonMetadata,
+  buildAutonomousProspectSearchDatamoonProviderMetadata,
   findActiveAutonomousProspectSearchDatamoonRun,
   isDatamoonAutonomousDiscoveryRunActive,
   isDatamoonAutonomousDiscoveryRunCompleted,
   isDatamoonAutonomousDiscoveryRunFailed,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
 import {
+  DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
   type AutonomousProspectSearchDatamoonRunMetadata,
   type DatamoonAutonomousDiscoveryStopReason,
@@ -248,6 +250,117 @@ function providerBlockedResult(
   }
 }
 
+async function resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    query: string
+    filters: GrowthProspectSearchFilters
+    activeRun: Awaited<ReturnType<typeof findActiveAutonomousProspectSearchDatamoonRun>>
+    targetingSummary: ReturnType<
+      typeof buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile
+    >["targetingSummary"]
+    readOnlyProof?: boolean
+  },
+): Promise<RunProspectSearchDatamoonAutonomousDiscoveryResult | null> {
+  if (!input.activeRun) return null
+
+  if (input.readOnlyProof) {
+    return {
+      qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+      companies: [],
+      built_query: input.query,
+      stopReason: "datamoon_request_active",
+      jobActive: true,
+      jobReused: true,
+      jobCreated: false,
+      rawCompanyCount: input.activeRun.loadingCount,
+      normalizedCompanyCount: 0,
+      normalizationStats: null,
+      providerStatusLabel: "datamoon_request_active",
+      providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
+      runId: input.activeRun.id,
+      targetingSummary: input.targetingSummary,
+    }
+  }
+
+  const polled = await pollDatamoonAudienceImportRun(admin, input.activeRun.id)
+  if (!polled.ok) {
+    return providerBlockedResult("datamoon_provider_error", input.query)
+  }
+
+  const run = polled.run
+  if (isDatamoonAutonomousDiscoveryRunActive(run)) {
+    return {
+      qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+      companies: [],
+      built_query: input.query,
+      stopReason: "datamoon_request_active",
+      jobActive: true,
+      jobReused: true,
+      jobCreated: false,
+      rawCompanyCount: run.loadingCount,
+      normalizedCompanyCount: 0,
+      normalizationStats: null,
+      providerStatusLabel: "datamoon_request_active",
+      providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
+      runId: run.id,
+      targetingSummary: input.targetingSummary,
+    }
+  }
+
+  if (isDatamoonAutonomousDiscoveryRunFailed(run)) {
+    return providerBlockedResult("datamoon_job_failed", input.query)
+  }
+
+  if (isDatamoonAutonomousDiscoveryRunCompleted(run)) {
+    const mapped = recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
+    const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
+    logGrowthEngine("prospect_search_datamoon_autonomous_discovery_normalized", {
+      qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+      organization_id: input.organizationId,
+      run_id: run.id,
+      ...mapped.stats,
+    })
+    return {
+      qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+      companies: mapped.companies,
+      built_query: input.query,
+      stopReason,
+      jobActive: false,
+      jobReused: true,
+      jobCreated: false,
+      rawCompanyCount: polled.records.length,
+      normalizedCompanyCount: mapped.companies.length,
+      normalizationStats: mapped.stats,
+      providerStatusLabel: stopReason ?? "datamoon_completed",
+      providerStatusMessage:
+        stopReason != null
+          ? autonomousDiscoveryStopReasonMessage(stopReason)
+          : `DataMoon returned ${mapped.companies.length} company candidate(s).`,
+      runId: run.id,
+      targetingSummary: input.targetingSummary,
+    }
+  }
+
+  return null
+}
+
+function buildAutonomousProspectSearchDatamoonRunMetadata(
+  input: RunProspectSearchDatamoonAutonomousDiscoveryInput,
+  fingerprint: string,
+): AutonomousProspectSearchDatamoonRunMetadata {
+  return {
+    qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+    organization_id: input.organizationId,
+    business_profile_fingerprint: fingerprint,
+    batch_size: input.limit,
+    purpose: "prospect_search_intake",
+    read_only_proof: input.readOnlyProof === true,
+    authority: input.authority,
+  }
+}
+
 export async function runProspectSearchDatamoonAutonomousDiscovery(
   admin: SupabaseClient,
   input: RunProspectSearchDatamoonAutonomousDiscoveryInput,
@@ -271,93 +384,65 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
   }
 
   const activeRun = await findActiveAutonomousProspectSearchDatamoonRun(admin, input.organizationId)
-  if (activeRun && !input.readOnlyProof) {
-    const polled = await pollDatamoonAudienceImportRun(admin, activeRun.id)
-    if (!polled.ok) {
-      return providerBlockedResult("datamoon_provider_error", input.query)
-    }
-
-    const run = polled.run
-    if (isDatamoonAutonomousDiscoveryRunActive(run)) {
-      return {
-        qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-        companies: [],
-        built_query: input.query,
-        stopReason: "datamoon_request_active",
-        jobActive: true,
-        jobReused: true,
-        jobCreated: false,
-        rawCompanyCount: run.loadingCount,
-        normalizedCompanyCount: 0,
-        normalizationStats: null,
-        providerStatusLabel: "datamoon_request_active",
-        providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
-        runId: run.id,
-        targetingSummary: projection.targetingSummary,
-      }
-    }
-
-    if (isDatamoonAutonomousDiscoveryRunFailed(run)) {
-      return providerBlockedResult("datamoon_job_failed", input.query)
-    }
-
-    if (isDatamoonAutonomousDiscoveryRunCompleted(run)) {
-      const mapped = recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
-      const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
-      logGrowthEngine("prospect_search_datamoon_autonomous_discovery_normalized", {
-        qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-        organization_id: input.organizationId,
-        run_id: run.id,
-        ...mapped.stats,
-      })
-      return {
-        qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-        companies: mapped.companies,
-        built_query: input.query,
-        stopReason,
-        jobActive: false,
-        jobReused: true,
-        jobCreated: false,
-        rawCompanyCount: polled.records.length,
-        normalizedCompanyCount: mapped.companies.length,
-        normalizationStats: mapped.stats,
-        providerStatusLabel: stopReason ?? "datamoon_completed",
-        providerStatusMessage:
-          stopReason != null
-            ? autonomousDiscoveryStopReasonMessage(stopReason)
-            : `DataMoon returned ${mapped.companies.length} company candidate(s).`,
-        runId: run.id,
-        targetingSummary: projection.targetingSummary,
-      }
-    }
-  }
-
-  if (activeRun && input.readOnlyProof) {
-    return {
-      qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-      companies: [],
-      built_query: input.query,
-      stopReason: "datamoon_request_active",
-      jobActive: true,
-      jobReused: true,
-      jobCreated: false,
-      rawCompanyCount: activeRun.loadingCount,
-      normalizedCompanyCount: 0,
-      normalizationStats: null,
-      providerStatusLabel: "datamoon_request_active",
-      providerStatusMessage: autonomousDiscoveryStopReasonMessage("datamoon_request_active"),
-      runId: activeRun.id,
+  if (activeRun) {
+    const resumed = await resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(admin, {
+      organizationId: input.organizationId,
+      query: input.query,
+      filters: input.filters,
+      activeRun,
       targetingSummary: projection.targetingSummary,
-    }
+      readOnlyProof: input.readOnlyProof,
+    })
+    if (resumed) return resumed
   }
+
+  const reservationMetadata = buildAutonomousProspectSearchDatamoonRunMetadata(
+    input,
+    projection.fingerprint,
+  )
 
   const started = await startDatamoonAudienceImportRun(
     admin,
     projection.request,
     { userId: input.createdBy ?? null },
+    {
+      autonomousProspectSearchReservation: {
+        organizationId: input.organizationId,
+        providerMetadata: buildAutonomousProspectSearchDatamoonProviderMetadata(
+          reservationMetadata,
+          {
+            prospect_search_query: input.query,
+            targeting_summary: projection.targetingSummary,
+          },
+        ),
+      },
+    },
   )
 
   if (!started.ok) {
+    if (started.error === DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR) {
+      const concurrentActiveRun = await findActiveAutonomousProspectSearchDatamoonRun(
+        admin,
+        input.organizationId,
+      )
+      const resumed = await resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(admin, {
+        organizationId: input.organizationId,
+        query: input.query,
+        filters: input.filters,
+        activeRun: concurrentActiveRun,
+        targetingSummary: projection.targetingSummary,
+        readOnlyProof: input.readOnlyProof,
+      })
+      if (resumed) {
+        logGrowthEngine("prospect_search_datamoon_autonomous_discovery_single_flight_resumed", {
+          qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+          organization_id: input.organizationId,
+          run_id: resumed.runId,
+        })
+        return resumed
+      }
+    }
+
     const stopReason: DatamoonAutonomousDiscoveryStopReason =
       started.error === "datamoon_provider_disabled"
         ? "datamoon_disabled"
@@ -365,17 +450,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     return providerBlockedResult(stopReason, input.query)
   }
 
-  const metadata: AutonomousProspectSearchDatamoonRunMetadata = {
-    qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
-    organization_id: input.organizationId,
-    business_profile_fingerprint: projection.fingerprint,
-    batch_size: input.limit,
-    purpose: "prospect_search_intake",
-    read_only_proof: input.readOnlyProof === true,
-    authority: input.authority,
-  }
-
-  await attachAutonomousProspectSearchDatamoonMetadata(admin, started.run.id, metadata, {
+  await attachAutonomousProspectSearchDatamoonMetadata(admin, started.run.id, reservationMetadata, {
     prospect_search_query: input.query,
     targeting_summary: projection.targetingSummary,
   })

@@ -9,6 +9,9 @@ export const AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX =
 export const AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_METADATA_KEY =
   "autonomous_prospect_search_1a" as const
 
+export const DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR =
+  "single_flight_active_run" as const
+
 export const DATAMOON_AUTONOMOUS_DISCOVERY_STOP_REASONS = [
   "datamoon_not_configured",
   "datamoon_disabled",

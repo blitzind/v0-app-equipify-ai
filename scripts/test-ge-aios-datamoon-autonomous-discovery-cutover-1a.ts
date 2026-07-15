@@ -272,14 +272,15 @@ const healthyActivePlan = resolveAutonomousPortfolioDiscoveryExecutionPlan(
 assert.equal(healthyActivePlan.action, "resume_active")
 console.log("  ✓ Phase 14E — healthy portfolio still polls orphaned active jobs to terminal state")
 
-assert.match(datamoonDiscoverySource, /if \(activeRun && !input\.readOnlyProof\)/)
+assert.match(datamoonDiscoverySource, /if \(activeRun\)/)
+assert.match(datamoonDiscoverySource, /autonomousProspectSearchReservation/)
 assert.match(datamoonDiscoverySource, /const started = await startDatamoonAudienceImportRun/)
 assert.ok(
   datamoonDiscoverySource.indexOf("findActiveAutonomousProspectSearchDatamoonRun") <
     datamoonDiscoverySource.indexOf("startDatamoonAudienceImportRun"),
 )
 assert.match(repositorySource, /datamoon_autonomous_discovery_job_reused/)
-console.log("  ✓ Phase 14F — active-run guard precedes new job creation; reuse telemetry exposed")
+console.log("  ✓ Phase 14F — active-run guard precedes reservation; reuse telemetry exposed")
 
 function isGitTracked(relativePath: string): boolean {
   try {

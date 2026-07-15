@@ -154,7 +154,7 @@ export async function createDatamoonDmDiscoveryRun(
     criteriaFingerprint: input.criteriaFingerprint,
   })
 
-  const run = await createDatamoonAudienceImportRun(admin, {
+  const runCreate = await createDatamoonAudienceImportRun(admin, {
     runName,
     providerMode: input.providerMode,
     audienceType: "advanced_search",
@@ -166,7 +166,8 @@ export async function createDatamoonDmDiscoveryRun(
     dryRun: input.dryRun,
     createdBy: null,
   })
-  if (!run) return null
+  if (!runCreate.ok) return null
+  const run = runCreate.run
 
   const updated = await updateDatamoonAudienceImportRun(admin, run.id, {
     status: "pending_build",

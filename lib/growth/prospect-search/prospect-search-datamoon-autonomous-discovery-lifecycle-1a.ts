@@ -17,6 +17,16 @@ import {
 
 const ACTIVE_STATUSES = new Set(["pending_build", "building"])
 
+export function buildAutonomousProspectSearchDatamoonProviderMetadata(
+  metadata: AutonomousProspectSearchDatamoonRunMetadata,
+  extra?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(extra ?? {}),
+    [AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_METADATA_KEY]: metadata,
+  }
+}
+
 function runsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("datamoon_audience_import_runs")
 }
