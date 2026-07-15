@@ -50,6 +50,10 @@ import {
   resolveDatamoonAudiencePollWaitTimeoutError,
   sleepForDatamoonAudiencePollWait,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-poll-wait"
+import {
+  enrichDatamoonOperationalTargetingStrategyMetadata,
+  type DatamoonOperationalTargetingStrategyMetadata,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 import { prepareDatamoonAudienceImportRequestForBuild } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare"
 import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
@@ -298,6 +302,16 @@ export async function startDatamoonAudienceImportRun(
       return { ok: false, error: "missing_provider_audience_id" }
     }
 
+    const existingTargetingStrategy = run.providerMetadata?.targeting_strategy
+    const targetingStrategy =
+      existingTargetingStrategy && typeof existingTargetingStrategy === "object"
+        ? enrichDatamoonOperationalTargetingStrategyMetadata({
+            metadata: existingTargetingStrategy as DatamoonOperationalTargetingStrategyMetadata,
+            resolvedTopicQueries: providerInput.workbench_context?.broadenedTopicSearchQueries,
+            resolvedTopicIds: providerInput.topic_ids,
+          })
+        : null
+
     const updated = await updateDatamoonAudienceImportRun(admin, run.id, {
       datamoonAudienceId: audienceId,
       status: "building",
@@ -310,6 +324,7 @@ export async function startDatamoonAudienceImportRun(
         dry_run: build.dry_run,
         audience_mode: build.audience_mode,
         provider_audience_id: audienceId,
+        ...(targetingStrategy ? { targeting_strategy: targetingStrategy } : {}),
       }) as Record<string, unknown>,
     })
 

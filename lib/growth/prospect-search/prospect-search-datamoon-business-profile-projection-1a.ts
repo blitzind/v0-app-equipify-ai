@@ -6,6 +6,11 @@ import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/busi
 import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
+  buildDatamoonOperationalTargetingStrategyMetadata,
+  translateDatamoonOperationalModelTargeting,
+  type DatamoonOperationalTargetingStrategyMetadata,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
+import {
   AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
@@ -24,6 +29,7 @@ export type DatamoonAutonomousDiscoveryRequestProjection = {
     negativeKeywordCount: number
     equipmentServiceFocus: boolean
     supportedServiceVerticalCount?: number
+    targetingStrategy?: DatamoonOperationalTargetingStrategyMetadata
   }
 }
 
@@ -55,24 +61,43 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
   organizationId: string
   batchSize: number
   generatedAt: string
+  audienceOrdinal?: number
 }): DatamoonAutonomousDiscoveryRequestProjection {
   const projection = projectApprovedBusinessProfileToLeadDiscovery(
     input.profile,
     input.companyName,
   )
+  const operationalTargeting = translateDatamoonOperationalModelTargeting({
+    projection,
+    organizationId: input.organizationId,
+    audienceOrdinal: input.audienceOrdinal ?? 0,
+  })
+  const targetingStrategy = buildDatamoonOperationalTargetingStrategyMetadata(operationalTargeting)
+
   const draft = buildAudienceDraftFromLeadDiscoveryProjection(projection, {
     audienceName: projection.audienceNameSuggestion,
     recordLimit: Math.max(1, Math.min(100, Math.floor(input.batchSize))),
     excludeDuplicates: true,
+    topics: operationalTargeting.topicPhrases,
   })
 
   const request = buildDatamoonImportRequestFromAudienceDraft(draft)
   request.run_name = `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:${input.generatedAt.slice(0, 10)}`
   request.limit = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
+  request.workbench_context = {
+    ...(request.workbench_context ?? {}),
+    topics: operationalTargeting.topicPhrases,
+    supplementalTopicSearchQueries: operationalTargeting.industryAliasesUsed,
+    clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
+  }
 
   const fingerprint = hashFingerprint([
     input.organizationId,
-    projection.supportedServiceVerticals.map((vertical) => vertical.id).join("|"),
+    String(input.audienceOrdinal ?? 0),
+    operationalTargeting.operationalCluster,
+    operationalTargeting.selectedVerticalIds.join("|"),
+    operationalTargeting.topicPhrases.join("|"),
+    operationalTargeting.industryAliasesUsed.join("|"),
     projection.qualificationCriteria.join("|"),
     projection.industries.join("|"),
     projection.keywords.join("|"),
@@ -97,6 +122,7 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
       buyerPersonaCount: projection.buyerPersonas.length,
       negativeKeywordCount: projection.negativeKeywords.length,
       equipmentServiceFocus: equipmentServiceFocus(input.profile),
+      targetingStrategy,
     },
   }
 }

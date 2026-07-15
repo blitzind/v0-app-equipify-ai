@@ -174,13 +174,21 @@ export async function searchDatamoonB2bTopics(
 
 export async function resolveDatamoonB2bTopicQueries(
   queries: readonly string[],
-  options?: { fetchImpl?: DatamoonFetchImpl; env?: NodeJS.ProcessEnv },
+  options?: {
+    fetchImpl?: DatamoonFetchImpl
+    env?: NodeJS.ProcessEnv
+    clusterBroadeningAnchors?: readonly string[]
+    multiVerticalProfile?: boolean
+  },
 ): Promise<{
   matches: DatamoonResolvedB2bTopic[]
   topic_ids: string[]
   broadenedTopicSearchQueries: string[]
 }> {
-  const broadenedTopicSearchQueries = expandDatamoonB2bTopicSearchQueries(queries)
+  const broadenedTopicSearchQueries = expandDatamoonB2bTopicSearchQueries(queries, {
+    clusterBroadeningAnchors: options?.clusterBroadeningAnchors,
+    multiVerticalProfile: options?.multiVerticalProfile,
+  })
   const candidates: DatamoonB2bTopicCandidate[] = []
   const seenCandidateKeys = new Set<string>()
 

@@ -50,6 +50,8 @@ export type DatamoonAudienceImportWorkbenchContext = {
   lookbackDays?: number
   intentLevels?: string[]
   topics?: string[]
+  supplementalTopicSearchQueries?: string[]
+  clusterBroadeningAnchors?: string[]
   broadenedTopicSearchQueries?: string[]
   resolvedB2bTopics?: DatamoonResolvedB2bTopic[]
   companySize?: string

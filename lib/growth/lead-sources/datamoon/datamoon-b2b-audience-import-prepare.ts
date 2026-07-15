@@ -14,6 +14,7 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import type { DatamoonFetchImpl } from "@/lib/growth/providers/datamoon/datamoon-http"
 import { normalizeDatamoonTopicIds } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
+import { mergeDatamoonOperationalTopicSearchQueries } from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 
 export async function prepareDatamoonAudienceImportRequestForBuild(
   input: DatamoonAudienceImportRequest,
@@ -26,7 +27,10 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
     return { ok: true, request: input }
   }
 
-  const topicQueries = normalizeDatamoonTopicIds(input.workbench_context?.topics ?? [])
+  const topicQueries = mergeDatamoonOperationalTopicSearchQueries({
+    topicPhrases: normalizeDatamoonTopicIds(input.workbench_context?.topics ?? []),
+    supplementalTopicSearchQueries: input.workbench_context?.supplementalTopicSearchQueries,
+  })
   if (topicQueries.length === 0) {
     return {
       ok: false,
@@ -41,7 +45,11 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
     }
   }
 
-  const resolution = await resolveDatamoonB2bTopicQueries(topicQueries, options)
+  const resolution = await resolveDatamoonB2bTopicQueries(topicQueries, {
+    ...options,
+    clusterBroadeningAnchors: input.workbench_context?.clusterBroadeningAnchors,
+    multiVerticalProfile: (input.workbench_context?.clusterBroadeningAnchors?.length ?? 0) > 0,
+  })
   if (resolution.topic_ids.length === 0) {
     return {
       ok: false,
@@ -71,7 +79,7 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
       filters: mappedFilters.providerFilters,
       workbench_context: {
         ...input.workbench_context,
-        topics: topicQueries,
+        topics: normalizeDatamoonTopicIds(input.workbench_context?.topics ?? []),
         broadenedTopicSearchQueries: resolution.broadenedTopicSearchQueries,
         resolvedB2bTopics: resolution.matches,
         omittedWorkbenchFilterFields: [

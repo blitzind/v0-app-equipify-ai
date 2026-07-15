@@ -126,6 +126,23 @@ export async function findLatestAutonomousProspectSearchDatamoonRun(
   return null
 }
 
+export async function countAutonomousProspectSearchDatamoonRunsForOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<number> {
+  const { count, error } = await runsTable(admin)
+    .select("*", { count: "exact", head: true })
+    .like("run_name", `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:%`)
+    .filter(
+      "provider_metadata->autonomous_prospect_search_1a->>organization_id",
+      "eq",
+      organizationId,
+    )
+
+  if (error || count == null) return 0
+  return count
+}
+
 export async function attachAutonomousProspectSearchDatamoonMetadata(
   admin: SupabaseClient,
   runId: string,

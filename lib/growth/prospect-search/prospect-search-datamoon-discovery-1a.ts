@@ -22,6 +22,7 @@ import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "@/li
 import {
   attachAutonomousProspectSearchDatamoonMetadata,
   buildAutonomousProspectSearchDatamoonProviderMetadata,
+  countAutonomousProspectSearchDatamoonRunsForOrganization,
   findActiveAutonomousProspectSearchDatamoonRun,
   isDatamoonAutonomousDiscoveryRunActive,
   isDatamoonAutonomousDiscoveryRunCompleted,
@@ -371,12 +372,18 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     maximumDailyDiscovery: input.maximumDailyDiscovery,
   })
 
+  const audienceOrdinal = await countAutonomousProspectSearchDatamoonRunsForOrganization(
+    admin,
+    input.organizationId,
+  )
+
   const projection = buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile({
     profile: input.approvedProfile,
     companyName: input.companyName,
     organizationId: input.organizationId,
     batchSize: input.limit,
     generatedAt: input.generatedAt,
+    audienceOrdinal,
   })
 
   if (!policy.eligible && policy.stopReason) {
@@ -413,6 +420,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
           {
             prospect_search_query: input.query,
             targeting_summary: projection.targetingSummary,
+            targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
           },
         ),
       },
@@ -453,6 +461,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
   await attachAutonomousProspectSearchDatamoonMetadata(admin, started.run.id, reservationMetadata, {
     prospect_search_query: input.query,
     targeting_summary: projection.targetingSummary,
+    targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
   })
 
   logGrowthEngine("prospect_search_datamoon_autonomous_discovery_started", {

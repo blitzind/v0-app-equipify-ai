@@ -43,7 +43,15 @@ function normalizeTopicQuery(value: string): string {
   return value.trim().toLowerCase()
 }
 
-export function expandDatamoonB2bTopicSearchQueries(queries: readonly string[]): string[] {
+export type ExpandDatamoonB2bTopicSearchQueriesOptions = {
+  clusterBroadeningAnchors?: readonly string[]
+  multiVerticalProfile?: boolean
+}
+
+export function expandDatamoonB2bTopicSearchQueries(
+  queries: readonly string[],
+  options?: ExpandDatamoonB2bTopicSearchQueriesOptions,
+): string[] {
   const output: string[] = []
   const seen = new Set<string>()
 
@@ -59,7 +67,10 @@ export function expandDatamoonB2bTopicSearchQueries(queries: readonly string[]):
 
   const shouldBroaden = queries.some((query) => EQUIPMENT_ICP_QUERY_PATTERN.test(query))
   if (shouldBroaden) {
-    for (const anchor of BROADENING_ANCHOR_QUERIES) add(anchor)
+    const clusterAnchors = options?.clusterBroadeningAnchors?.filter(Boolean) ?? []
+    const useClusterAnchors = options?.multiVerticalProfile === true && clusterAnchors.length > 0
+    const anchors = useClusterAnchors ? clusterAnchors : BROADENING_ANCHOR_QUERIES
+    for (const anchor of anchors) add(anchor)
   }
 
   return output
