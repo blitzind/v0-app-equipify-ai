@@ -120,13 +120,28 @@ export function resolveAutonomyTickStopReason(input: {
   selectedWork: boolean
   decisionResolved: boolean
   authorityDisposition: string | null
+  authorityReasonCode?: string | null
   dryRunStopReason: string | null | undefined
 }): string | null {
   if (!input.selectedWork) return "no_executable_work"
-  if (!input.decisionResolved) return "required_state_unavailable"
-  if (input.authorityDisposition === "deferred") return "required_state_unavailable"
-  if (input.authorityDisposition != null && input.authorityDisposition !== "allowed") {
-    return input.authorityDisposition
+
+  if (input.authorityDisposition === "blocked") {
+    return input.authorityReasonCode ?? "execution_authority_blocked"
   }
+  if (input.authorityDisposition === "deferred") {
+    return input.authorityReasonCode ?? "decision_resolution_unavailable"
+  }
+  if (input.authorityDisposition === "operator_required") {
+    return input.authorityReasonCode ?? "operator_required"
+  }
+
+  if (!input.decisionResolved) {
+    return input.authorityReasonCode ?? "decision_resolution_unavailable"
+  }
+
+  if (input.authorityDisposition != null && input.authorityDisposition !== "allowed") {
+    return input.authorityReasonCode ?? input.authorityDisposition
+  }
+
   return input.dryRunStopReason ?? null
 }

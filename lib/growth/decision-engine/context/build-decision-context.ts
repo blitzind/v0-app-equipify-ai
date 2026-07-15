@@ -13,6 +13,7 @@ import {
 } from "@/lib/growth/ava-home/narrative/context/build-ava-narrative-context"
 import type { AvaNarrativeContext } from "@/lib/growth/ava-home/narrative/narrative-types"
 import type { DecisionCandidate, DecisionContext } from "@/lib/growth/decision-engine/types"
+import type { GrowthPortfolioEligibilityContext } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 import { attachRelationshipGraphToCandidate } from "@/lib/growth/relationship/resolve-relationship-graph-from-candidate"
 import {
   parseLeadIdFromHref,
@@ -36,6 +37,7 @@ export type BuildDecisionContextInput = {
   narrativeContext?: AvaNarrativeContext
   memorySummary?: import("@/lib/growth/memory/types").AvaMemorySummary | null
   leadSnapshotsById?: RelationshipLeadSnapshotMap
+  portfolioEligibility?: GrowthPortfolioEligibilityContext | null
 }
 
 function inferActionKind(actionLabel: string): DecisionCandidate["kind"] {
@@ -70,8 +72,15 @@ function candidateFromWaiting(item: GrowthHomeWaitingOnYouItem): DecisionCandida
   }
 }
 
-function candidateFromQueueItem(item: GrowthHomeDailyWorkQueueItem): DecisionCandidate {
+function candidateFromQueueItem(
+  item: GrowthHomeDailyWorkQueueItem,
+  portfolioEligibility?: GrowthPortfolioEligibilityContext | null,
+): DecisionCandidate | null {
   const kind = inferActionKind(item.actionLabel)
+  const leadId = parseLeadIdFromHref(item.href)
+  if (portfolioEligibility && leadId && !portfolioEligibility.eligibleLeadIds.has(leadId)) {
+    return null
+  }
   return {
     id: item.id,
     kind,
@@ -98,6 +107,13 @@ function buildResearchCandidates(input: BuildDecisionContextInput): DecisionCand
 
   return (research.leadResults ?? [])
     .filter((row) => row.outcome === "completed" && row.companyName)
+    .filter((row) => {
+      if (input.portfolioEligibility && !input.portfolioEligibility.eligibleLeadIds.has(row.leadId)) {
+        return false
+      }
+      // Completed loop entries are historical — only forward actionable follow-ons.
+      return row.readyForOutreachReview === true || row.qualificationStatus === "completed"
+    })
     .slice(0, 5)
     .map((row) => {
       const ready = row.readyForOutreachReview === true
@@ -214,9 +230,15 @@ function buildMeetingCandidates(input: BuildDecisionContextInput): DecisionCandi
 
 function buildDailyWorkQueueResearchCandidates(
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[],
+  portfolioEligibility?: GrowthPortfolioEligibilityContext | null,
 ): DecisionCandidate[] {
   return dailyWorkQueue
     .filter((item) => /research|run_research/i.test(item.actionLabel) && item.href)
+    .filter((item) => {
+      const leadId = parseLeadIdFromHref(item.href)
+      if (!portfolioEligibility || !leadId) return true
+      return portfolioEligibility.eligibleLeadIds.has(leadId)
+    })
     .slice(0, 5)
     .map((item) => {
       const leadId = parseLeadIdFromHref(item.href)
@@ -239,6 +261,7 @@ function buildDailyWorkQueueResearchCandidates(
 function buildLeadDiscoveryCandidates(
   missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null | undefined,
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[],
+  portfolioEligibility?: GrowthPortfolioEligibilityContext | null,
 ): DecisionCandidate[] {
   if (!missionDiscovery?.startupDiscoveryReady) return []
 
@@ -276,7 +299,10 @@ function buildLeadDiscoveryCandidates(
         },
       ]
     case "begin_research": {
-      const queueCandidates = buildDailyWorkQueueResearchCandidates(dailyWorkQueue)
+      const queueCandidates = buildDailyWorkQueueResearchCandidates(
+        dailyWorkQueue,
+        portfolioEligibility,
+      )
       if (queueCandidates.length > 0) return queueCandidates
       return [
         {
@@ -346,12 +372,18 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   const narrative = input.narrativeContext ?? buildAvaNarrativeContext(narrativeInput)
 
   const approvals = input.waitingOnYou.map(candidateFromWaiting)
-  const opportunities = input.dailyWorkQueue.map(candidateFromQueueItem)
+  const opportunities = input.dailyWorkQueue
+    .map((item) => candidateFromQueueItem(item, input.portfolioEligibility))
+    .filter((row): row is DecisionCandidate => row != null)
   const research = buildResearchCandidates(input)
   const missions = [
     ...buildMissionCandidates(input),
     ...buildScaleAwarenessCandidates(input),
-    ...buildLeadDiscoveryCandidates(input.workspaceSummary.missionDiscovery, input.dailyWorkQueue),
+    ...buildLeadDiscoveryCandidates(
+      input.workspaceSummary.missionDiscovery,
+      input.dailyWorkQueue,
+      input.portfolioEligibility,
+    ),
   ]
   const inbox = buildInboxCandidates(input)
   const meetings = buildMeetingCandidates(input)

@@ -53,7 +53,16 @@ export type BuildAvaDailyBriefingInput = {
   hour: number
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool" | "missionDiscovery"
+    | "kpis"
+    | "meetings"
+    | "inbox"
+    | "operatorTasks"
+    | "avaConsole"
+    | "dashboard"
+    | "leadPool"
+    | "missionDiscovery"
+    | "portfolioLeads"
+    | "eligibleLeadCount"
   >
   accomplishments: GrowthHomeAccomplishmentGroup[]
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
@@ -67,7 +76,7 @@ export type BuildAvaDailyBriefingInput = {
   leadSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
   salesOutcomes?: GrowthHomeSalesOutcomesPayload | null
   /** GE-AIOS-17C — Server-hydrated organizational knowledge */
-  organizationalKnowledge?: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[] | null
+  portfolioLeads?: import("@/lib/growth/types").GrowthLead[] | null
 }
 
 function appendScaleStoryBlock(
@@ -135,7 +144,14 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     generatedAt,
     leadSnapshotsById: input.leadSnapshotsById,
     memorySummary,
+    organizationId: input.organizationId ?? null,
+    portfolioLeads: input.portfolioLeads ?? input.workspaceSummary.portfolioLeads ?? null,
   })
+  const eligibleLeadCount =
+    input.workspaceSummary.eligibleLeadCount ??
+    input.portfolioLeads?.length ??
+    input.workspaceSummary.portfolioLeads?.length ??
+    null
   const currentSnapshot = buildAvaNarrativeMetricsSnapshotFromContext(context)
   const since_yesterday = buildSinceYesterdayLines(currentSnapshot, input.previousSnapshot ?? null)
   const operatingRhythm = runOperatingRhythm({
@@ -155,6 +171,7 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     repliesToday: context.metrics.repliesToday,
     setupIncomplete: context.businessUnderstanding.profileIncomplete,
     missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+    eligibleLeadCount,
   })
   const story_blocks = appendScaleStoryBlock(
     dailyActivityLinesToStoryBlocks(daily_activity_narrative),

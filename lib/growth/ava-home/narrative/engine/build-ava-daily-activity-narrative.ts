@@ -30,6 +30,10 @@ import {
   resolveLeadDiscoveryNarrativeFocus,
 } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import {
+  GROWTH_PORTFOLIO_NO_ELIGIBLE_RESEARCH_COPY,
+  GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 
 export const GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER =
   "ge-aios-17d-daily-activity-narrative-v1" as const
@@ -205,6 +209,7 @@ export function buildDailyActivityWorkingNowLines(input: {
   operatingRhythm: AvaOperatingRhythm
   specialistOrchestrator?: AvaSpecialistOrchestratorResult | null
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  eligibleLeadCount?: number | null
 }): string[] {
   const lines: string[] = []
   const activeWork = input.workResult.active_work
@@ -231,6 +236,10 @@ export function buildDailyActivityWorkingNowLines(input: {
     lines.push(input.operatingRhythm.active_cycle.summary)
   }
 
+  if (lines.length === 0 && input.eligibleLeadCount === 0) {
+    lines.push(GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY)
+  }
+
   return lines.slice(0, 2)
 }
 
@@ -242,6 +251,7 @@ export function buildDailyActivityWorkingNextLines(input: {
   setupIncomplete?: boolean
   setupBlockingSummary?: string | null
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  eligibleLeadCount?: number | null
 }): string[] {
   const lines: string[] = []
 
@@ -287,6 +297,8 @@ export function buildDailyActivityWorkingNextLines(input: {
     const discoveryNext = buildLeadDiscoveryWorkingNextLine(input.missionDiscovery)
     if (discoveryNext) {
       lines.push(discoveryNext)
+    } else if (input.eligibleLeadCount === 0) {
+      lines.push(GROWTH_PORTFOLIO_NO_ELIGIBLE_RESEARCH_COPY)
     } else {
       lines.push(NARRATIVE_INTELLIGENCE_EMPTY_QUEUE_MESSAGE)
     }
@@ -306,6 +318,7 @@ export function buildAvaDailyActivityNarrative(input: {
   setupIncomplete?: boolean
   setupBlockingSummary?: string | null
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  eligibleLeadCount?: number | null
 }): AvaDailyActivityNarrative {
   const completedLines = buildDailyActivityCompletedLines(input)
   const workingNowLines = buildDailyActivityWorkingNowLines(input)

@@ -107,12 +107,24 @@ function buildEngineWorkspaceSummary(
     relationshipSnapshots: payload.relationshipSnapshots,
     leadPool: payload.leadPool,
     missionDiscovery: payload.missionDiscovery ?? null,
+    portfolioLeads: payload.portfolioLeads,
+    eligibleLeadCount: payload.eligibleLeadCount,
   }
 }
 
 type BuildAvaHomeHeroEngineSummary = Pick<
   GrowthHomeWorkspaceSummaryPayload,
-  "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool" | "missionDiscovery"
+  | "kpis"
+  | "meetings"
+  | "inbox"
+  | "operatorTasks"
+  | "avaConsole"
+  | "dashboard"
+  | "relationshipSnapshots"
+  | "leadPool"
+  | "missionDiscovery"
+  | "portfolioLeads"
+  | "eligibleLeadCount"
 >
 
 type Props = {
@@ -339,6 +351,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           workManager={avaHero.workManager ?? null}
           leadPool={workspaceSummary?.leadPool ?? null}
           progress={aiOsUx.canonicalOperatorProgress}
+          eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
         />
 
         <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />

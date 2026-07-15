@@ -5,8 +5,10 @@ import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { mapAslWorkflowAgentToActionKind } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-action-policy-1a"
 import {
   evaluateCanonicalExecutionAuthorityForLead,
+  buildLeadLifecycleSnapshotForAuthority,
 } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
 import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
+import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { runMemoryEngine } from "@/lib/growth/memory/engine/run-memory-engine"
 import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { delegateWorkItem } from "@/lib/growth/specialists/execution/sales-specialist-execution-bridge"
@@ -26,6 +28,9 @@ import {
   type AutonomyTickHealthStage,
   type GrowthAiosAutonomyTickHealthSnapshot,
 } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
+import {
+  GROWTH_PORTFOLIO_EMPTY_OR_INELIGIBLE_STOP_REASON,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 
 function emptySnapshot(input: Partial<GrowthAiosAutonomyTickHealthSnapshot>): GrowthAiosAutonomyTickHealthSnapshot {
   return {
@@ -102,7 +107,7 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
 
   try {
     stage = "organization_resolution"
-    const organizationId = getGrowthEngineAiOrgId(env)
+    const organizationId = getGrowthEngineAiOrgId()
     const killSwitches = await getRuntimeKillSwitchStates(admin)
     organizationResolved = organizationId != null
 
@@ -148,6 +153,8 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
     const workResult = runWorkManager({
       ...portfolioSnapshot.workManagerInput,
       memorySummary,
+      organizationId,
+      portfolioLeads: portfolioSnapshot.portfolioLeads,
     })
 
     const candidateCount = workResult.all_work_items.length
@@ -160,6 +167,7 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
     const drySelected = dryRun.selected_work?.[0] ?? null
 
     let authorityDisposition: string | null = null
+    let authorityReasonCode: string | null = null
     let decisionResolved = false
     let admissionBlocked = false
     let wouldExecute = false
@@ -182,6 +190,18 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
         decisionResolutionStarted = true
         authorityEvaluationStarted = true
 
+        const lifecycle = lead ? await buildLeadLifecycleSnapshotForAuthority(admin, lead).catch(() => null) : null
+
+        const runtimeContext = createGrowthAiOsRuntimeContext(admin, {
+          organizationId,
+          leadId,
+          generatedAt,
+          companyName: lead?.companyName ?? null,
+          cacheScope: "autonomy-tick-health",
+        })
+        const decisionResolution = await runtimeContext.getDecision().catch(() => null)
+        decisionResolved = decisionResolution?.decision?.decisionFingerprint != null
+
         try {
           const authority = await evaluateCanonicalExecutionAuthorityForLead(admin, {
             organizationId,
@@ -189,9 +209,10 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
             actionKind: mapAslWorkflowAgentToActionKind(workflowAgent),
             generatedAt,
             lead,
+            lifecycle: lifecycle ?? undefined,
           })
           authorityDisposition = authority.disposition
-          decisionResolved = authority.decisionFingerprint != null
+          authorityReasonCode = authority.reasonCode
           wouldExecute =
             Boolean(selectedItem && isExecutableWorkItem(selectedItem)) &&
             Boolean(delegation?.delegated) &&
@@ -199,8 +220,21 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
             !admissionBlocked &&
             dryRun.dry_run === true &&
             (dryRun.selected_work?.length ?? 0) > 0
+
+          logGrowthEngine("autonomy_tick_health_authority_evaluated", {
+            qa_marker: GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
+            stage,
+            disposition: authority.disposition,
+            reason_code: authority.reasonCode,
+            decision_resolved: decisionResolved,
+            lifecycle_reason: authority.lifecycleReason,
+            organization_resolved: organizationResolved,
+            portfolio_snapshot_built: portfolioSnapshotBuilt,
+            work_selected: workSelected,
+          })
         } catch (authorityError) {
           authorityDisposition = "deferred"
+          authorityReasonCode = "decision_resolution_unavailable"
           decisionResolved = false
           wouldExecute = false
           logGrowthEngine("autonomy_tick_health_authority_deferred", {
@@ -218,12 +252,16 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
     }
 
     const selectedWork = Boolean(selectedItem ?? drySelected)
-    const stopReason = resolveAutonomyTickStopReason({
-      selectedWork,
-      decisionResolved,
-      authorityDisposition,
-      dryRunStopReason: dryRun.stop_reason,
-    })
+    const stopReason =
+      !selectedWork && portfolioSnapshot.eligibleLeadCount === 0
+        ? GROWTH_PORTFOLIO_EMPTY_OR_INELIGIBLE_STOP_REASON
+        : resolveAutonomyTickStopReason({
+            selectedWork,
+            decisionResolved,
+            authorityDisposition,
+            authorityReasonCode,
+            dryRunStopReason: dryRun.stop_reason,
+          })
     const ok = wouldExecute && !killSwitches.autonomy_outbound_enabled
 
     stage = "complete"

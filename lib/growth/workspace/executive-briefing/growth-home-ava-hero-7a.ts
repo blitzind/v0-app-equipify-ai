@@ -89,7 +89,17 @@ export type BuildAvaHomeHeroInput = {
   repliesWaiting: number
   workspaceSummary?: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool" | "missionDiscovery"
+    | "kpis"
+    | "meetings"
+    | "inbox"
+    | "operatorTasks"
+    | "avaConsole"
+    | "dashboard"
+    | "relationshipSnapshots"
+    | "leadPool"
+    | "missionDiscovery"
+    | "portfolioLeads"
+    | "eligibleLeadCount"
   >
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
@@ -304,6 +314,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     leadSnapshotsById,
     salesOutcomes: input.salesOutcomes ?? null,
     organizationalKnowledge: input.organizationalKnowledge ?? null,
+    portfolioLeads: input.workspaceSummary.portfolioLeads ?? null,
   })
 
   assertDailyBriefing(dailyBriefing)

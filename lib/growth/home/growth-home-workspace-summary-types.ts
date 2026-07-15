@@ -142,4 +142,7 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   canonicalActiveMissions: GrowthCanonicalActiveMissionsProjection | null
   /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — single prioritized operator focus */
   canonicalOperatorFocus: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
+  /** GE-AIOS-PORTFOLIO-ELIGIBILITY-CLOSURE-1A — bounded lead pool for portfolio eligibility */
+  portfolioLeads?: import("@/lib/growth/types").GrowthLead[]
+  eligibleLeadCount?: number
 }

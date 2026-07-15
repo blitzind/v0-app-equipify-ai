@@ -72,7 +72,10 @@ assert.match(proof1aSource, /tracePortfolioAslPath/)
 assert.match(proof1aSource, /traceLegacyHomeSummaryComparison/)
 assert.match(proof1aSource, /fetchDeployedGrowthAiosRuntimeConfigHealth/)
 assert.doesNotMatch(proof1aSource, /BLOCKED_BY_OBSOLETE_FEATURE_GATE/)
-assert.match(serviceSource, /resolveAdmissionBlockedFromLeadMetadata/)
+assert.match(serviceSource, /createGrowthAiOsRuntimeContext/)
+assert.match(serviceSource, /runtimeContext\.getDecision/)
+assert.match(serviceSource, /authorityReasonCode/)
+assert.match(serviceSource, /buildLeadLifecycleSnapshotForAuthority/)
 assert.doesNotMatch(serviceSource, /resolveLeadAdmissionStateFromMetadata\(lead\.metadata\)\.state/)
 assert.match(serviceSource, /let stage: AutonomyTickHealthStage/)
 assert.match(routeSource, /AutonomyTickHealthBuildError/)
@@ -153,9 +156,30 @@ assert.equal(
     selectedWork: true,
     decisionResolved: false,
     authorityDisposition: "deferred",
+    authorityReasonCode: "degraded_safe_research_deferred",
     dryRunStopReason: null,
   }),
-  "required_state_unavailable",
+  "degraded_safe_research_deferred",
+)
+assert.equal(
+  resolveAutonomyTickStopReason({
+    selectedWork: true,
+    decisionResolved: true,
+    authorityDisposition: "blocked",
+    authorityReasonCode: "hard_terminal_archived",
+    dryRunStopReason: null,
+  }),
+  "hard_terminal_archived",
+)
+assert.equal(
+  resolveAutonomyTickStopReason({
+    selectedWork: true,
+    decisionResolved: false,
+    authorityDisposition: "deferred",
+    authorityReasonCode: null,
+    dryRunStopReason: null,
+  }),
+  "decision_resolution_unavailable",
 )
 assert.equal(
   resolveAutonomyTickStopReason({
@@ -183,12 +207,26 @@ const deferredResearch = sampleTickHealth({
   decisionResolved: false,
   authorityDisposition: "deferred",
   wouldExecute: false,
-  stopReason: "required_state_unavailable",
+  stopReason: "degraded_safe_research_deferred",
 })
 assert.equal(deferredResearch.mutationPerformed, false)
 assert.equal(deferredResearch.wouldExecute, false)
 assert.equal(
   resolveGrowthAiosAutonomyTickProofVerdict({ tickHealth: deferredResearch }),
+  "BLOCKED_BY_EXECUTION_AUTHORITY",
+)
+
+const archivedResearch = sampleTickHealth({
+  selectedWork: true,
+  selectedWorkType: "research",
+  decisionResolved: true,
+  authorityDisposition: "blocked",
+  wouldExecute: false,
+  stopReason: "hard_terminal_archived",
+})
+assert.equal(archivedResearch.stopReason, "hard_terminal_archived")
+assert.equal(
+  resolveGrowthAiosAutonomyTickProofVerdict({ tickHealth: archivedResearch }),
   "BLOCKED_BY_EXECUTION_AUTHORITY",
 )
 console.log("  ✓ Phase 8 — research work with deferred authority stays mutation-free")

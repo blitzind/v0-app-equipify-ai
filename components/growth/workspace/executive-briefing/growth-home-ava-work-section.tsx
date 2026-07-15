@@ -6,6 +6,9 @@ import {
   GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE,
   GROWTH_CUSTOMER_EMPTY_WORK_NEXT_LABEL,
 } from "@/lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
+import {
+  GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 import { GROWTH_TRAINING_COMPANY_PROFILE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import {
@@ -31,6 +34,7 @@ type Props = {
   workManager: AvaWorkManagerResult | null
   leadPool?: GrowthHomeLeadPoolSummary | null
   progress?: GrowthCanonicalOperatorProgressProjection | null
+  eligibleLeadCount?: number | null
 }
 
 function WorkItemRow({ item }: { item: HomeWorkItemPresentation }) {
@@ -94,7 +98,7 @@ function WorkItemList({
   )
 }
 
-export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progress = null }: Props) {
+export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progress = null, eligibleLeadCount = null }: Props) {
   const safeWorkManager = normalizeAvaWorkManagerResult(workManager)
   const hasWorkPlan = Boolean(safeWorkManager && safeWorkManager.work_plan.length > 0)
   const scaleLine = buildHomeRelationshipScaleLine(leadPool)
@@ -133,7 +137,12 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progres
 
       {!wm ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE}</p>
+          <p className="text-sm text-muted-foreground">
+            {eligibleLeadCount === 0
+              ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY
+              : GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE}
+          </p>
+          {eligibleLeadCount === 0 ? null : (
           <Link
             href={GROWTH_TRAINING_COMPANY_PROFILE_ROUTE}
             className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:underline dark:text-indigo-300"
@@ -141,6 +150,7 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progres
             {GROWTH_CUSTOMER_EMPTY_WORK_NEXT_LABEL}
             <ArrowRight className="size-3" aria-hidden />
           </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">

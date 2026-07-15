@@ -10,9 +10,16 @@ import { GROWTH_WORK_MANAGER_QA_MARKER, type AvaWorkManagerResult } from "@/lib/
 import type { BuildWorkContextInput } from "@/lib/growth/work-manager/context/build-work-context"
 import type { AvaMemorySummary } from "@/lib/growth/memory/types"
 import { orchestrateWorkManagerResult } from "@/lib/growth/specialists/engine/run-specialist-orchestrator"
+import {
+  applyPortfolioEligibilityToWorkManagerResult,
+  buildPortfolioEligibilityContext,
+  filterPortfolioEligibleWorkItems,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 
 export type RunWorkManagerInput = BuildWorkContextInput & {
   memorySummary?: AvaMemorySummary | null
+  organizationId?: string | null
+  portfolioLeads?: import("@/lib/growth/types").GrowthLead[] | null
 }
 
 export type ExecuteReadyWorkItemsResult =
@@ -47,11 +54,19 @@ export function executeReadyWorkItems(
 
 export function runWorkManager(input: RunWorkManagerInput): AvaWorkManagerResult {
   const timestamp = input.generatedAt ?? new Date().toISOString()
+  const portfolioEligibility =
+    input.organizationId && input.portfolioLeads
+      ? buildPortfolioEligibilityContext(input.organizationId, input.portfolioLeads)
+      : null
   const decisionResult = runDecisionEngine({
     ...input,
     memorySummary: input.memorySummary ?? null,
+    portfolioEligibility,
   })
-  const workItems = nextBestActionsToWorkItems(decisionResult.next_best_actions, timestamp)
+  const workItems = filterPortfolioEligibleWorkItems(
+    nextBestActionsToWorkItems(decisionResult.next_best_actions, timestamp),
+    portfolioEligibility,
+  )
   const completedToday = buildCompletedWorkItems(
     input.accomplishments,
     input.workspaceSummary.avaConsole.researchLoopSummary,
@@ -65,9 +80,10 @@ export function runWorkManager(input: RunWorkManagerInput): AvaWorkManagerResult
     completed_today: completedToday,
   }
   const { workResult, specialistResult } = orchestrateWorkManagerResult(baseResult)
+  const eligibleWorkResult = applyPortfolioEligibilityToWorkManagerResult(workResult, portfolioEligibility)
 
   return {
-    ...workResult,
+    ...eligibleWorkResult,
     specialist_orchestrator_qa_marker: specialistResult.qaMarker,
     specialist_orchestrator_result: specialistResult,
   }

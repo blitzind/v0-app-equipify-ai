@@ -8,6 +8,7 @@ import type {
   GrowthHomeDailyWorkQueueItem,
   GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 
 export type GrowthCanonicalOperatorProgressItem = {
@@ -31,6 +32,7 @@ export function projectCanonicalOperatorProgress(input: {
   dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   focusLeadId?: string | null
+  eligibleLeadCount?: number | null
 }): GrowthCanonicalOperatorProgressProjection {
   const waitingIds = new Set((input.waitingOnYou ?? []).map((row) => row.id))
   const items: GrowthCanonicalOperatorProgressItem[] = []
@@ -75,12 +77,16 @@ export function projectCanonicalOperatorProgress(input: {
 
   const activeLabel = wm?.active_work
     ? wm.active_work.company_name ?? wm.active_work.title
-    : items[0]?.label ?? null
+    : items[0]?.label ??
+      (input.eligibleLeadCount === 0 ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY : null)
 
   return {
     qaMarker: GROWTH_AIOS_OPERATOR_STORY_IMPLEMENTATION_1A_QA_MARKER,
     title: "Progress",
-    subtitle: "Background work and momentum across your accounts",
+    subtitle:
+      input.eligibleLeadCount === 0 && !wm?.active_work
+        ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY
+        : "Background work and momentum across your accounts",
     items,
     activeLabel,
   }

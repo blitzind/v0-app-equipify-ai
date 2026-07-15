@@ -133,6 +133,7 @@ async function loadAutonomousSalesLoopContext(
     salesOutcomes: snapshot.salesOutcomes.outcomes,
     organizationalKnowledge: snapshot.organizationalKnowledge.store.items,
     persistedMemoryStore: snapshot.organizationalMemory.store,
+    portfolioLeads: snapshot.portfolioLeads,
   }
 }
 
@@ -143,6 +144,7 @@ function buildWorkManagerState(input: {
   persistedMemoryStore: import("@/lib/growth/memory/types").AvaOrganizationalMemoryStore
   organizationId: string
   generatedAt: string
+  portfolioLeads?: import("@/lib/growth/types").GrowthLead[]
 }): { workResult: AvaWorkManagerResult; salesOutcomes: SalesOutcome[] } {
   const { summary: memorySummary } = runMemoryEngine({
     organizationId: input.organizationId,
@@ -160,6 +162,8 @@ function buildWorkManagerState(input: {
   const workResult = runWorkManager({
     ...input.workManagerInput,
     memorySummary,
+    organizationId: input.organizationId,
+    portfolioLeads: input.portfolioLeads ?? null,
   })
 
   return { workResult, salesOutcomes: input.salesOutcomes }

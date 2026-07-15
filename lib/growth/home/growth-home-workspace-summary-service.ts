@@ -59,6 +59,10 @@ import type {
 } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
+import {
+  buildPortfolioEligibilityContext,
+  sanitizeResearchLoopSummaryForPortfolio,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
@@ -174,6 +178,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   })
   stageTimings.push({ label: "lead_pool", durationMs: Date.now() - leadPoolStart, timedOut: false })
   const leads = leadPoolPage.leads
+  const portfolioEligibility = organizationId
+    ? buildPortfolioEligibilityContext(organizationId, leads)
+    : null
 
   const revenueQueueSections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
   const revenueQueue: GrowthHomeWorkspaceSummaryRevenueQueue = {
@@ -381,7 +388,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     newReplies: kpis.repliesToday,
   }
 
-  const avaResearchLoopSummary = organizationId
+  const avaResearchLoopSummaryRaw = organizationId
     ? await withGrowthHomeLoaderBudget({
         label: "ava_research_loop_summary",
         budgetMs: loaderBudgetMs,
@@ -392,6 +399,10 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         return step.value
       })
     : null
+  const avaResearchLoopSummary = sanitizeResearchLoopSummaryForPortfolio(
+    avaResearchLoopSummaryRaw,
+    portfolioEligibility,
+  )
 
   const suggestedNextAction =
     dailyWorkQueueBundle.display?.top_items?.[0]?.action_label ??
@@ -731,6 +742,8 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     canonicalOperatorTask,
     canonicalActiveMissions,
     canonicalOperatorFocus,
+    portfolioLeads: leads,
+    eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
   }
 }
 

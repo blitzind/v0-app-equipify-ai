@@ -934,6 +934,7 @@
     "test:ge-aios-scheduler-runtime-optimization-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-scheduler-runtime-optimization-1a.ts",
     "test:ge-aios-authority-proof-audit-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-authority-proof-audit-1a.ts",
     "test:ge-aios-execution-authority-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-execution-authority-closure-1a.ts",
+    "test:ge-aios-portfolio-eligibility-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-portfolio-eligibility-closure-1a.ts",
     "test:ge-aios-degraded-enforcement-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-degraded-enforcement-closure-1a.ts",
     "test:ge-aios-autonomy-recertification-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-autonomy-recertification-1a.ts",
     "probe:ge-aios-authority-proof-production-readonly": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-authority-proof-production-readonly.ts",

@@ -470,6 +470,7 @@ export async function listGrowthLeads(
     } else {
       query = query.neq("status", "archived")
     }
+    query = query.not("status", "in", '("archived","disqualified","duplicate")')
   }
 
   const { data, error } = await query.range(offset, offset + limit - 1)
@@ -544,6 +545,7 @@ export async function fetchGrowthHomeLeadPoolPage(
   } else {
     query = query.neq("status", "archived")
   }
+  query = query.not("status", "in", '("archived","disqualified","duplicate")')
 
   if (parsedCursor) {
     query = query.or(

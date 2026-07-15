@@ -8,6 +8,11 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import { fetchDailyRevenueWorkQueueFromLeads } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
+import {
+  buildPortfolioEligibilityContext,
+  filterPortfolioEligibleLeads,
+  sanitizeResearchLoopSummaryForPortfolio,
+} from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
 import { fetchGrowthHomeLeadPoolPage } from "@/lib/growth/lead-repository"
 import { fetchOrganizationKnowledgeStore } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
@@ -42,6 +47,8 @@ export type GrowthAutonomousPortfolioWorkSnapshot = {
   organizationalMemory: GrowthHomeOrganizationMemoryPayload
   relationshipSnapshots: RelationshipLeadSnapshotBatchResult
   leadCount: number
+  eligibleLeadCount: number
+  portfolioLeads: import("@/lib/growth/types").GrowthLead[]
   durationMs: number
 }
 
@@ -72,12 +79,14 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
     limit: GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
   })
   const leads = leadPoolPage.leads
+  const portfolioEligibility = buildPortfolioEligibilityContext(input.organizationId, leads)
+  const eligibleLeads = filterPortfolioEligibleLeads(leads, input.organizationId)
   const revenueQueueSections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
 
-  const [dailyWorkQueueBundle, relationshipSnapshots, avaResearchLoopSummary, organizationalMemory, organizationalKnowledge] =
+  const [dailyWorkQueueBundle, relationshipSnapshots, avaResearchLoopSummaryRaw, organizationalMemory, organizationalKnowledge] =
     await Promise.all([
-      fetchDailyRevenueWorkQueueFromLeads(admin, leads),
-      enrichRelationshipLeadSnapshotsBatch(admin, leads),
+      fetchDailyRevenueWorkQueueFromLeads(admin, eligibleLeads),
+      enrichRelationshipLeadSnapshotsBatch(admin, eligibleLeads),
       fetchLatestAvaResearchLoopSummary(admin, input.organizationId).catch(() => null),
       fetchOrganizationMemoryStore(admin, {
         organizationId: input.organizationId,
@@ -88,6 +97,11 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
         generatedAt,
       }),
     ])
+
+  const avaResearchLoopSummary = sanitizeResearchLoopSummaryForPortfolio(
+    avaResearchLoopSummaryRaw,
+    portfolioEligibility,
+  )
 
   const sources: GrowthWorkspaceDashboardSourcePayload = {
     briefing: null,
@@ -162,6 +176,8 @@ export async function buildGrowthAutonomousPortfolioWorkSnapshot(
     organizationalMemory,
     relationshipSnapshots,
     leadCount: leads.length,
+    eligibleLeadCount: portfolioEligibility.eligibleCount,
+    portfolioLeads: leads,
     durationMs: Date.now() - startedAt,
   }
 }
