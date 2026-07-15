@@ -1,5 +1,19 @@
+import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+
 export const GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER =
   "ge-aios-live-autonomy-tick-proof-1b-v1" as const
+
+export type AutonomyTickHealthStage =
+  | "initializing"
+  | "organization_resolution"
+  | "portfolio_snapshot"
+  | "runtime_context"
+  | "work_manager"
+  | "asl_dry_run"
+  | "lead_resolution"
+  | "admission_evaluation"
+  | "execution_authority"
+  | "complete"
 
 export type GrowthAiosAutonomyTickHealthSnapshot = {
   ok: boolean
@@ -18,6 +32,33 @@ export type GrowthAiosAutonomyTickHealthSnapshot = {
   mutationPerformed: boolean
   stopReason: string | null
   admissionBlocked: boolean
+}
+
+export type AutonomyTickHealthBuildDiagnostics = {
+  stage: AutonomyTickHealthStage
+  organizationResolved: boolean
+  portfolioSnapshotBuilt: boolean
+  workSelected: boolean
+  decisionResolutionStarted: boolean
+  authorityEvaluationStarted: boolean
+  errorClass: string | null
+}
+
+export class AutonomyTickHealthBuildError extends Error {
+  readonly stage: AutonomyTickHealthStage
+  readonly diagnostics: AutonomyTickHealthBuildDiagnostics
+
+  constructor(input: {
+    stage: AutonomyTickHealthStage
+    diagnostics: AutonomyTickHealthBuildDiagnostics
+    cause: unknown
+  }) {
+    const causeMessage = input.cause instanceof Error ? input.cause.message : String(input.cause)
+    super(`Autonomy tick health failed at ${input.stage}: ${causeMessage}`)
+    this.name = "AutonomyTickHealthBuildError"
+    this.stage = input.stage
+    this.diagnostics = input.diagnostics
+  }
 }
 
 export type GrowthAiosAutonomyTickProofVerdict =
@@ -65,4 +106,27 @@ export function resolveGrowthAiosAutonomyTickProofVerdict(input: {
     return "BLOCKED_BY_EMPTY_PORTFOLIO"
   }
   return "READY_AFTER_PORTFOLIO_ADMISSION"
+}
+
+/** Admission metadata may be absent on Production leads — null is valid, not blocked. */
+export function resolveAdmissionBlockedFromLeadMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): boolean {
+  const admission = resolveLeadAdmissionStateFromMetadata(metadata)
+  return admission === "review" || admission === "rejected" || admission === "invalid"
+}
+
+export function resolveAutonomyTickStopReason(input: {
+  selectedWork: boolean
+  decisionResolved: boolean
+  authorityDisposition: string | null
+  dryRunStopReason: string | null | undefined
+}): string | null {
+  if (!input.selectedWork) return "no_executable_work"
+  if (!input.decisionResolved) return "required_state_unavailable"
+  if (input.authorityDisposition === "deferred") return "required_state_unavailable"
+  if (input.authorityDisposition != null && input.authorityDisposition !== "allowed") {
+    return input.authorityDisposition
+  }
+  return input.dryRunStopReason ?? null
 }

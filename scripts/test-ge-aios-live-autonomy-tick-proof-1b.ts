@@ -8,6 +8,9 @@ import fs from "node:fs"
 import path from "node:path"
 import {
   resolveGrowthAiosAutonomyTickProofVerdict,
+  resolveAdmissionBlockedFromLeadMetadata,
+  resolveAutonomyTickStopReason,
+  AutonomyTickHealthBuildError,
 } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
 import {
   GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
@@ -69,6 +72,11 @@ assert.match(proof1aSource, /tracePortfolioAslPath/)
 assert.match(proof1aSource, /traceLegacyHomeSummaryComparison/)
 assert.match(proof1aSource, /fetchDeployedGrowthAiosRuntimeConfigHealth/)
 assert.doesNotMatch(proof1aSource, /BLOCKED_BY_OBSOLETE_FEATURE_GATE/)
+assert.match(serviceSource, /resolveAdmissionBlockedFromLeadMetadata/)
+assert.doesNotMatch(serviceSource, /resolveLeadAdmissionStateFromMetadata\(lead\.metadata\)\.state/)
+assert.match(serviceSource, /let stage: AutonomyTickHealthStage/)
+assert.match(routeSource, /AutonomyTickHealthBuildError/)
+assert.doesNotMatch(routeSource, /message: detail/)
 console.log("  ✓ Phase 1 — deployed portfolio ASL path + dry-run endpoint wired")
 
 const serialized = JSON.stringify(sampleTickHealth())
@@ -132,5 +140,84 @@ console.log("  ✓ Phase 4 — verdict taxonomy identifies portfolio/admission/a
 
 assert.equal(GROWTH_AIOS_AUTONOMY_TICK_HEALTH_ROUTE_PATH, "/api/platform/growth/ai-os/autonomy-tick-health")
 console.log("  ✓ Phase 5 — autonomy tick health route path canonical")
+
+assert.equal(resolveAdmissionBlockedFromLeadMetadata(null), false)
+assert.equal(resolveAdmissionBlockedFromLeadMetadata({}), false)
+assert.equal(resolveAdmissionBlockedFromLeadMetadata(undefined), false)
+assert.equal(resolveAdmissionBlockedFromLeadMetadata({ admission_state: "accepted" }), false)
+assert.equal(resolveAdmissionBlockedFromLeadMetadata({ admission_state: "review" }), true)
+console.log("  ✓ Phase 6 — null admission metadata is valid, not blocked")
+
+assert.equal(
+  resolveAutonomyTickStopReason({
+    selectedWork: true,
+    decisionResolved: false,
+    authorityDisposition: "deferred",
+    dryRunStopReason: null,
+  }),
+  "required_state_unavailable",
+)
+assert.equal(
+  resolveAutonomyTickStopReason({
+    selectedWork: false,
+    decisionResolved: false,
+    authorityDisposition: null,
+    dryRunStopReason: null,
+  }),
+  "no_executable_work",
+)
+assert.equal(
+  resolveAutonomyTickStopReason({
+    selectedWork: true,
+    decisionResolved: true,
+    authorityDisposition: "allowed",
+    dryRunStopReason: null,
+  }),
+  null,
+)
+console.log("  ✓ Phase 7 — truthful stop reasons for missing state and empty portfolio")
+
+const deferredResearch = sampleTickHealth({
+  selectedWork: true,
+  selectedWorkType: "research",
+  decisionResolved: false,
+  authorityDisposition: "deferred",
+  wouldExecute: false,
+  stopReason: "required_state_unavailable",
+})
+assert.equal(deferredResearch.mutationPerformed, false)
+assert.equal(deferredResearch.wouldExecute, false)
+assert.equal(
+  resolveGrowthAiosAutonomyTickProofVerdict({ tickHealth: deferredResearch }),
+  "BLOCKED_BY_EXECUTION_AUTHORITY",
+)
+console.log("  ✓ Phase 8 — research work with deferred authority stays mutation-free")
+
+const routeErrorBody = JSON.stringify({
+  ok: false,
+  qaMarker: GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
+  error: "autonomy_tick_health_failed",
+  stage: "admission_evaluation",
+})
+assert.doesNotMatch(routeErrorBody, /Cannot read properties|stack|message/i)
+assert.match(routeErrorBody, /admission_evaluation/)
+console.log("  ✓ Phase 9 — sanitized error response exposes stage only")
+
+const buildError = new AutonomyTickHealthBuildError({
+  stage: "execution_authority",
+  diagnostics: {
+    stage: "execution_authority",
+    organizationResolved: true,
+    portfolioSnapshotBuilt: true,
+    workSelected: true,
+    decisionResolutionStarted: true,
+    authorityEvaluationStarted: true,
+    errorClass: "TypeError",
+  },
+  cause: new TypeError("Cannot read properties of null (reading 'state')"),
+})
+assert.equal(buildError.stage, "execution_authority")
+assert.match(buildError.diagnostics.errorClass ?? "", /TypeError/)
+console.log("  ✓ Phase 10 — server-side stage diagnostics capture failure boundary")
 
 console.log("\nGE-AIOS-LIVE-AUTONOMY-TICK-PROOF-1B PASS\n")

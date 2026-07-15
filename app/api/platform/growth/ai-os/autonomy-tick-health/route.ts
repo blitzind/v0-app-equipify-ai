@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { buildGrowthAiosAutonomyTickHealthSnapshot } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a"
-import { GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
+import {
+  AutonomyTickHealthBuildError,
+  GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
+} from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -34,13 +37,29 @@ export async function POST(request: Request) {
     const snapshot = await buildGrowthAiosAutonomyTickHealthSnapshot(access.admin)
     return NextResponse.json(snapshot)
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
+    const stage =
+      error instanceof AutonomyTickHealthBuildError ? error.stage : "initializing"
+    const diagnostics =
+      error instanceof AutonomyTickHealthBuildError ? error.diagnostics : null
+
+    logGrowthEngine("autonomy_tick_health_route_failed", {
+      qa_marker: GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
+      stage,
+      error_class: error instanceof Error ? error.name : "UnknownError",
+      organization_resolved: diagnostics?.organizationResolved ?? null,
+      portfolio_snapshot_built: diagnostics?.portfolioSnapshotBuilt ?? null,
+      work_selected: diagnostics?.workSelected ?? null,
+      decision_resolution_started: diagnostics?.decisionResolutionStarted ?? null,
+      authority_evaluation_started: diagnostics?.authorityEvaluationStarted ?? null,
+      stack: error instanceof Error ? error.stack : null,
+    })
+
     return NextResponse.json(
       {
         ok: false,
         qaMarker: GROWTH_AIOS_LIVE_AUTONOMY_TICK_PROOF_1B_QA_MARKER,
         error: "autonomy_tick_health_failed",
-        message: detail.slice(0, 240),
+        stage,
       },
       { status: 500 },
     )
