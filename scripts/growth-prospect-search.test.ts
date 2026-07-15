@@ -1429,6 +1429,73 @@ async function main(): Promise<void> {
   }
   assert.equal(rowMatchesTerritoryFilter({ state: "ON", country: "CA" }, usTerritory), false)
 
+  const geoOnlyRow = {
+    id: "geo-row",
+    source_type: "external_discovered" as const,
+    company_name: "Geo Co",
+    website: null,
+    industry: null,
+    subindustry: null,
+    employees: null,
+    revenue_range: null,
+    location: "Austin, TX",
+    city: "Austin",
+    state: "TX",
+    country: "US",
+    intent_score: null,
+    buying_stage: null,
+    lead_score: null,
+    confidence: 0.5,
+    company_match_confidence: null,
+    decision_maker_coverage: null,
+    verification_status: "external_unverified",
+    signals: [] as string[],
+    search_intent_category: null,
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: null,
+    rank_score: 0.5,
+    match_reasoning: [] as string[],
+    keywords: [] as string[],
+    notes: null,
+  }
+  assert.notEqual(explainProspectSearchFilterDrop(geoOnlyRow, nationwideFilters, { external_discovery: true }), "location")
+  assert.notEqual(
+    explainProspectSearchFilterDrop(
+      { ...geoOnlyRow, city: "Orlando", state: "FL", location: "Orlando, FL" },
+      nationwideFilters,
+      { external_discovery: true },
+    ),
+    "location",
+  )
+  assert.ok(
+    ["territory", "location"].includes(
+      explainProspectSearchFilterDrop(
+        { ...geoOnlyRow, city: "Toronto", state: "ON", country: "CA", location: "Toronto, ON" },
+        nationwideFilters,
+        { external_discovery: true },
+      ) ?? "",
+    ),
+  )
+  const chicagoManualFilters = normalizeProspectSearchFilters({ location: "Chicago" })
+  assert.equal(
+    explainProspectSearchFilterDrop(
+      { ...geoOnlyRow, city: "Chicago", state: "IL", location: "Chicago, IL" },
+      chicagoManualFilters,
+      { external_discovery: true },
+    ),
+    null,
+  )
+  const texasManualFilters = normalizeProspectSearchFilters({ location: "Texas" })
+  assert.equal(
+    explainProspectSearchFilterDrop(
+      { ...geoOnlyRow, city: "Houston", state: "TX", location: "Houston, TX" },
+      texasManualFilters,
+      { external_discovery: true },
+    ),
+    null,
+  )
+
   const row = {
     city: "Greeneville",
     state: "TN",

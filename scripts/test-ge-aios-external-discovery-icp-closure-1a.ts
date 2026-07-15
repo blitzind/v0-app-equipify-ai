@@ -156,6 +156,128 @@ assert.equal(bpFilters.location, "US")
 assert.equal(bpFilters.territory_filter?.country, "US")
 console.log("  ✓ Phase 1b — Business Profile projects nationwide US filters")
 
+function geoFilterCompany(input: {
+  city?: string | null
+  state?: string | null
+  country?: string | null
+  location?: string | null
+}): GrowthProspectSearchCompanyResult {
+  return {
+    id: "geo-filter-test",
+    source_type: "external_discovered",
+    company_name: "Geo Filter Test Co",
+    website: null,
+    industry: null,
+    subindustry: null,
+    city: input.city ?? null,
+    state: input.state ?? null,
+    country: input.country ?? null,
+    location: input.location ?? null,
+    employees: null,
+    revenue_range: null,
+    intent_score: null,
+    buying_stage: null,
+    lead_score: null,
+    confidence: 0.5,
+    company_match_confidence: null,
+    decision_maker_coverage: null,
+    verification_status: "external_unverified",
+    signals: [],
+    search_intent_category: null,
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: null,
+    rank_score: 0.5,
+    match_reasoning: [],
+    keywords: [],
+    notes: null,
+  }
+}
+
+// GE-AIOS-TERRITORY-FILTER-AUTHORITY-1A — territory_filter is canonical when active
+const nationwideUsFilters = normalizeProspectSearchFilters({ location: "US" })
+const austinCompany = geoFilterCompany({
+  city: "Austin",
+  state: "TX",
+  country: "US",
+  location: "Austin, TX",
+})
+assert.notEqual(
+  explainProspectSearchFilterDrop(austinCompany, nationwideUsFilters, { external_discovery: true }),
+  "location",
+)
+assert.notEqual(
+  explainProspectSearchFilterDrop(austinCompany, nationwideUsFilters, { external_discovery: true }),
+  "territory",
+)
+
+const torontoCompany = geoFilterCompany({
+  city: "Toronto",
+  state: "ON",
+  country: "CA",
+  location: "Toronto, ON",
+})
+assert.ok(
+  ["territory", "location"].includes(
+    explainProspectSearchFilterDrop(torontoCompany, nationwideUsFilters, { external_discovery: true }) ?? "",
+  ),
+)
+
+const chicagoFilters = normalizeProspectSearchFilters({ location: "Chicago" })
+const chicagoCompany = geoFilterCompany({
+  city: "Chicago",
+  state: "IL",
+  country: "US",
+  location: "Chicago, IL",
+})
+assert.equal(explainProspectSearchFilterDrop(chicagoCompany, chicagoFilters, { external_discovery: true }), null)
+assert.equal(
+  explainProspectSearchFilterDrop(
+    geoFilterCompany({ city: "Dallas", state: "TX", country: "US", location: "Dallas, TX" }),
+    chicagoFilters,
+    { external_discovery: true },
+  ),
+  "location",
+)
+
+const texasFilters = normalizeProspectSearchFilters({ location: "Texas" })
+const houstonCompany = geoFilterCompany({
+  city: "Houston",
+  state: "TX",
+  country: "US",
+  location: "Houston, TX",
+})
+assert.equal(explainProspectSearchFilterDrop(houstonCompany, texasFilters, { external_discovery: true }), null)
+
+const orlandoCompany = geoFilterCompany({
+  city: "Orlando",
+  state: "FL",
+  country: "US",
+  location: "Orlando, FL",
+})
+assert.notEqual(
+  explainProspectSearchFilterDrop(orlandoCompany, nationwideUsFilters, { external_discovery: true }),
+  "location",
+)
+
+const londonCompany = geoFilterCompany({
+  city: "London",
+  state: null,
+  country: "GB",
+  location: "London, UK",
+})
+assert.ok(
+  ["territory", "location"].includes(
+    explainProspectSearchFilterDrop(londonCompany, nationwideUsFilters, { external_discovery: true }) ?? "",
+  ),
+)
+
+assert.match(
+  readSource("lib/growth/prospect-search/prospect-search-filters.ts"),
+  /territoryFilterAuthorizesRow/,
+)
+console.log("  ✓ Phase 1c — Territory filter authority supersedes redundant location substring")
+
 // Phase 2 — Company mapping
 const normalized = normalizeDatamoonAudienceRecord({
   first_name: "Alex",

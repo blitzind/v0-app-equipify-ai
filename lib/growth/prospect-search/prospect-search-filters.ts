@@ -23,6 +23,7 @@ import {
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
 import {
+  hasActiveTerritoryFilter,
   mergeLocationTextIntoTerritoryFilter,
   normalizeTerritoryFilter,
   rowMatchesTerritoryFilter,
@@ -114,6 +115,43 @@ function buildExternalDiscoveryKeywordBlob(row: ProspectSearchIndustryEvidenceRo
     .join(" ")
 }
 
+function buildProspectSearchGeoRow(
+  row: Pick<
+    GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
+    | "city"
+    | "state"
+    | "postal_code"
+    | "country"
+    | "location"
+    | "service_area"
+    | "metro"
+    | "lat"
+    | "lng"
+  >,
+) {
+  return {
+    city: row.city,
+    state: row.state,
+    postal_code: row.postal_code,
+    country: row.country,
+    location: row.location,
+    service_area: row.service_area,
+    metro: row.metro,
+    lat: row.lat,
+    lng: row.lng,
+  }
+}
+
+/** When canonical territory evaluation passes, legacy location substring must not contradict it. */
+function territoryFilterAuthorizesRow<
+  T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
+>(row: T, filters: GrowthProspectSearchFilters): boolean {
+  if (!filters.territory_filter || !hasActiveTerritoryFilter(filters.territory_filter)) {
+    return false
+  }
+  return rowMatchesTerritoryFilter(buildProspectSearchGeoRow(row), filters.territory_filter)
+}
+
 export type ProspectSearchFilterOptions = {
   external_discovery?: boolean
 }
@@ -130,7 +168,7 @@ export function explainProspectSearchFilterDrop<
   if (filters.subindustry && !includesFold(row.subindustry ?? row.industry, filters.subindustry)) {
     return "subindustry"
   }
-  if (filters.location) {
+  if (filters.location && !territoryFilterAuthorizesRow(row, filters)) {
     const loc = [row.location, row.city, row.state, row.service_area].join(" ")
     if (!includesFold(loc, filters.location)) return "location"
   }
