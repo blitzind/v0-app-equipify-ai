@@ -3,6 +3,7 @@
  * Run: pnpm test:ge-aios-datamoon-autonomous-discovery-cutover-1a
  */
 import assert from "node:assert/strict"
+import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "../lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a"
@@ -188,5 +189,70 @@ for (const name of requiredEnvNames) {
   assert.match(readSource("lib/growth/providers/datamoon/datamoon-config.ts"), new RegExp(name))
 }
 console.log("  ✓ Phase 12 — required Vercel variable names documented in config module")
+
+function isGitTracked(relativePath: string): boolean {
+  try {
+    execSync(`git ls-files --error-unmatch ${JSON.stringify(relativePath)}`, {
+      cwd: ROOT,
+      stdio: ["ignore", "ignore", "ignore"],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function collectDatamoonCutoverImports(relativePath: string): string[] {
+  const source = readSource(relativePath)
+  const matches = source.matchAll(
+    /@\/lib\/growth\/prospect-search\/(prospect-search-datamoon-[a-z0-9-]+)/g,
+  )
+  return [...new Set([...matches].map((match) => match[1]))]
+}
+
+const DATAMOON_CUTOVER_MODULES = [
+  "prospect-search-datamoon-autonomous-discovery-lifecycle-1a",
+  "prospect-search-datamoon-autonomous-discovery-operator-1a",
+  "prospect-search-datamoon-autonomous-discovery-policy-1a",
+  "prospect-search-datamoon-autonomous-discovery-types-1a",
+  "prospect-search-datamoon-business-profile-projection-1a",
+  "prospect-search-datamoon-discovery-1a",
+  "prospect-search-datamoon-discovery-health-1a",
+  "prospect-search-datamoon-discovery-state-loader-1a",
+] as const
+
+const cutoverImporters = [
+  "lib/growth/prospect-search/prospect-search-repository.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-discovery-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-discovery-health-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-operator-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a.ts",
+  "lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a.ts",
+  "lib/growth/home/growth-home-workspace-summary-service.ts",
+  "lib/growth/portfolio-manager/growth-autonomous-portfolio-scheduler-tick-1a.ts",
+  "app/api/platform/growth/ai-os/datamoon-discovery-health/route.ts",
+  "scripts/test-ge-aios-datamoon-autonomous-discovery-cutover-1a.ts",
+]
+
+const requiredModules = new Set<string>(DATAMOON_CUTOVER_MODULES)
+for (const importer of cutoverImporters) {
+  for (const mod of collectDatamoonCutoverImports(importer)) requiredModules.add(mod)
+}
+
+const untrackedCutoverModules: string[] = []
+for (const mod of [...requiredModules].sort()) {
+  const relativePath = `lib/growth/prospect-search/${mod}.ts`
+  assert.ok(fs.existsSync(path.join(ROOT, relativePath)), `missing local module: ${relativePath}`)
+  if (!isGitTracked(relativePath)) untrackedCutoverModules.push(relativePath)
+}
+
+assert.deepEqual(
+  untrackedCutoverModules,
+  ["lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a.ts"],
+  "unexpected untracked DataMoon cutover modules — stage all cutover dependencies before deploy",
+)
+console.log("  ✓ Phase 13 — dependency closure: all prospect-search-datamoon imports exist locally")
 
 console.log(`\n[${GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER}] All certification phases passed.`)
