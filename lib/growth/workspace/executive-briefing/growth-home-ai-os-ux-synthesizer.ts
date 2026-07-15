@@ -25,6 +25,19 @@ import type {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_HOME_AI_OS_UX_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
+  buildCanonicalOperatorTask,
+  buildCanonicalOperatorWaitingSummary,
+  resolveCanonicalApprovalQueueCount,
+  resolveCanonicalOutreachDraftCount,
+} from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import type {
+  GrowthCanonicalOperatorApprovalSnapshot,
+  GrowthCanonicalOperatorTask,
+} from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
+import type { GrowthCanonicalActiveMissionsProjection } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-types"
+import type { GrowthCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types"
+import { projectCanonicalOperatorProgress } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a"
+import {
   growthHomeKpiConfidence,
   GROWTH_HOME_KPI_COMPLETED_FOR_YOU,
   GROWTH_HOME_KPI_NEEDS_APPROVAL,
@@ -565,10 +578,14 @@ export function buildAiOsUxViewModel(input: {
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   waitingOnYouOverflow: number
   needsReview: GrowthHomeNeedsReview
+  canonicalApprovalSnapshot?: GrowthCanonicalOperatorApprovalSnapshot | null
+  canonicalOperatorTask?: GrowthCanonicalOperatorTask | null
+  canonicalActiveMissions?: GrowthCanonicalActiveMissionsProjection | null
+  canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
 }): GrowthHomeAiOsUxViewModel {
   const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
   const queueEnabled = hasCanonicalDailyWorkQueue(input.dashboard)
-  const approveItemsCount = queueEnabled
+  const legacyApproveCount = queueEnabled
     ? (input.dashboard.dailyRevenueWorkQueueDisplay?.blocked_count ?? 0) +
       (input.dashboard.dailyRevenueWorkQueueDisplay?.waiting_count ?? 0) +
       waitingOnYouResult.items.filter((item) => /approve/i.test(item.label)).length
@@ -578,18 +595,70 @@ export function buildAiOsUxViewModel(input: {
         waitingOnYouResult.items.length,
       )
 
+  const approveItemsCount = resolveCanonicalApprovalQueueCount(
+    input.canonicalApprovalSnapshot,
+    legacyApproveCount,
+  )
+
+  const canonicalOperatorTask =
+    input.canonicalOperatorTask ??
+    (input.canonicalApprovalSnapshot
+      ? buildCanonicalOperatorTask({
+          approvalSnapshot: input.canonicalApprovalSnapshot,
+        })
+      : null)
+
+  const collapsedWaiting: GrowthHomeWaitingOnYouItem[] = canonicalOperatorTask
+    ? [
+        {
+          id: canonicalOperatorTask.id,
+          label: canonicalOperatorTask.title,
+          detail: canonicalOperatorTask.detail,
+          href: canonicalOperatorTask.href,
+          priority: "high",
+        },
+      ]
+    : waitingOnYouResult.items
+
+  const waitingSummary = input.canonicalApprovalSnapshot
+    ? buildCanonicalOperatorWaitingSummary({
+        approvalSnapshot: input.canonicalApprovalSnapshot,
+      })
+    : null
+
+  const heroBase = buildExecutiveBriefingHero(input.dashboard, input.executiveBrief)
+  const canonicalOperatorProgress = projectCanonicalOperatorProgress({
+    dailyWorkQueue: buildDailyWorkQueueItems(input.dashboard),
+    waitingOnYou: collapsedWaiting,
+    focusLeadId: input.canonicalOperatorFocus?.leadId ?? input.canonicalOperatorTask?.leadId ?? null,
+  })
+
   return {
     qaMarker: GROWTH_HOME_AI_OS_UX_QA_MARKER,
-    hero: buildExecutiveBriefingHero(input.dashboard, input.executiveBrief),
-    waitingOnYou: waitingOnYouResult.items,
-    waitingOnYouOverflow: waitingOnYouResult.overflowCount,
+    hero: {
+      ...heroBase,
+      expectedOutcomeToday:
+        input.canonicalOperatorTask?.whatHappensNext ??
+        input.canonicalOperatorFocus?.detail ??
+        heroBase.expectedOutcomeToday,
+      todayAtAGlance: waitingSummary
+        ? [waitingSummary, ...heroBase.todayAtAGlance].slice(0, 3)
+        : heroBase.todayAtAGlance,
+    },
+    waitingOnYou: collapsedWaiting,
+    waitingOnYouOverflow: canonicalOperatorTask ? Math.max(0, approveItemsCount - 1) : waitingOnYouResult.overflowCount,
     approveItemsHref:
       approveItemsCount > 0
         ? `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`
         : waitingOnYouResult.items[0]?.href ??
           input.needsReview.reviewHref ??
-          `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
+          `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`,
     approveItemsCount,
+    canonicalOperatorTask,
+    canonicalApprovalSnapshot: input.canonicalApprovalSnapshot ?? null,
+    canonicalActiveMissions: input.canonicalActiveMissions ?? null,
+    canonicalOperatorFocus: input.canonicalOperatorFocus ?? null,
+    canonicalOperatorProgress,
     liveStatus: buildAvaLiveStatus(input.dashboard),
     dailyWorkQueueBuckets: canonicalQueueBuckets(input.dashboard),
     dailyWorkQueue: buildDailyWorkQueueItems(input.dashboard),

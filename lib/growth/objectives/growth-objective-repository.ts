@@ -16,6 +16,15 @@ import {
 import { planGrowthObjective } from "@/lib/growth/objectives/growth-objective-planner"
 import { normalizeObjectiveExecutionContext } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { probeRuntimeTable } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
+import {
+  GROWTH_OBJECTIVE_SCHEDULER_ELIGIBLE_FETCH_LIMIT,
+  GROWTH_OBJECTIVE_SCHEDULER_FETCH_LIMIT,
+  GROWTH_OBJECTIVE_SCHEDULER_ORG_FETCH_LIMIT,
+} from "@/lib/growth/relationship/relationship-scale-limits"
+import {
+  selectSchedulerOrganizationIdsWithFairness,
+  sortObjectivesBySchedulerWakeTime,
+} from "@/lib/growth/objectives/growth-objective-scheduler-selection-1a"
 
 const memoryStore = new Map<string, GrowthObjective[]>()
 
@@ -335,6 +344,95 @@ export async function listActiveRunningGrowthObjectives(
   return (data ?? [])
     .map((row) => mapRow(row as Record<string, unknown>))
     .filter((entry) => entry.runtime?.running && !entry.emergencyStopActive)
+}
+
+function filterActiveRunningObjectives(objectives: GrowthObjective[]): GrowthObjective[] {
+  return objectives.filter(
+    (entry) => entry.status === "active" && entry.runtime?.running && !entry.emergencyStopActive,
+  )
+}
+
+let schedulerEligibilityColumnsReady: boolean | null = null
+
+async function probeSchedulerEligibilityColumns(admin: SupabaseClient): Promise<boolean> {
+  if (schedulerEligibilityColumnsReady !== null) return schedulerEligibilityColumnsReady
+  const { error } = await objectivesTable(admin)
+    .select("scheduler_runtime_running, scheduler_wake_at")
+    .limit(1)
+  schedulerEligibilityColumnsReady = !error?.message?.includes("scheduler_runtime_running")
+  return schedulerEligibilityColumnsReady
+}
+
+/** Reset column probe between certification runs. */
+export function resetSchedulerEligibilityColumnProbe(): void {
+  schedulerEligibilityColumnsReady = null
+}
+
+/** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — DB-bounded eligible objective fetch for scheduler tick. */
+export async function listEligibleGrowthObjectivesForSchedulerTick(
+  admin: SupabaseClient,
+  input?: { limit?: number; now?: string },
+): Promise<GrowthObjective[]> {
+  const limit = input?.limit ?? GROWTH_OBJECTIVE_SCHEDULER_ELIGIBLE_FETCH_LIMIT
+  const probe = await probeRuntimeTable(admin, "organization_growth_objectives")
+  if (probe.missing) {
+    return sortObjectivesBySchedulerWakeTime(filterActiveRunningObjectives([...memoryStore.values()].flat())).slice(
+      0,
+      limit,
+    )
+  }
+
+  const indexedColumnsReady = await probeSchedulerEligibilityColumns(admin)
+  if (indexedColumnsReady) {
+    const { data, error } = await objectivesTable(admin)
+      .select("*")
+      .eq("status", "active")
+      .eq("emergency_stop_active", false)
+      .eq("scheduler_runtime_running", true)
+      .order("scheduler_wake_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(limit)
+
+    if (!error) {
+      return (data ?? []).map((row) => mapRow(row as Record<string, unknown>))
+    }
+  }
+
+  const { data, error } = await objectivesTable(admin)
+    .select("*")
+    .eq("status", "active")
+    .eq("emergency_stop_active", false)
+    .order("updated_at", { ascending: true })
+    .limit(limit * 2)
+
+  if (error) throw new Error(error.message)
+
+  return sortObjectivesBySchedulerWakeTime(
+    (data ?? []).map((row) => mapRow(row as Record<string, unknown>)).filter((entry) => entry.runtime?.running),
+  ).slice(0, limit)
+}
+
+/** @deprecated Use listEligibleGrowthObjectivesForSchedulerTick — retained for compatibility. */
+export async function listActiveRunningGrowthObjectivesForScheduler(
+  admin: SupabaseClient,
+  input?: { limit?: number },
+): Promise<GrowthObjective[]> {
+  return listEligibleGrowthObjectivesForSchedulerTick(admin, {
+    limit: input?.limit ?? GROWTH_OBJECTIVE_SCHEDULER_FETCH_LIMIT,
+  })
+}
+
+/** Lightweight org discovery for scheduler sub-ticks — deterministic fairness ordering. */
+export async function listActiveRunningGrowthObjectiveOrganizationIds(
+  admin: SupabaseClient,
+  input?: { limit?: number },
+): Promise<string[]> {
+  const objectives = await listEligibleGrowthObjectivesForSchedulerTick(admin, {
+    limit: GROWTH_OBJECTIVE_SCHEDULER_ELIGIBLE_FETCH_LIMIT,
+  })
+  return selectSchedulerOrganizationIdsWithFairness(objectives, {
+    limit: input?.limit ?? GROWTH_OBJECTIVE_SCHEDULER_ORG_FETCH_LIMIT,
+  })
 }
 
 export async function listGrowthObjectivesForOrganizationEvent(

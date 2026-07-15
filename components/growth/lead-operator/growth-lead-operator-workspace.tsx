@@ -294,6 +294,107 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
             buyingStage={workspace.buying_stage?.detected_stage ?? null}
             decisionMakerConfidence={workspace.card.decision_maker_confidence}
           />
+          {workspace.canonical_mission ? (
+            <GrowthEngineCard title="Mission">
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mission
+                  </p>
+                  <p className="font-medium text-foreground">{workspace.canonical_mission.missionTitle}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Current objective
+                  </p>
+                  <p>{workspace.canonical_mission.currentObjective}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Phase
+                  </p>
+                  <p>{workspace.canonical_mission.activePhaseLabel}</p>
+                </div>
+                {workspace.canonical_mission.currentBlocker ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Blocked by
+                    </p>
+                    <p>{workspace.canonical_mission.currentBlocker}</p>
+                  </div>
+                ) : null}
+                {workspace.canonical_mission.expectedOutcome ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Expected outcome
+                    </p>
+                    <p>{workspace.canonical_mission.expectedOutcome}</p>
+                  </div>
+                ) : null}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Next Ava action
+                    </p>
+                    <p>{workspace.canonical_mission.nextAvaAction}</p>
+                  </div>
+                  {workspace.canonical_mission.nextOperatorAction ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Your action
+                      </p>
+                      <p>{workspace.canonical_mission.nextOperatorAction}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </GrowthEngineCard>
+          ) : workspace.operator_opportunity_narrative ? (
+            <GrowthEngineCard title="What Ava needs">
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Current focus
+                  </p>
+                  <p className="font-medium text-foreground">
+                    {workspace.operator_opportunity_narrative.currentFocus}
+                  </p>
+                </div>
+                {workspace.operator_opportunity_narrative.blockedBy ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Blocked by
+                    </p>
+                    <p>{workspace.operator_opportunity_narrative.blockedBy}</p>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Next step
+                  </p>
+                  <p>{workspace.operator_opportunity_narrative.nextStep}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Why
+                  </p>
+                  <p>{workspace.operator_opportunity_narrative.why}</p>
+                </div>
+                {workspace.operator_opportunity_narrative.evidence.length ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Evidence
+                    </p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                      {workspace.operator_opportunity_narrative.evidence.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </GrowthEngineCard>
+          ) : null}
           {typeof workspace.row.metadata?.prospect_search === "object" &&
           workspace.row.metadata.prospect_search &&
           typeof (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id ===

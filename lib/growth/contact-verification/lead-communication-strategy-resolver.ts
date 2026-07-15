@@ -14,7 +14,11 @@ import {
 import { isNativeRevenueDecisionEngineEnabled } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
 import { buildProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
-import { loadIreHistoricalLearning } from "@/lib/growth/revenue-workflow/load-ire-historical-learning"
+import {
+  loadIreHistoricalLearning,
+  scopeIreHistoricalLearningForLead,
+} from "@/lib/growth/revenue-workflow/load-ire-historical-learning"
+import type { EmailLearningObservation } from "@/lib/growth/contact-verification/email-learning"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export type LeadCommunicationStrategyBundle = {
@@ -98,7 +102,11 @@ export function buildLeadCommunicationStrategyTouchHistory(
 
 export async function resolveLeadCommunicationStrategyBundle(
   lead: GrowthLead,
-  options?: { organizationId?: string | null; admin?: SupabaseClient },
+  options?: {
+    organizationId?: string | null
+    admin?: SupabaseClient
+    preloadedOrgLearning?: EmailLearningObservation[] | null
+  },
 ): Promise<LeadCommunicationStrategyBundle> {
   if (!isNativeRevenueDecisionEngineEnabled()) {
     return { enabled: false, bundle: null }
@@ -111,13 +119,22 @@ export async function resolveLeadCommunicationStrategyBundle(
 
   const organizationId = options?.organizationId ?? null
   const historicalLearning =
-    options?.admin && organizationId
-      ? await loadIreHistoricalLearning({
-          admin: options.admin,
-          organizationId,
-          leadId: lead.id,
-          email: lead.contactEmail,
-        })
+    organizationId != null
+      ? options?.preloadedOrgLearning != null
+        ? scopeIreHistoricalLearningForLead({
+            organizationId,
+            leadId: lead.id,
+            email: lead.contactEmail,
+            preloadedOrgObservations: options.preloadedOrgLearning,
+          })
+        : options?.admin
+          ? await loadIreHistoricalLearning({
+              admin: options.admin,
+              organizationId,
+              leadId: lead.id,
+              email: lead.contactEmail,
+            })
+          : []
       : []
 
   const bundle = await resolveNativeRevenueDecisionAuthoritativeBundle({

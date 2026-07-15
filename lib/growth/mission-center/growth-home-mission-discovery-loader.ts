@@ -9,6 +9,7 @@ import {
   type GrowthHomeMissionDiscoverySnapshot,
 } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import { listActiveRunningGrowthObjectives } from "@/lib/growth/objectives/growth-objective-repository"
+import { GROWTH_HOME_MISSION_DISCOVERY_OBJECTIVE_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
 export async function loadGrowthHomeMissionDiscoverySnapshot(
   admin: SupabaseClient,
@@ -18,7 +19,9 @@ export async function loadGrowthHomeMissionDiscoverySnapshot(
   },
 ): Promise<GrowthHomeMissionDiscoverySnapshot | null> {
   const objectives = await listActiveRunningGrowthObjectives(admin).catch(() => [])
-  const orgObjectives = objectives.filter((row) => row.organizationId === input.organizationId)
+  const orgObjectives = objectives
+    .filter((row) => row.organizationId === input.organizationId)
+    .slice(0, GROWTH_HOME_MISSION_DISCOVERY_OBJECTIVE_LIMIT)
   return buildGrowthHomeMissionDiscoverySnapshot({
     objectives: orgObjectives,
     leadPool: input.leadPool ?? null,

@@ -6,8 +6,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { buildLeadLifecycleSnapshotForAuthority } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { evaluateGrowth5fPackagePreparation } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
+import type { GrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import type { GrowthCanonicalPackagePreparationEnforcement } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-types"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { GrowthAutonomousOutreachPreparationWakeCondition } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
@@ -37,21 +40,29 @@ export async function assertGrowth5fPackagePreparationAllowed(
     isOperatorRebuild?: boolean
     isMaterialRefresh?: boolean
     cacheScope?: string
+    runtimeContext?: GrowthAiOsRuntimeContext
   },
 ): Promise<GrowthCanonicalPackagePreparationEnforcement> {
-  const resolution = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    generatedAt: input.generatedAt,
-    packageSnapshot: input.previousPackage ?? undefined,
-    cacheScope: input.cacheScope ?? "growth5f:direct-caller",
-  }).catch(() => null)
+  const resolution =
+    input.runtimeContext != null
+      ? await input.runtimeContext.getDecision().catch(() => null)
+      : await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          generatedAt: input.generatedAt,
+          packageSnapshot: input.previousPackage ?? undefined,
+          cacheScope: input.cacheScope ?? "growth5f:direct-caller",
+        }).catch(() => null)
+
+  const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
+  const leadLifecycle = lead ? await buildLeadLifecycleSnapshotForAuthority(admin, lead) : undefined
 
   const enforcement = evaluateGrowth5fPackagePreparation(resolution, {
     proposedPurpose: input.proposedPurpose ?? input.previousPackage?.expectedOutcome ?? null,
     wakeCondition: input.wakeCondition,
     isOperatorRebuild: input.isOperatorRebuild,
     isMaterialRefresh: input.isMaterialRefresh,
+    leadLifecycle,
   })
 
   if (!enforcement.allowed) {

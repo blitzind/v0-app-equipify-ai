@@ -128,6 +128,7 @@ export function normalizeGrowthHomeWorkspaceSummaryPayload(
     },
     leadPool,
     missionDiscovery: payload.missionDiscovery ?? null,
+    canonicalOperatorFocus: payload.canonicalOperatorFocus ?? null,
   }
 }
 
@@ -196,5 +197,10 @@ export function normalizeGrowthHomeAiOsUxViewModel(
     throughput: aiOsUx.throughput ?? [],
     waitingOnYouOverflow: aiOsUx.waitingOnYouOverflow ?? 0,
     approveItemsCount: aiOsUx.approveItemsCount ?? 0,
+    canonicalOperatorTask: aiOsUx.canonicalOperatorTask ?? null,
+    canonicalApprovalSnapshot: aiOsUx.canonicalApprovalSnapshot ?? null,
+    canonicalActiveMissions: aiOsUx.canonicalActiveMissions ?? null,
+    canonicalOperatorFocus: aiOsUx.canonicalOperatorFocus ?? null,
+    canonicalOperatorProgress: aiOsUx.canonicalOperatorProgress ?? null,
   }
 }

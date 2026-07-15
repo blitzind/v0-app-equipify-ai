@@ -5,12 +5,18 @@
 import { projectCanonicalDecisionOperatorCard } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-operator-card"
 import type { GrowthCanonicalNextBestDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-types"
 import type { GrowthCanonicalDecisionFreshness } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
+import {
+  humanizeOperatorBadgeLabel,
+  humanizeOperatorDecisionTitle,
+  humanizeOperatorFacingLine,
+  stripInternalEngineTerms,
+} from "@/lib/growth/aios/operator-experience/growth-operator-language-1a"
 
 export const GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1B_OPERATOR_PROJECTION_QA_MARKER =
   "ge-aios-decision-engine-1b-operator-projection-v1" as const
 
 function sanitizeOperatorCopy(value: string): string {
-  return value.replace(/\u2014/g, "-").replace(/\s+/g, " ").trim()
+  return stripInternalEngineTerms(value.replace(/\u2014/g, "-").replace(/\s+/g, " ").trim())
 }
 
 export type GrowthCanonicalOperatorDecisionProjection = {
@@ -40,10 +46,12 @@ export function projectGrowthCanonicalOperatorDecision(input: {
 
   return {
     qaMarker: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1B_OPERATOR_PROJECTION_QA_MARKER,
-    headline: sanitizeOperatorCopy(card.headline),
+    headline: "What I need from you",
     primaryAction: input.decision.primaryAction,
-    whatToDo: sanitizeOperatorCopy(card.whatToDo),
-    why: card.why.map(sanitizeOperatorCopy),
+    whatToDo: sanitizeOperatorCopy(
+      humanizeOperatorDecisionTitle(card.whatToDo, input.decision.primaryAction),
+    ),
+    why: card.why.map((line) => sanitizeOperatorCopy(humanizeOperatorFacingLine(line))),
     whenLabel: sanitizeOperatorCopy(card.whenLabel),
     whoActs: sanitizeOperatorCopy(card.whoActs),
     whoInvolved: card.whoInvolved ? sanitizeOperatorCopy(card.whoInvolved) : null,
@@ -51,7 +59,9 @@ export function projectGrowthCanonicalOperatorDecision(input: {
     thenActions: card.thenActions.map(sanitizeOperatorCopy),
     doNotActions: card.doNotActions.map(sanitizeOperatorCopy),
     confidenceLabel: sanitizeOperatorCopy(card.confidenceLabel),
-    freshnessLabel: input.freshness?.label ? sanitizeOperatorCopy(input.freshness.label) : null,
+    freshnessLabel: input.freshness?.label
+      ? sanitizeOperatorCopy(humanizeOperatorBadgeLabel(input.freshness.label))
+      : null,
     operatorReviewRequired: card.operatorReviewRequired,
     transportBlocked: card.transportBlocked,
     decisionFingerprint: input.decision.decisionFingerprint,
@@ -80,7 +90,7 @@ export function projectCanonicalDecisionEssentials(input: {
     projection.freshnessLabel ? `Freshness: ${projection.freshnessLabel}` : null,
     projection.prerequisites[0] ? `Prerequisite: ${projection.prerequisites[0]}` : null,
     projection.doNotActions[0] ? `Do not: ${projection.doNotActions[0]}` : null,
-    projection.transportBlocked ? "Send Plane blocked until approval clears" : null,
+    projection.transportBlocked ? "Waiting for your approval before outreach" : null,
   ].filter(Boolean) as string[]
 
   return lines.slice(0, 8)

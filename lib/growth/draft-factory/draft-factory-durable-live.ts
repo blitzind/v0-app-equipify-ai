@@ -7,8 +7,12 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
-import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { evaluateDraftFactoryDecisionGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
+import { buildLeadLifecycleSnapshotForAuthority } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { recordDegradedEnforcementTelemetry } from "@/lib/growth/aios/execution/growth-degraded-enforcement-telemetry-1a"
+import { classifyDraftFactoryFailureRecoverability } from "@/lib/growth/aios/execution/growth-degraded-enforcement-policy-1a"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { recordRuntimeGuardrailAudit } from "@/lib/growth/runtime-guardrails/growth-runtime-audit-repository"
 import {
@@ -22,7 +26,6 @@ import {
   type AiOsDraftFactoryWakeInput,
 } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
@@ -119,6 +122,14 @@ export async function advanceDraftFactoryForLeadLive(
   const now = input.now ?? new Date().toISOString()
   const workerId = input.workerId ?? `df-live:${now}`
 
+  const runtimeContext = createGrowthAiOsRuntimeContext(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    boundary: "draft_factory_advance",
+    cacheScope: "draft-factory:advance",
+    generatedAt: now,
+  })
+
   let repository
   try {
     const resolved = await resolveDraftFactoryDurableRepository({
@@ -214,23 +225,50 @@ export async function advanceDraftFactoryForLeadLive(
         ? String((input.wake as { type: string }).type)
         : "scheduled_resume"
 
-  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    generatedAt: now,
-    cacheScope: "draft-factory:advance",
-  }).catch(() => null)
+  const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
+  const leadLifecycle = lead ? await buildLeadLifecycleSnapshotForAuthority(admin, lead) : undefined
+
+  const canonicalDecision = await runtimeContext.getDecision().catch(() => null)
   const draftFactoryGate = evaluateDraftFactoryDecisionGate(canonicalDecision, {
     wakeCondition: wakeType,
+    leadLifecycle,
   })
   if (!draftFactoryGate.allowGeneration) {
+    if (!canonicalDecision) {
+      recordDegradedEnforcementTelemetry({
+        organizationId: input.organizationId,
+        leadId: input.leadId,
+        actionKind: "draft_factory_advancement",
+        scope: "draft_factory_advance",
+        result: {
+          qaMarker: "ge-aios-degraded-enforcement-closure-1a-policy-v1",
+          disposition: "deferred",
+          reasonCode: draftFactoryGate.outcome,
+          decisionResolutionFailed: true,
+          lifecycleEvidenceAvailable: Boolean(leadLifecycle),
+          terminal: false,
+          retryAppropriate: true,
+          nextSafeRetryAt: draftFactoryGate.nextEligibleWakeAt,
+          operatorExplanation: draftFactoryGate.reason,
+          transportBlocked: true,
+          enforcementFingerprint: draftFactoryGate.enforcementFingerprint,
+        },
+      })
+    }
+    const recoverability = classifyDraftFactoryFailureRecoverability({
+      errorCode: draftFactoryGate.outcome,
+      leadLifecycle,
+    })
     completionHints = {
       ...completionHints,
       decisionEnforcementBlocked: true,
       canonicalDecisionEnforcementOutcome: draftFactoryGate.outcome,
       canonicalEnforcementFingerprint: draftFactoryGate.enforcementFingerprint,
-      decisionNextEligibleWakeAt: draftFactoryGate.nextEligibleWakeAt,
+      decisionNextEligibleWakeAt:
+        draftFactoryGate.nextEligibleWakeAt ??
+        (recoverability === "recoverable" ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null),
       generationCapacityAvailable: false,
+      draftFactoryFailureRecoverability: recoverability,
     }
     allowGeneration = false
   }
@@ -319,6 +357,7 @@ export async function advanceDraftFactoryForLeadLive(
               organizationId,
               leadId,
               generatedAt,
+              runtimeContext,
             },
           )
           if (!persisted) return null

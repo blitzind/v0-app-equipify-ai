@@ -4,7 +4,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
-import { buildGrowthHomeWorkspaceSummary } from "@/lib/growth/home/growth-home-workspace-summary-service"
+import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { runMemoryEngine } from "@/lib/growth/memory/engine/run-memory-engine"
 import { buildGrowthHomeOrganizationalKnowledge } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { persistValidatedSalesOutcomeMemoryEvents } from "@/lib/growth/memory/storage/organization-memory-repository"
@@ -35,13 +35,13 @@ import type {
   AutonomousSalesLoopSelectedWorkItem,
 } from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
 import type { SalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-types"
-import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 import {
   executeReadyWorkItems,
   runWorkManager,
   type RunWorkManagerInput,
 } from "@/lib/growth/work-manager/manager/run-work-manager"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
+import { withSchedulerWorkTimeout } from "@/lib/growth/runtime-guardrails/growth-scheduler-runtime-budget-1a"
 import { continueCurrentPhase } from "@/lib/growth/operating-rhythm/engine/run-operating-rhythm"
 
 export type RunAutonomousSalesLoopInput = {
@@ -121,39 +121,18 @@ async function loadAutonomousSalesLoopContext(
     return null
   }
 
-  const summary = await buildGrowthHomeWorkspaceSummary({
-    admin,
-    operatorEmail: input.operatorEmail ?? "ava-autonomous@equipify.ai",
-    actorUserId: input.actorUserId ?? "autonomous-sales-loop",
+  const snapshot = await buildGrowthAutonomousPortfolioWorkSnapshot(admin, {
+    organizationId: input.organizationId,
+    generatedAt: input.generatedAt,
   }).catch(() => null)
 
-  if (!summary?.ok) return null
-
-  const briefing = synthesizeGrowthHomeExecutiveBriefing({
-    dashboard: summary.dashboard,
-  })
+  if (!snapshot) return null
 
   return {
-    workManagerInput: {
-      workspaceSummary: {
-        kpis: summary.kpis,
-        meetings: summary.meetings,
-        inbox: summary.inbox,
-        operatorTasks: summary.operatorTasks,
-        avaConsole: summary.avaConsole,
-        dashboard: summary.dashboard,
-        leadPool: summary.leadPool,
-      },
-      waitingOnYou: briefing.aiOsUx.waitingOnYou,
-      dailyWorkQueue: briefing.aiOsUx.dailyWorkQueue,
-      accomplishments: briefing.accomplishments,
-      timeline: briefing.timeline,
-      generatedAt: input.generatedAt,
-      leadSnapshotsById: summary.relationshipSnapshots.byLeadId,
-    },
-    salesOutcomes: summary.salesOutcomes.outcomes,
-    organizationalKnowledge: summary.organizationalKnowledge.store.items,
-    persistedMemoryStore: summary.organizationalMemory.store,
+    workManagerInput: snapshot.workManagerInput,
+    salesOutcomes: snapshot.salesOutcomes.outcomes,
+    organizationalKnowledge: snapshot.organizationalKnowledge.store.items,
+    persistedMemoryStore: snapshot.organizationalMemory.store,
   }
 }
 
@@ -524,11 +503,13 @@ export async function tickAutonomousSalesLoopForScheduler(
     startedAt?: number
     maxRuntimeMs?: number
     maxOrganizations?: number
+    perOrganizationTimeoutMs?: number
     dryRun?: boolean
   },
 ): Promise<AutonomousSalesSchedulerTickResult> {
   const startedAt = input.startedAt ?? Date.now()
   const maxRuntimeMs = input.maxRuntimeMs ?? 20_000
+  const perOrganizationTimeoutMs = input.perOrganizationTimeoutMs ?? 8_000
   const organizationIds = [...new Set(input.organizationIds)].slice(0, input.maxOrganizations ?? 5)
 
   const killSwitches = await getRuntimeKillSwitchStates(admin)
@@ -579,13 +560,28 @@ export async function tickAutonomousSalesLoopForScheduler(
       continue
     }
 
-    const loopResult = await runAutonomousSalesLoop({
-      admin,
-      organizationId,
-      maxIterations: input.dryRun ? 1 : 2,
-      dailyBudgetMinutes: 30,
-      dryRun: input.dryRun,
-    })
+    let loopResult: Awaited<ReturnType<typeof runAutonomousSalesLoop>>
+    try {
+      loopResult = await withSchedulerWorkTimeout(
+        runAutonomousSalesLoop({
+          admin,
+          organizationId,
+          maxIterations: input.dryRun ? 1 : 2,
+          dailyBudgetMinutes: 30,
+          dryRun: input.dryRun,
+        }),
+        perOrganizationTimeoutMs,
+        "autonomous_sales_loop_org",
+      )
+    } catch {
+      organizationResults.push({
+        organizationId,
+        executed: false,
+        outcomes_completed: 0,
+        stop_reason: "org_work_timeout",
+      })
+      continue
+    }
 
     organizationResults.push({
       organizationId,

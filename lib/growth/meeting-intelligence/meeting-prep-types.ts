@@ -151,4 +151,6 @@ export type GrowthMeetingPrepBundle = {
   canonicalRecommendedNextAction?: string | null
   /** GE-AIOS-MEETING-INTELLIGENCE-1A — computed battle plan (never persisted separately) */
   canonicalMeetingBrief?: import("@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-types").GrowthCanonicalMeetingBrief | null
+  /** GE-AIOS-MISSION-ORCHESTRATION-1A — mission brief for meeting workspace */
+  canonicalMission?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalMission | null
 }

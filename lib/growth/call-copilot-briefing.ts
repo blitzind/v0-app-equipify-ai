@@ -13,11 +13,22 @@ import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-pla
 import { resolveOutreachLeadIndustryTags } from "@/lib/growth/outreach/personalization/context-packet-builder"
 import type { GrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-types"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
-import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
+import type { GrowthLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-types"
+import { buildCanonicalOperatorAccountNarrative } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-account-narrative-1a"
+import { projectCanonicalLeadOpportunityNarrative } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { resolveCanonicalCompanyDisplayName } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 import type { GrowthLead } from "@/lib/growth/types"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { resolveCanonicalChannelContentForLead } from "@/lib/growth/aios/growth/growth-channels-1a-canonical-resolver"
 import { GROWTH_AIOS_CHANNELS_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-channels-1a-types"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { buildCanonicalMission } from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
+import {
+  createGrowthAiOsRuntimeContext,
+  type GrowthAiOsRuntimeContext,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 
 export {
   computeBriefEffectivenessScore,
@@ -36,13 +47,64 @@ function isHighRiskCall(lead: GrowthLead, riskWarnings: string[]): boolean {
 export async function buildGrowthCallCopilotBriefing(
   admin: SupabaseClient,
   lead: GrowthLead,
+  options?: { runtimeContext?: GrowthAiOsRuntimeContext },
 ): Promise<GrowthCallCopilotBriefing> {
-  const [decisionMakers, inputSnapshot, settings, memory] = await Promise.all([
+  const organizationId = getGrowthEngineAiOrgId()
+
+  const runtimeContext =
+    options?.runtimeContext ??
+    (organizationId
+      ? createGrowthAiOsRuntimeContext(admin, {
+          organizationId,
+          leadId: lead.id,
+          boundary: "call_load",
+          cacheScope: "operator-surface",
+          companyName: lead.companyName,
+        })
+      : null)
+
+  const [decisionMakers, inputSnapshot, settings, memoryBundle, canonicalDecision] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     buildGrowthAiCopilotInput(admin, lead),
     fetchGrowthCopilotSettings(admin),
-    buildLeadMemoryInfluenceContext(admin, lead.id),
+    runtimeContext
+      ? runtimeContext.getMemory()
+      : organizationId
+        ? resolveCanonicalHumanMemoryForLead(admin, {
+            organizationId,
+            leadId: lead.id,
+          }).catch(() => null)
+        : Promise.resolve(null),
+    runtimeContext
+      ? runtimeContext.getDecision()
+      : organizationId
+        ? resolveGrowthCanonicalDecisionForLeadCached(admin, {
+            organizationId,
+            leadId: lead.id,
+            cacheScope: "operator-surface",
+          }).catch(() => null)
+        : Promise.resolve(null),
   ])
+
+  const emptyMemory: GrowthLeadMemoryInfluenceContext = {
+    available: false,
+    memoryCoverageScore: null,
+    relationshipStage: null,
+    relationshipSummary: null,
+    engagementTrend: null,
+    progressionScore: null,
+    topObjections: [],
+    topPreferences: [],
+    priorInteractionSummaries: [],
+    commitmentSummaries: [],
+    riskFlags: [],
+    avoidRepeating: [],
+    committeeContext: [],
+    unresolvedObjectionCount: 0,
+    unresolvedHighSeverityObjectionCount: 0,
+  }
+
+  const memory = memoryBundle?.influence ?? emptyMemory
 
   const frameworks = resolveGrowthAiCopilotFrameworkKeys(lead)
   const likelyObjections = [
@@ -96,19 +158,59 @@ export async function buildGrowthCallCopilotBriefing(
     riskWarnings.push("Decision maker not confirmed.")
   }
 
-  const whyNow =
-    memory.relationshipSummary?.trim() ||
-    lead.nextBestActionReason?.trim() ||
-    lead.executiveRecommendation?.trim() ||
-    `NBA: ${lead.nextBestAction ?? "call_now"} with ${lead.engagementTier ?? "unknown"} engagement.`
+  const operatorDecision = canonicalDecision
+    ? projectGrowthCanonicalOperatorDecision({
+        decision: canonicalDecision.decision,
+        freshness: canonicalDecision.freshness,
+      })
+    : null
+
+  const opportunityNarrative = canonicalDecision
+    ? projectCanonicalLeadOpportunityNarrative({
+        leadId: lead.id,
+        companyName: lead.companyName,
+        decision: operatorDecision,
+      })
+    : null
+
+  const canonicalMission =
+    organizationId && canonicalDecision
+      ? buildCanonicalMission({
+          organizationId,
+          leadId: lead.id,
+          companyName: lead.companyName,
+          contactName: lead.contactName,
+          decisionResolution: canonicalDecision,
+          relationshipSummary: memory.relationshipSummary,
+          conversationSummary: operatorDecision?.whatToDo ?? null,
+          openCommitments: memory.commitmentSummaries,
+          opportunityNarrative: opportunityNarrative ?? undefined,
+          memorySummary: memoryBundle?.relationship.summary ?? null,
+        })
+      : null
+
+  const canonicalAccountNarrative = buildCanonicalOperatorAccountNarrative({
+    leadId: lead.id,
+    companyName: lead.companyName,
+    memoryBundle,
+    decision: operatorDecision,
+    opportunityNarrative: opportunityNarrative ?? undefined,
+    mission: canonicalMission,
+  })
+
+  const companyDisplayName = resolveCanonicalCompanyDisplayName(
+    memoryBundle?.identity ?? null,
+    lead.companyName,
+  )
+
+  const whyNow = canonicalAccountNarrative.whatHappened
 
   const openingLine = lead.contactName
-    ? `Hi ${lead.contactName.split(" ")[0]} — calling from Equipify about ${lead.companyName}.`
-    : `Hi — calling about ${lead.companyName}.`
+    ? `Hi ${lead.contactName.split(" ")[0]} — calling from Equipify about ${companyDisplayName}.`
+    : `Hi — calling about ${companyDisplayName}.`
 
   let canonicalCallGuide: string | null = null
   let canonicalCallGuideSource: string | null = null
-  const organizationId = getGrowthEngineAiOrgId()
   if (organizationId) {
     const materialized = await resolveCanonicalChannelContentForLead(admin, {
       organizationId,
@@ -130,9 +232,8 @@ export async function buildGrowthCallCopilotBriefing(
     : openingLine
 
   const recommendedCta =
-    lead.nextBestAction === "call_now" || lead.nextBestAction === "call_immediately"
-      ? "Confirm a short follow-up or demo slot before ending the call."
-      : "Agree on one concrete next step with a date."
+    operatorDecision?.thenActions[0]?.trim() ||
+    "Agree on one concrete next step with a date."
 
   const influenceScore = computePlaybookInfluenceScore(playbookRules)
   const attribution = buildPlaybookAttribution({ rules: playbookRules, conflicts: [] })
@@ -140,7 +241,7 @@ export async function buildGrowthCallCopilotBriefing(
   const briefing: GrowthCallCopilotBriefing = {
     whoToCall: {
       contactName: lead.contactName,
-      companyName: lead.companyName,
+      companyName: companyDisplayName,
       phone: lead.contactPhone,
       decisionMakers: decisionMakers.slice(0, 4).map((dm) => ({
         name: dm.fullName,
@@ -172,6 +273,8 @@ export async function buildGrowthCallCopilotBriefing(
       commitments: memory.commitmentSummaries,
       riskFlags: memory.riskFlags,
     },
+    canonicalMission,
+    canonicalAccountNarrative,
   }
 
   void inputSnapshot

@@ -44,6 +44,11 @@ import {
   enrichAutonomousQualificationPilotWithAutonomyPolicy,
   evaluateQualificationPilotAutonomyPolicyGate,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  evaluateCanonicalExecutionAuthorityForLead,
+  recheckCanonicalExecutionAuthorityForLead,
+} from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 
 export {
   applyQualificationPilotControlTransition,
@@ -446,6 +451,26 @@ export async function runAutonomousQualificationManualEvaluation(
         organizationId: input.organizationId,
         leadId: input.leadId,
       })
+      const qualificationAuthority = await evaluateCanonicalExecutionAuthorityForLead(admin, {
+        organizationId: input.organizationId,
+        leadId: input.leadId,
+        actionKind: "qualification_mutation",
+        generatedAt,
+      })
+      if (!isCanonicalExecutionAllowed(qualificationAuthority)) {
+        appendAutonomousQualificationRun({
+          organizationId: input.organizationId,
+          now: generatedAt,
+          run: buildAutonomousQualificationRunRecord({
+            leadId: input.leadId,
+            companyName: snapshot?.companyName ?? null,
+            wakeCondition: "manual_qualification_request",
+            generatedAt,
+            outcome: "skipped",
+            skipReason: qualificationAuthority.reasonCode,
+          }),
+        })
+      } else {
       try {
         await executeAutonomousQualificationEvaluation(admin, {
           organizationId: input.organizationId,
@@ -477,6 +502,7 @@ export async function runAutonomousQualificationManualEvaluation(
             outcome: "failed",
           }),
         })
+      }
       }
     }
   }

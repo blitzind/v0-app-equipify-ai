@@ -64,6 +64,7 @@ export type AdvanceDraftFactoryForLeadInput = {
     canonicalDecisionEnforcementOutcome?: string
     canonicalEnforcementFingerprint?: string
     decisionNextEligibleWakeAt?: string | null
+    draftFactoryFailureRecoverability?: "recoverable" | "non_recoverable"
   }
 }
 

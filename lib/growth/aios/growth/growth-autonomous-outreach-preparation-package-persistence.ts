@@ -34,6 +34,10 @@ import type {
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { resolveGrowthCanonicalDecisionForLeadCached, invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { evaluateGrowth5fPackagePreparation } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
+import {
+  createGrowthAiOsRuntimeContext,
+  type GrowthAiOsRuntimeContext,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export {
@@ -63,6 +67,7 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
     generatedAt: string
     companyName?: string | null
     wakeCondition?: GrowthAutonomousOutreachPreparationWakeCondition
+    runtimeContext?: GrowthAiOsRuntimeContext
   },
 ): Promise<DraftFactoryGrowth5FPackageResult | null> {
   const packageId = buildOutreachPrepPackageId(input.leadId, input.generatedAt)
@@ -118,13 +123,19 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
   })
   if (!snapshot) return null
 
-  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    generatedAt: input.generatedAt,
-    packageSnapshot: previousPackage,
-    cacheScope: "growth5f:package-preparation",
-  }).catch(() => null)
+  const runtimeContext =
+    input.runtimeContext ??
+    createGrowthAiOsRuntimeContext(admin, {
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      boundary: "growth_5f_generation",
+      cacheScope: "growth5f:package-preparation",
+      generatedAt: input.generatedAt,
+      packageSnapshot: previousPackage,
+      companyName: input.companyName ?? lead.companyName,
+    })
+
+  const canonicalDecision = await runtimeContext.getDecision().catch(() => null)
   const packageEnforcement = evaluateGrowth5fPackagePreparation(canonicalDecision, {
     proposedPurpose: previousPackage?.expectedOutcome ?? null,
     wakeCondition,
@@ -155,6 +166,7 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
       wakeCondition === "relationship_material_change"
         ? ["relationship_material_change"]
         : undefined,
+    runtimeContext,
   })
 
   if (approvalPackage.pendingHumanApproval !== true || approvalPackage.transportBlocked !== true) {

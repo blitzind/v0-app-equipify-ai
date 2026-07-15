@@ -18,6 +18,11 @@ import type {
   SalesSpecialistDelegationResult,
   SalesWorkflowAgentKind,
 } from "@/lib/growth/specialists/execution/sales-outcome-types"
+import {
+  evaluateCanonicalExecutionAuthorityForLead,
+} from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
+import { mapAslWorkflowAgentToActionKind } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-action-policy-1a"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
@@ -47,6 +52,29 @@ export async function executeSalesWorkflowAgent(
 ): Promise<ExecuteSalesWorkflowAgentResult> {
   const { workflow_agent: workflowAgent, workItem } = input
   const leadId = extractLeadIdFromWorkItem(workItem)
+
+  if (
+    leadId &&
+    (workflowAgent === "research_agent" || workflowAgent === "qualification_agent")
+  ) {
+    const authority = await evaluateCanonicalExecutionAuthorityForLead(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      actionKind: mapAslWorkflowAgentToActionKind(workflowAgent),
+      generatedAt: input.generatedAt,
+      bypassDecisionCache: true,
+    })
+    if (!isCanonicalExecutionAllowed(authority)) {
+      return {
+        executed: false,
+        workflow_agent: workflowAgent,
+        skip_reason:
+          authority.disposition === "deferred"
+            ? `execution_authority_deferred:${authority.reasonCode}`
+            : `execution_authority_blocked:${authority.reasonCode}`,
+      }
+    }
+  }
 
   switch (workflowAgent) {
     case "research_agent": {

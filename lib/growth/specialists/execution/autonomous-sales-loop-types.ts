@@ -15,6 +15,7 @@ export type AutonomousSalesLoopStopReason =
   | "no_executable_work"
   | "autonomy_disabled"
   | "context_unavailable"
+  | "org_work_timeout"
 
 export type AutonomousSalesLoopIterationResult = {
   work_item_id: string

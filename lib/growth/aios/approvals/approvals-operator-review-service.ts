@@ -1,5 +1,6 @@
 /**
  * GE-AIOS-APPROVALS-2A — Compose operator review packet from existing stores (server-only).
+ * Memory authority: resolveCanonicalHumanMemoryForLead via runtimeContext.getMemory().
  */
 
 import "server-only"
@@ -14,8 +15,10 @@ import { findAutonomousOutreachPreparationRunByPackageId } from "@/lib/growth/ai
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
-import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import {
+  createGrowthAiOsRuntimeContext,
+  type GrowthAiOsRuntimeContext,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 import { loadLatestCanonicalDecisionOperatorOverrideForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-override-loader"
 
@@ -27,6 +30,7 @@ export async function loadApprovals2AOperatorReviewPacket(
     leadId: string
     teammateName?: string | null
     now?: string
+    runtimeContext?: GrowthAiOsRuntimeContext
   },
 ): Promise<Approvals2AOperatorReviewPacket | null> {
   const run = await findAutonomousOutreachPreparationRunByPackageId(
@@ -56,26 +60,28 @@ export async function loadApprovals2AOperatorReviewPacket(
     .filter(Boolean)
     .slice(0, 4)
 
-  const freshCanonicalHumanMemory = await resolveCanonicalHumanMemoryForLead(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    packageSnapshot: { ...pkg, canonicalHumanMemory: pkg.canonicalHumanMemory },
-    skipPackageLoad: true,
-    companyName: lead?.companyName ?? pkg.companyName,
-  }).catch(() => pkg.canonicalHumanMemory ?? null)
+  const runtimeContext =
+    input.runtimeContext ??
+    createGrowthAiOsRuntimeContext(admin, {
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      boundary: "approval_review",
+      cacheScope: "operator-surface",
+      packageSnapshot: { ...pkg, canonicalHumanMemory: pkg.canonicalHumanMemory },
+      generatedAt: input.now,
+      companyName: lead?.companyName ?? pkg.companyName,
+    })
+
+  const freshCanonicalHumanMemory = await runtimeContext.getMemory().catch(
+    () => pkg.canonicalHumanMemory ?? null,
+  )
 
   const pkgForProjection = {
     ...pkg,
     canonicalHumanMemory: freshCanonicalHumanMemory ?? pkg.canonicalHumanMemory ?? null,
   }
 
-  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    packageSnapshot: pkgForProjection,
-    preloadedMemoryBundle: freshCanonicalHumanMemory,
-    cacheScope: "operator-surface",
-  }).catch(() => null)
+  const canonicalDecision = await runtimeContext.getDecision().catch(() => null)
 
   const canonicalDecisionOverride = await loadLatestCanonicalDecisionOperatorOverrideForLead(admin, {
     organizationId: input.organizationId,

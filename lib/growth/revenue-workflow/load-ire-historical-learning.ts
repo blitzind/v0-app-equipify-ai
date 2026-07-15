@@ -49,3 +49,38 @@ export async function loadIreHistoricalLearning(input: {
 
   return mergeHistoricalLearningObservations(observations, scoped)
 }
+
+/** Org-level IRE learning snapshot — one DB read per DRQ/Home pass (GE-AIOS-HOME-RUNTIME-OPTIMIZATION-1A). */
+export async function loadIreOrgHistoricalLearningObservations(input: {
+  admin?: SupabaseClient
+  organizationId: string
+  limit?: number
+}): Promise<EmailLearningObservation[]> {
+  const outcomes =
+    input.admin && !isInMemoryLearningStoreEnabled()
+      ? await listRecentClosedLoopLearningOutcomes(input.admin, {
+          organizationId: input.organizationId,
+          limit: input.limit ?? 500,
+        })
+      : listStoredLearningOutcomes(input.organizationId)
+
+  return mapClosedLoopLearningOutcomesToEmailObservations(outcomes)
+}
+
+export function scopeIreHistoricalLearningForLead(input: {
+  organizationId: string
+  leadId?: string | null
+  domain?: string | null
+  email?: string | null
+  preloadedOrgObservations?: EmailLearningObservation[] | null
+}): Promise<EmailLearningObservation[]> {
+  const observations = input.preloadedOrgObservations ?? []
+  const scoped = filterEmailLearningObservations({
+    observations,
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    domain: input.domain,
+    email: input.email,
+  })
+  return mergeHistoricalLearningObservations(observations, scoped)
+}

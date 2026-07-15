@@ -77,12 +77,11 @@ export function GrowthCallWorkspacePostCallClosurePanel({
             <GrowthBadge label="No follow-up package required" tone="neutral" />
           )}
           {closure.followUpPackageStatus === "pending_approval" ? (
-            <GrowthBadge label="Package in Human Approval Center" tone="attention" />
+            <GrowthBadge label="Waiting for your approval" tone="attention" />
           ) : null}
           {closure.operatorReviewRequired ? (
-            <GrowthBadge label="Memory or committee review required" tone="attention" />
+            <GrowthBadge label="Needs your review" tone="attention" />
           ) : null}
-          <GrowthBadge label="Send Plane blocked" tone="neutral" />
         </div>
 
         {closure.memoryReviewItems.length ? (

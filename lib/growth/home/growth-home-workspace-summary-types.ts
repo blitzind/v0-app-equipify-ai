@@ -15,6 +15,11 @@ import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/rela
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import type { GrowthCanonicalDecisionResolution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
+import type {
+  GrowthCanonicalOperatorApprovalSnapshot,
+  GrowthCanonicalOperatorTask,
+} from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
+import type { GrowthCanonicalActiveMissionsProjection } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-types"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -129,4 +134,12 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null
   /** GE-AIOS-DECISION-ENGINE-1B — canonical hero decision for top-priority lead */
   canonicalHeroDecision: GrowthCanonicalDecisionResolution | null
+  /** GE-AIOS-OPERATOR-EXPERIENCE-1A — canonical approval queue snapshot (HAC + Growth 5F) */
+  canonicalOperatorApproval: GrowthCanonicalOperatorApprovalSnapshot | null
+  /** GE-AIOS-OPERATOR-EXPERIENCE-1A — single prioritized operator task */
+  canonicalOperatorTask: GrowthCanonicalOperatorTask | null
+  /** GE-AIOS-MISSION-ORCHESTRATION-1A — active account missions (projection only) */
+  canonicalActiveMissions: GrowthCanonicalActiveMissionsProjection | null
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — single prioritized operator focus */
+  canonicalOperatorFocus: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
 }

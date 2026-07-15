@@ -131,8 +131,21 @@ export async function enforceCanonicalDecisionForSequenceChannelJob(
     const enforcement = evaluateCanonicalSequenceStepExecution(null, {
       stepLabel: channelLabel,
       stepChannel: input.job.channel ?? null,
+      executionPhase: "dispatch",
     })
-    return { allowed: true, enforcement, decisionFingerprint: null }
+    await finalizeCanonicalDecisionSuppressedJob(admin, input.job, enforcement)
+    return {
+      allowed: false,
+      enforcement,
+      decisionFingerprint: null,
+      result: {
+        ok: false,
+        jobId: input.job.id,
+        status: "blocked",
+        message: enforcement.outcome,
+        blocked: true,
+      },
+    }
   }
 
   const resolution = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
@@ -145,6 +158,7 @@ export async function enforceCanonicalDecisionForSequenceChannelJob(
     stepLabel: channelLabel,
     stepChannel: input.job.channel ?? null,
     operatorOverride: false,
+    executionPhase: "dispatch",
   })
   const decisionFingerprint = resolution?.decision.decisionFingerprint ?? null
 

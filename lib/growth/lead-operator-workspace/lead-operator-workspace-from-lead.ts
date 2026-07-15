@@ -1,5 +1,6 @@
 /**
  * GE-SIMPLIFY-1F — Build operator workspace payload directly from canonical growth.leads.
+ * Decision authority: GrowthAiOsRuntimeContext.getDecision() (Runtime Context 1A).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -41,7 +42,15 @@ import {
   readLeadMetadataSummary,
 } from "@/lib/growth/revenue-queue/revenue-queue-inbox-display-map"
 import type { GrowthLead } from "@/lib/growth/types"
-import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { projectCanonicalLeadOpportunityNarrative } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import { buildCanonicalOperatorAccountNarrative } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-account-narrative-1a"
+import { buildCanonicalMission } from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
+import {
+  createGrowthAiOsRuntimeContext,
+  type GrowthAiOsRuntimeContext,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
@@ -381,7 +390,7 @@ function buildBuyingStageFromLead(
 export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
   admin: SupabaseClient,
   lead: GrowthLead,
-  options?: { organizationId?: string | null },
+  options?: { organizationId?: string | null; runtimeContext?: GrowthAiOsRuntimeContext },
 ): Promise<GrowthLeadOperatorWorkspacePayload> {
   const workspaceOrg = resolveGrowthEngineWorkspaceOrganizationId(options?.organizationId)
   const organizationId = workspaceOrg?.organizationId ?? null
@@ -413,24 +422,41 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     ...(handoff?.operator_attribution ?? []),
   ]
 
+  const runtimeContext =
+    options?.runtimeContext ??
+    (organizationId
+      ? createGrowthAiOsRuntimeContext(admin, {
+          organizationId,
+          leadId: lead.id,
+          boundary: "lead_workspace_load",
+          cacheScope: "operator-surface",
+          companyName: lead.companyName,
+        })
+      : null)
+
   const [
     intentResult,
     searchSignals,
     buyingStageRows,
     companyMatches,
     canonical_decision,
+    memoryBundle,
   ] = await Promise.all([
     loadIntentActivityFromLead(admin, lead),
     loadSearchIntentSignalsForRevenueQueue(admin, lead.id, 12),
     loadBuyingStageAssessmentsForRevenueQueue(admin, lead.id, 3),
     loadCompanyIdentificationMatchesForRevenueQueue(admin, lead.id, 5),
-    organizationId
-      ? resolveGrowthCanonicalDecisionForLeadCached(admin, {
-          organizationId,
-          leadId: lead.id,
-          cacheScope: "operator-surface",
-        }).catch(() => null)
+    runtimeContext
+      ? runtimeContext.getDecision()
       : Promise.resolve(null),
+    runtimeContext
+      ? runtimeContext.getMemory()
+      : organizationId
+        ? resolveCanonicalHumanMemoryForLead(admin, {
+            organizationId,
+            leadId: lead.id,
+          }).catch(() => null)
+        : Promise.resolve(null),
   ])
 
   const { history: intentActivity, identified } = intentResult
@@ -445,6 +471,48 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     source_type: s.source_type,
     evidence: s.evidence,
   }))
+
+  const operatorDecision = canonical_decision
+    ? projectGrowthCanonicalOperatorDecision({
+        decision: canonical_decision.decision,
+        freshness: canonical_decision.freshness,
+      })
+    : null
+
+  const operator_opportunity_narrative = canonical_decision
+    ? projectCanonicalLeadOpportunityNarrative({
+        leadId: lead.id,
+        companyName: lead.companyName,
+        decision: operatorDecision,
+      })
+    : null
+
+  const canonical_mission =
+    organizationId && canonical_decision
+      ? buildCanonicalMission({
+          organizationId,
+          leadId: lead.id,
+          companyName: lead.companyName,
+          contactName: lead.contactName,
+          decisionResolution: canonical_decision,
+          opportunityNarrative: operator_opportunity_narrative ?? undefined,
+          relationshipSummary:
+            memoryBundle?.relationship.summary ??
+            handoff?.operator_evidence?.[0]?.claim ??
+            null,
+          conversationSummary: operatorDecision?.whatToDo ?? null,
+          memorySummary: memoryBundle?.relationship.summary ?? null,
+        })
+      : null
+
+  const canonical_account_narrative = buildCanonicalOperatorAccountNarrative({
+    leadId: lead.id,
+    companyName: lead.companyName,
+    memoryBundle,
+    decision: operatorDecision,
+    opportunityNarrative: operator_opportunity_narrative ?? undefined,
+    mission: canonical_mission,
+  })
 
   return {
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
@@ -464,5 +532,8 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     company_match: buildCompanyMatchFromLead(lead, companyMatches[0] ?? null),
     buying_stage: buildBuyingStageFromLead(lead, buyingStageRows[0] ?? null),
     canonical_decision,
+    operator_opportunity_narrative,
+    canonical_account_narrative,
+    canonical_mission,
   }
 }

@@ -169,8 +169,8 @@ assert.ok(
   "lead workspace must use canonical org resolver",
 )
 assert.ok(
-  leadWorkspaceSource.includes("resolveGrowthCanonicalDecisionForLeadCached"),
-  "lead workspace must use cached canonical decision resolver",
+  leadWorkspaceSource.includes("createGrowthAiOsRuntimeContext"),
+  "lead workspace must use Runtime Context 1A for canonical decision resolution",
 )
 console.log("  ✓ repair: lead-operator-workspace-from-lead organization + decision resolution")
 

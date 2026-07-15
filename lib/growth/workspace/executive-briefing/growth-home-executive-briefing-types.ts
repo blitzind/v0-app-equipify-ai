@@ -385,6 +385,15 @@ export type GrowthHomeAiOsUxViewModel = {
   waitingOnYouOverflow: number
   approveItemsHref: string | null
   approveItemsCount: number
+  /** GE-AIOS-OPERATOR-EXPERIENCE-1A — collapsed single operator task */
+  canonicalOperatorTask: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
+  canonicalApprovalSnapshot: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
+  /** GE-AIOS-MISSION-ORCHESTRATION-1A — one mission per active account */
+  canonicalActiveMissions: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — unified operator focus */
+  canonicalOperatorFocus: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — progress projection (not a planner) */
+  canonicalOperatorProgress: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a").GrowthCanonicalOperatorProgressProjection | null
   liveStatus: GrowthHomeAvaLiveStatus | null
   dailyWorkQueueBuckets: GrowthHomeDailyWorkQueueBuckets | null
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]

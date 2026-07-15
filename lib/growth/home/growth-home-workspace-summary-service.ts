@@ -12,8 +12,8 @@ import {
   withGrowthHomeLoaderBudget,
   type GrowthHomeLoaderTiming,
 } from "@/lib/growth/home/growth-home-workspace-loader-budget"
-import { buildGrowthHomeOrganizationMemory } from "@/lib/growth/memory/storage/organization-memory-repository"
-import { buildGrowthHomeOrganizationalKnowledge } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
+import { fetchOrganizationMemoryStore } from "@/lib/growth/memory/storage/organization-memory-repository"
+import { fetchOrganizationKnowledgeStore } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import { GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
@@ -61,7 +61,17 @@ import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growt
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
-import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
+import { loadCanonicalOperatorApprovalSnapshotForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-loader"
+import {
+  buildCanonicalOperatorTask,
+  resolveCanonicalApprovalQueueCount,
+  resolveCanonicalOutreachDraftCount,
+} from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { buildCanonicalMissionsFromApprovalSnapshot } from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
+import { projectCanonicalActiveMissionsForHome } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-home"
+import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -446,11 +456,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         label: "organization_memory",
         budgetMs: loaderBudgetMs,
         fn: () =>
-          buildGrowthHomeOrganizationMemory({
-            admin: input.admin,
+          fetchOrganizationMemoryStore(input.admin, {
             organizationId,
             generatedAt,
-            salesOutcomes: salesOutcomes.outcomes,
           }),
         fallback: {
           qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
@@ -486,12 +494,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         label: "organization_knowledge",
         budgetMs: loaderBudgetMs,
         fn: () =>
-          buildGrowthHomeOrganizationalKnowledge({
-            admin: input.admin,
+          fetchOrganizationKnowledgeStore(input.admin, {
             organizationId,
             generatedAt,
-            memoryEvents: organizationalMemory.store.events,
-            salesOutcomes: salesOutcomes.outcomes,
           }),
         fallback: {
           qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
@@ -565,28 +570,131 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const durationMs = Date.now() - startedAt
   logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })
 
-  const heroLeadId =
+  const canonicalOperatorApproval = organizationId
+    ? await withGrowthHomeLoaderBudget({
+        label: "canonical_operator_approval",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
+            organizationId,
+            generatedAt,
+          }),
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
+    : null
+
+  const canonicalApprovalCount = resolveCanonicalApprovalQueueCount(
+    canonicalOperatorApproval,
+    kpis.approvalQueueCount,
+  )
+  const canonicalDraftCount = resolveCanonicalOutreachDraftCount(
+    canonicalOperatorApproval,
+    salesOutcomes.dailySummary.approvals_pending,
+  )
+
+  if (canonicalOperatorApproval) {
+    kpis.approvalQueueCount = canonicalApprovalCount
+    operatorTasks.pendingApprovals = canonicalApprovalCount
+    salesOutcomes.dailySummary.approvals_pending = canonicalApprovalCount
+    salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
+    avaConsole.waitingForApproval =
+      canonicalApprovalCount > 0
+        ? `${canonicalApprovalCount} item(s) waiting for your approval`
+        : null
+  }
+
+  const revenueQueueLeadId =
     dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
     leads.find((row) => row.id)?.id ??
     null
+  const revenueQueueCompanyName =
+    dailyWorkQueueBundle.display?.top_items?.[0]?.company_name ??
+    leads.find((row) => row.id === revenueQueueLeadId)?.companyName ??
+    null
+
+  const preliminaryMissions =
+    organizationId && canonicalOperatorApproval
+      ? buildCanonicalMissionsFromApprovalSnapshot({
+          organizationId,
+          approvalSnapshot: canonicalOperatorApproval,
+        })
+      : []
+
+  const preliminaryFocus = buildCanonicalOperatorFocus({
+    approvalSnapshot: canonicalOperatorApproval,
+    missions: preliminaryMissions,
+    revenueQueueLeadId,
+    revenueQueueCompanyName,
+    leads: leads.map((row) => ({ id: row.id, companyName: row.companyName })),
+  })
+
+  const heroLeadId = preliminaryFocus?.leadId ?? revenueQueueLeadId
 
   const canonicalHeroDecision =
     organizationId && heroLeadId
       ? await withGrowthHomeLoaderBudget({
           label: "canonical_hero_decision",
           budgetMs: loaderBudgetMs,
-          fn: () =>
-            resolveGrowthCanonicalDecisionForLeadCached(input.admin, {
+          fn: () => {
+            const heroContext = createGrowthAiOsRuntimeContext(input.admin, {
               organizationId,
               leadId: heroLeadId,
+              boundary: "home_load",
               cacheScope: "operator-surface",
-            }),
+            })
+            return heroContext.getDecision()
+          },
           fallback: null,
         }).then((step) => {
           stageTimings.push(step.timing)
           return step.value
         })
       : null
+
+  const canonicalOperatorFocus = buildCanonicalOperatorFocus({
+    approvalSnapshot: canonicalOperatorApproval,
+    missions: preliminaryMissions,
+    decisionResolution: canonicalHeroDecision,
+    revenueQueueLeadId,
+    revenueQueueCompanyName,
+    leads: leads.map((row) => ({ id: row.id, companyName: row.companyName })),
+  }) ?? preliminaryFocus
+
+  const canonicalOperatorTask = buildCanonicalOperatorTask({
+    approvalSnapshot:
+      canonicalOperatorApproval ?? {
+        qaMarker: "ge-aios-operator-experience-1a-v1",
+        outreachPackageCount: 0,
+        outreachDraftCount: 0,
+        pendingApprovalCount: 0,
+        waitingForOperator: false,
+        packages: [],
+        topPackage: null,
+      },
+    decision: canonicalHeroDecision
+      ? projectGrowthCanonicalOperatorDecision({
+          decision: canonicalHeroDecision.decision,
+          freshness: canonicalHeroDecision.freshness,
+        })
+      : null,
+    focusLeadId: canonicalOperatorFocus?.leadId ?? heroLeadId,
+    focusCompanyName: canonicalOperatorFocus?.companyName ?? null,
+    focusHref: canonicalOperatorFocus?.href ?? null,
+  })
+
+  const heroLeadCompanyName =
+    leads.find((row) => row.id === heroLeadId)?.companyName ?? null
+
+  const canonicalActiveMissions = projectCanonicalActiveMissionsForHome({
+    organizationId,
+    canonicalOperatorApproval,
+    canonicalHeroDecision,
+    canonicalOperatorTask,
+    heroLeadCompanyName,
+  })
 
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
@@ -619,6 +727,10 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     leadPool,
     missionDiscovery,
     canonicalHeroDecision,
+    canonicalOperatorApproval,
+    canonicalOperatorTask,
+    canonicalActiveMissions,
+    canonicalOperatorFocus,
   }
 }
 

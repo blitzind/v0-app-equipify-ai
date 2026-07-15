@@ -15,12 +15,12 @@ import {
   type HomeWorkItemPresentation,
 } from "@/lib/growth/home/growth-home-runtime-presenter"
 import { normalizeAvaWorkManagerResult } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
+import type { GrowthCanonicalOperatorProgressProjection } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a"
+import { GROWTH_AIOS_OPERATOR_STORY_IMPLEMENTATION_1A_QA_MARKER } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types"
 import {
   AVA_WORK_MANAGER_BLOCKED_TITLE,
   AVA_WORK_MANAGER_COMPLETED_TODAY_TITLE,
-  AVA_WORK_MANAGER_TODAY_WORK_TITLE,
   AVA_WORK_MANAGER_UP_NEXT_TITLE,
-  AVA_WORK_MANAGER_WAITING_ON_YOU_TITLE,
   AVA_WORK_MANAGER_WORKING_NOW_TITLE,
   GROWTH_WORK_MANAGER_QA_MARKER,
   type AvaWorkItem,
@@ -30,6 +30,7 @@ import {
 type Props = {
   workManager: AvaWorkManagerResult | null
   leadPool?: GrowthHomeLeadPoolSummary | null
+  progress?: GrowthCanonicalOperatorProgressProjection | null
 }
 
 function WorkItemRow({ item }: { item: HomeWorkItemPresentation }) {
@@ -93,7 +94,7 @@ function WorkItemList({
   )
 }
 
-export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props) {
+export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progress = null }: Props) {
   const safeWorkManager = normalizeAvaWorkManagerResult(workManager)
   const hasWorkPlan = Boolean(safeWorkManager && safeWorkManager.work_plan.length > 0)
   const scaleLine = buildHomeRelationshipScaleLine(leadPool)
@@ -114,15 +115,19 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
 
   return (
     <section
-      data-qa-section="home-ava-work"
+      data-qa-section="home-ava-progress"
+      data-qa-marker-operator-story={GROWTH_AIOS_OPERATOR_STORY_IMPLEMENTATION_1A_QA_MARKER}
       data-qa-marker-11a={GROWTH_WORK_MANAGER_QA_MARKER}
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card/70 p-5 shadow-sm"
     >
       <div className="mb-4 border-b border-border/50 pb-3 space-y-1">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {AVA_WORK_MANAGER_TODAY_WORK_TITLE}
+          {progress?.title ?? "Progress"}
         </h2>
+        <p className="text-sm text-muted-foreground">
+          {progress?.subtitle ?? "Background work and momentum across your accounts"}
+        </p>
         {scaleLine ? <p className="text-sm text-muted-foreground">{scaleLine}</p> : null}
       </div>
 
@@ -155,16 +160,6 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
             {AVA_WORK_MANAGER_UP_NEXT_TITLE}
           </p>
           <WorkItemList items={upNextItems} emptyLabel="No additional work queued." />
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {AVA_WORK_MANAGER_WAITING_ON_YOU_TITLE}
-          </p>
-          <WorkItemList
-            items={wm.operator_queue.slice(0, 4)}
-            emptyLabel="Nothing waiting on you."
-          />
         </div>
 
         {wm.blocked.length > 0 ? (

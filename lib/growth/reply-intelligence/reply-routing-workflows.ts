@@ -2,6 +2,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { registerUnsubscribe } from "@/lib/growth/compliance/suppression-engine"
+import {
+  propagateCanonicalTerminalStateForLead,
+  propagateContactTerminalStateForLead,
+} from "@/lib/growth/aios/approvals/completed-work-lifecycle-propagation"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 import { upsertGrowthSuppressionEntry } from "@/lib/growth/outbound/suppression-repository"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import type { ReplyIntentClassificationV2Result } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
@@ -24,7 +29,7 @@ type WorkflowRoute = {
   actionStatus: "recorded" | "pending_review"
 }
 
-const STOP_INTENTS = new Set<GrowthReplyIntent>(["unsubscribe", "not_interested", "wrong_contact", "angry_complaint"])
+const MANDATORY_HARD_STOP_INTENTS = new Set<GrowthReplyIntent>(["unsubscribe", "not_interested", "angry_complaint"])
 const POSITIVE_INTENTS = new Set<GrowthReplyIntent>(["positive_interest", "meeting_request", "demo_request", "pricing_question"])
 
 function resolveWorkflowRoutes(input: {
@@ -34,20 +39,23 @@ function resolveWorkflowRoutes(input: {
 }): WorkflowRoute[] {
   const routes: WorkflowRoute[] = []
 
-  if (STOP_INTENTS.has(input.intent)) {
+  if (MANDATORY_HARD_STOP_INTENTS.has(input.intent) || input.intent === "wrong_contact") {
     routes.push({
       actionType: "suppress_outreach",
       severity: input.intent === "angry_complaint" ? "critical" : "high",
       title: "Suppress future outreach",
       summary: input.classification.recommendedOperatorAction,
-      actionStatus: input.intent === "unsubscribe" ? "recorded" : "pending_review",
+      actionStatus: MANDATORY_HARD_STOP_INTENTS.has(input.intent) ? "recorded" : "pending_review",
     })
     routes.push({
       actionType: "stop_sequence",
       severity: "high",
       title: "Stop sequence",
-      summary: "Automated sequence should pause pending operator review.",
-      actionStatus: "pending_review",
+      summary:
+        input.intent === "wrong_contact"
+          ? "Wrong contact — stop outreach to this person immediately."
+          : "Mandatory stop — Ava halted the sequence immediately.",
+      actionStatus: MANDATORY_HARD_STOP_INTENTS.has(input.intent) ? "recorded" : "pending_review",
     })
   }
 
@@ -267,6 +275,24 @@ export async function routeReplyWorkflows(
     contactId: input.contactId,
     sequenceEnrollmentId: input.sequenceEnrollmentId,
   })
+
+  const organizationId = resolveGrowthEngineWorkspaceOrganizationId()
+  if (organizationId && MANDATORY_HARD_STOP_INTENTS.has(input.classification.intent)) {
+    await propagateCanonicalTerminalStateForLead(admin, {
+      organizationId,
+      leadId: input.leadId,
+      reason: input.classification.intent === "unsubscribe" ? "unsubscribed" : "compliance_suppressed",
+      idempotencyKey: `reply_intelligence:${input.classification.intent}:${input.replyId}`,
+    })
+  } else if (organizationId && input.classification.intent === "wrong_contact") {
+    await propagateContactTerminalStateForLead(admin, {
+      organizationId,
+      leadId: input.leadId,
+      contactId: input.contactId,
+      sequenceEnrollmentId: input.sequenceEnrollmentId,
+      reason: "wrong_contact",
+    })
+  }
 
   return { actions: actionIds, suppressed }
 }

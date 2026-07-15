@@ -2,6 +2,10 @@
  * GE-AIOS-DECISION-ENGINE-1C — Runtime canonical decision enforcement (client-safe).
  */
 
+import {
+  evaluateDegradedCanonicalEnforcement,
+} from "@/lib/growth/aios/execution/growth-degraded-enforcement-policy-1a"
+import type { GrowthCanonicalLeadLifecycleSnapshot } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import type { GrowthCanonicalDecisionResolution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
 import type { GrowthCanonicalNextBestDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-types"
 import {
@@ -118,11 +122,20 @@ export function evaluateGrowth5fPackagePreparation(
   context: GrowthCanonicalPackagePreparationContext = {},
 ): GrowthCanonicalPackagePreparationEnforcement {
   if (!resolution) {
+    const degraded = evaluateDegradedCanonicalEnforcement({
+      actionKind: context.isPreviewOnly ? "package_preview" : "package_preparation",
+      leadLifecycle: context.leadLifecycle,
+      explicitOperatorRequest: context.isOperatorRebuild === true,
+    })
     return packagePreparationResult({
-      allowed: true,
-      outcome: "decision_allowed",
-      reason: "Canonical decision unavailable — fail open for package preparation.",
-      decisionFingerprint: "unresolved",
+      allowed: degraded.disposition === "allowed",
+      outcome:
+        degraded.disposition === "allowed"
+          ? "decision_allowed"
+          : "decision_deferred_resolution_unavailable",
+      reason: degraded.operatorExplanation,
+      decisionFingerprint: degraded.enforcementFingerprint,
+      nextEligibleWakeAt: degraded.nextSafeRetryAt,
     })
   }
 
@@ -279,14 +292,22 @@ export function evaluateCanonicalSequenceStepExecution(
     stepLabel?: string | null
     stepChannel?: string | null
     operatorOverride?: boolean
+    executionPhase?: "preparation" | "dispatch"
+    leadLifecycle?: GrowthCanonicalLeadLifecycleSnapshot
   } = {},
 ): GrowthCanonicalSequenceStepEnforcement {
   if (!resolution) {
+    const degraded = evaluateDegradedCanonicalEnforcement({
+      actionKind:
+        context.executionPhase === "preparation" ? "sequence_preparation" : "sequence_dispatch",
+      leadLifecycle: context.leadLifecycle,
+    })
     return sequenceResult({
-      allowed: true,
-      outcome: "canonical_decision_suppressed",
-      reason: "Canonical decision unavailable — sequence path continues with existing gates.",
-      decisionFingerprint: "unresolved",
+      allowed: false,
+      outcome: "canonical_decision_resolution_unavailable",
+      reason: degraded.operatorExplanation,
+      decisionFingerprint: degraded.enforcementFingerprint,
+      waitUntil: degraded.nextSafeRetryAt,
     })
   }
 
@@ -441,14 +462,19 @@ export function evaluateCanonicalTransportBoundary(
     channel?: string | null
     operatorOverride?: boolean
     humanApproved?: boolean
+    leadLifecycle?: GrowthCanonicalLeadLifecycleSnapshot
   } = {},
 ): GrowthCanonicalTransportBoundaryEnforcement {
   if (!resolution) {
+    const degraded = evaluateDegradedCanonicalEnforcement({
+      actionKind: "transport_dispatch",
+      leadLifecycle: context.leadLifecycle,
+    })
     return transportResult({
-      allowed: true,
-      outcome: "transport_allowed",
-      reason: "Canonical decision unavailable — existing transport gates remain authoritative.",
-      decisionFingerprint: "unresolved",
+      allowed: false,
+      outcome: "transport_blocked_resolution_unavailable",
+      reason: degraded.operatorExplanation,
+      decisionFingerprint: degraded.enforcementFingerprint,
     })
   }
 

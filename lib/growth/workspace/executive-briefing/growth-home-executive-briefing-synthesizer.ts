@@ -146,6 +146,10 @@ export type GrowthHomeExecutiveBriefingInput = {
   teammate?: AiTeammatePresentation
   teammateName?: string | null
   operatorDisplayName?: string | null
+  canonicalOperatorApproval?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
+  canonicalOperatorTask?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
+  canonicalActiveMissions?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
+  canonicalOperatorFocus?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
 }
 
 function metricValue(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: string, label: string): number {
@@ -1199,6 +1203,10 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     waitingOnYou: waitingOnYouResult.items,
     waitingOnYouOverflow: waitingOnYouResult.overflowCount,
     needsReview,
+    canonicalApprovalSnapshot: input.canonicalOperatorApproval ?? null,
+    canonicalOperatorTask: input.canonicalOperatorTask ?? null,
+    canonicalActiveMissions: input.canonicalActiveMissions ?? null,
+    canonicalOperatorFocus: input.canonicalOperatorFocus ?? null,
   })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)

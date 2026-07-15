@@ -15,6 +15,7 @@ import {
   type CanonicalDecisionOperatorOverrideRecord,
   type CanonicalDecisionOperatorOverrideScope,
 } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
+import { formatDegradedEnforcementOperatorMessage } from "@/lib/growth/aios/execution/growth-degraded-enforcement-policy-1a"
 
 export function validateCanonicalDecisionOperatorOverride(input: {
   resolution: GrowthCanonicalDecisionResolution | null
@@ -92,8 +93,8 @@ export function evaluateCanonicalCopilotMaterializationConsistency(
       allowedForReview: true,
       blocked: false,
       refreshRequired: false,
-      reason: "Canonical decision unavailable — materialization allowed for operator review.",
-      outcome: "allowed",
+      reason: formatDegradedEnforcementOperatorMessage("preview_only"),
+      outcome: "preview_only_degraded",
     }
   }
 

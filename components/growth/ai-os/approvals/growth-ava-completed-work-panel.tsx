@@ -49,6 +49,12 @@ import {
   sortCompletedWorkForOperatorPriority,
   summarizeActionableCompletedWork,
 } from "@/lib/growth/aios/approvals/completed-work-operator-ux"
+import { buildCanonicalOperatorApprovalSnapshot } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import {
+  buildCanonicalMission,
+  groupCompletedWorkByMission,
+} from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
+import { GROWTH_AIOS_MISSION_ORCHESTRATION_1A_QA_MARKER } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-types"
 import { humanizeCompletedWorkSupportingSummary } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
 import {
   formatGrowthCustomerApprovalActionLabel,
@@ -411,6 +417,35 @@ export function GrowthAvaCompletedWorkPanel() {
 
   const summary = useMemo(() => summarizeActionableCompletedWork(activeItems), [activeItems])
 
+  const canonicalApproval = useMemo(
+    () =>
+      buildCanonicalOperatorApprovalSnapshot({
+        hacItems: activeItems,
+        packagesById,
+        dismissedItemIds: dismissedIds,
+      }),
+    [activeItems, packagesById, dismissedIds],
+  )
+
+  const missionGroups = useMemo(() => {
+    const missionsByLeadId = new Map(
+      canonicalApproval.packages
+        .filter((pkg) => pkg.leadId)
+        .map((pkg) => [
+          pkg.leadId,
+          buildCanonicalMission({
+            organizationId,
+            leadId: pkg.leadId,
+            companyName: pkg.companyName,
+            approvalSnapshot: canonicalApproval,
+            packagePreview: pkg,
+            hacItems: activeItems,
+          }),
+        ]),
+    )
+    return groupCompletedWorkByMission({ items: activeItems, missionsByLeadId })
+  }, [canonicalApproval, activeItems, organizationId])
+
   const primaryItems = useMemo(() => {
     if (!projection) return [] as GrowthAvaCompletedWorkItem[]
     return projection.items.filter(
@@ -454,6 +489,7 @@ export function GrowthAvaCompletedWorkPanel() {
         data-qa-marker-hac={GROWTH_HUMAN_APPROVAL_CENTER_QA_MARKER}
         data-qa-marker-19c-4a={GROWTH_ZERO_ASSISTANCE_ADOPTION_19C_4A_QA_MARKER}
         data-qa-marker-operator-ux={GROWTH_AIOS_OPERATOR_UX_1A_QA_MARKER}
+        data-qa-marker-mission={GROWTH_AIOS_MISSION_ORCHESTRATION_1A_QA_MARKER}
       >
         <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <p className="text-xl font-semibold tracking-tight text-foreground">
@@ -465,22 +501,79 @@ export function GrowthAvaCompletedWorkPanel() {
               : resolveCompletedWorkHeroWaiting(teammate)}
           </p>
           {!showGlobalEmpty ? (
-            <ul className="mt-4 space-y-1 text-sm text-foreground">
-              <li>
-                {summary.outreachPackages} outreach package
-                {summary.outreachPackages === 1 ? "" : "s"}
-              </li>
-              <li>
-                {summary.followUpDecisions} follow-up decision
-                {summary.followUpDecisions === 1 ? "" : "s"}
-              </li>
-              <li>
-                {summary.supportingRecommendations} supporting recommendation
-                {summary.supportingRecommendations === 1 ? "" : "s"}
-              </li>
+            <ul className="mt-4 space-y-2 text-sm text-foreground">
+              {canonicalApproval.packages.slice(0, 4).map((pkg) => (
+                <li key={pkg.itemId} className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
+                  <p className="font-medium">{pkg.companyName}</p>
+                  <p className="text-muted-foreground">
+                    {pkg.channelLabel ?? "Email sequence"} prepared
+                    {pkg.draftCount > 0
+                      ? ` · ${pkg.draftCount} draft${pkg.draftCount === 1 ? "" : "s"}`
+                      : ""}
+                    {pkg.preparedAgoLabel ? ` · ${pkg.preparedAgoLabel}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{pkg.statusLabel}</p>
+                </li>
+              ))}
+              {canonicalApproval.packages.length === 0 ? (
+                <>
+                  <li>
+                    {canonicalApproval.outreachPackageCount} outreach package
+                    {canonicalApproval.outreachPackageCount === 1 ? "" : "s"}
+                  </li>
+                  <li>
+                    {summary.followUpDecisions} follow-up decision
+                    {summary.followUpDecisions === 1 ? "" : "s"}
+                  </li>
+                </>
+              ) : null}
+              {summary.supportingRecommendations > 0 ? (
+                <li>
+                  {summary.supportingRecommendations} supporting recommendation
+                  {summary.supportingRecommendations === 1 ? "" : "s"}
+                </li>
+              ) : null}
             </ul>
           ) : null}
         </div>
+
+        {!showGlobalEmpty && missionGroups.length > 0 ? (
+          <div data-qa-section="completed-work-mission-groups" className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Mission history
+            </h2>
+            {missionGroups.map((group) => (
+              <article
+                key={group.missionId}
+                className="rounded-xl border border-border/70 bg-card p-4 space-y-2"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-semibold">{group.missionTitle}</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={group.href}>Open mission</Link>
+                  </Button>
+                </div>
+                {group.completed.length > 0 ? (
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {group.completed.map((line) => (
+                      <li key={`done:${line}`}>✓ {line}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {group.waiting.length > 0 ? (
+                  <div className="text-sm">
+                    <p className="font-medium text-foreground">Waiting</p>
+                    <ul className="mt-1 space-y-1 text-muted-foreground">
+                      {group.waiting.map((line) => (
+                        <li key={`wait:${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
 
         {showGlobalEmpty ? (
           <div className="rounded-xl border border-border/70 bg-card p-5">

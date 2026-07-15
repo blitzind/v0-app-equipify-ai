@@ -25,7 +25,7 @@ export type CanonicalCopilotMaterializationConsistency = {
   blocked: boolean
   refreshRequired: boolean
   reason: string
-  outcome: "allowed" | "refresh_required" | "blocked"
+  outcome: "allowed" | "refresh_required" | "blocked" | "preview_only_degraded"
 }
 
 export type Growth5fPackageBuildMode = "production" | "preview_only"

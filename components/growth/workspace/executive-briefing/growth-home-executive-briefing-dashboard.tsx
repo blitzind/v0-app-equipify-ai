@@ -48,6 +48,7 @@ import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/g
 import type { GrowthWorkspaceRecentView, GrowthWorkspaceContinueItem } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { GrowthHomeAvaHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-hero-section"
+import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
 import { GrowthHomeAvaWorkSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-work-section"
 import { GrowthHomeAvaOperatingRhythmSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section"
 import { GrowthHomeAvaMemorySection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-memory-section"
@@ -57,7 +58,7 @@ import { GrowthHomeLaunchCompleteBanner } from "@/components/growth/workspace/ex
 import { GrowthHomeFirstWeekGuide } from "@/components/growth/workspace/executive-briefing/growth-home-first-week-guide"
 import { GrowthHomeCollapsibleSection } from "@/components/growth/workspace/executive-briefing/growth-home-collapsible-section"
 import { GrowthHomeExecutiveSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section"
-import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
+import { GrowthHomeCanonicalMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-canonical-missions-section"
 import { GrowthHomeStartAvaSetupSection } from "@/components/growth/workspace/executive-briefing/growth-home-start-ava-setup-section"
 import { GrowthHomeAvaLiveStatusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-live-status-section"
 import { GrowthHomeMissionCenterSection } from "@/components/growth/workspace/executive-briefing/growth-home-mission-center-section"
@@ -146,8 +147,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
         continueItems,
         teammate,
         operatorDisplayName,
+        canonicalOperatorApproval: workspaceSummary?.canonicalOperatorApproval ?? null,
+        canonicalOperatorTask: workspaceSummary?.canonicalOperatorTask ?? null,
+        canonicalActiveMissions: workspaceSummary?.canonicalActiveMissions ?? null,
+        canonicalOperatorFocus: workspaceSummary?.canonicalOperatorFocus ?? null,
       }),
-    [dashboard, recentViews, continueItems, teammate, operatorDisplayName],
+    [dashboard, recentViews, continueItems, teammate, operatorDisplayName, workspaceSummary?.canonicalOperatorApproval, workspaceSummary?.canonicalOperatorTask, workspaceSummary?.canonicalActiveMissions, workspaceSummary?.canonicalOperatorFocus],
   )
 
   useEffect(() => {
@@ -318,15 +323,22 @@ export function GrowthHomeExecutiveBriefingDashboard({
           learnedTodayCount={avaHero.dailyActivityNarrative?.learned_today.length ?? 0}
         />
 
-        <GrowthHomeAvaWorkSection
-          workManager={avaHero.workManager ?? null}
-          leadPool={workspaceSummary?.leadPool ?? null}
+        <GrowthHomeCanonicalMissionsSection
+          missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
+          overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
+          totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
         />
 
         <GrowthHomeAiOsWaitingOnYouSection
           aiOsUx={aiOsUx}
           relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
           waitingCompanyByLeadId={waitingCompanyByLeadId}
+        />
+
+        <GrowthHomeAvaWorkSection
+          workManager={avaHero.workManager ?? null}
+          leadPool={workspaceSummary?.leadPool ?? null}
+          progress={aiOsUx.canonicalOperatorProgress}
         />
 
         <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />

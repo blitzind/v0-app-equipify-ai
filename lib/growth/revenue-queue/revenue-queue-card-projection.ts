@@ -27,6 +27,7 @@ import {
   deriveEvidenceStrength,
   normalizeConfidence,
 } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
+import { resolveAuthoritativeForm } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function formatTimeSince(iso: string): string {
@@ -193,7 +194,7 @@ export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): Reven
 
   return {
     id: lead.id,
-    company_name: lead.companyName || "Unknown company",
+    company_name: resolveAuthoritativeForm(lead.companyName || "Unknown company"),
     domain: domainFromWebsite(lead.website),
     lead_score: leadScoreValue ?? (intentScore > 0 ? intentScore : null),
     intent_score: intentScore,
@@ -229,5 +230,7 @@ export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): Reven
     is_high_intent_visitor: isHighIntentVisitor,
     is_returning_account: isReturningAccount,
     needs_review: needsReview,
+    queue_role: "navigation",
+    navigation_cta_label: "Open account",
   }
 }

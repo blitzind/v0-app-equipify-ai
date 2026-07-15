@@ -5,6 +5,7 @@ import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth
 import type { GrowthCanonicalNextBestDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-types"
 import type { GrowthCanonicalDecisionFreshness } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
 import type { GrowthCanonicalOperatorDecisionProjection } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { humanizeOperatorBadgeLabel } from "@/lib/growth/aios/operator-experience/growth-operator-language-1a"
 
 function BulletList({ title, lines }: { title: string; lines: string[] }) {
   if (!lines.length) return null
@@ -35,7 +36,7 @@ export function GrowthCanonicalDecisionCard({
   if (!projected) return null
 
   return (
-    <GrowthEngineCard title={projected.headline} subtitle="One prioritized next step from Ava">
+    <GrowthEngineCard title={projected.headline} subtitle="What Ava needs and why">
       <div className="space-y-4">
         <div>
           <p className="text-sm font-medium text-foreground">{projected.whatToDo}</p>
@@ -49,18 +50,20 @@ export function GrowthCanonicalDecisionCard({
         {projected.prerequisites.length ? (
           <BulletList title="Must happen first" lines={projected.prerequisites} />
         ) : null}
-        {projected.thenActions.length ? <BulletList title="Then" lines={projected.thenActions} /> : null}
-        {projected.doNotActions.length ? <BulletList title="Do not" lines={projected.doNotActions} /> : null}
+        {projected.thenActions.length ? <BulletList title="What happens next" lines={projected.thenActions} /> : null}
+        {projected.doNotActions.length ? <BulletList title="Hold off on" lines={projected.doNotActions} /> : null}
 
         <div className="flex flex-wrap gap-2">
           <GrowthBadge label={projected.confidenceLabel} tone="neutral" />
           {projected.freshnessLabel ? (
-            <GrowthBadge label={projected.freshnessLabel} tone="attention" />
+            <GrowthBadge label={humanizeOperatorBadgeLabel(projected.freshnessLabel)} tone="attention" />
           ) : null}
           {projected.operatorReviewRequired ? (
-            <GrowthBadge label="Operator review required" tone="attention" />
+            <GrowthBadge label="Needs your review" tone="attention" />
           ) : null}
-          {projected.transportBlocked ? <GrowthBadge label="Send Plane blocked" tone="neutral" /> : null}
+          {projected.transportBlocked ? (
+            <GrowthBadge label="Waiting for your approval before outreach" tone="neutral" />
+          ) : null}
         </div>
       </div>
     </GrowthEngineCard>

@@ -49,6 +49,7 @@ import { resolveCanonicalCompanyDisplayName } from "@/lib/growth/aios/growth/gro
 import type { GrowthAutonomousOutreachPreparationWakeCondition } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { Growth5fPackageBuildMode } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
 import { assertGrowth5fPackagePreparationAllowed } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-growth5f-gate"
+import type { GrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -64,6 +65,7 @@ export async function buildAutonomousOutreachApprovalPackage(
     wakeCondition?: GrowthAutonomousOutreachPreparationWakeCondition
     adaptiveEvents?: AdaptiveProspectEvent[]
     buildMode?: Growth5fPackageBuildMode
+    runtimeContext?: GrowthAiOsRuntimeContext
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage> {
   if (input.buildMode !== "preview_only") {
@@ -77,6 +79,7 @@ export async function buildAutonomousOutreachApprovalPackage(
       isOperatorRebuild: Boolean(input.refreshReasons?.length),
       isMaterialRefresh: input.wakeCondition === "relationship_material_change",
       cacheScope: "growth5f:build-package",
+      runtimeContext: input.runtimeContext,
     })
   }
 
@@ -93,16 +96,23 @@ export async function buildAutonomousOutreachApprovalPackage(
     input.adaptiveEvents ??
     (await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []))
 
-  const memoryBundle = await resolveCanonicalHumanMemoryForLead(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    generatedAt: input.generatedAt,
-    researchSnapshot: input.snapshot,
-    packageSnapshot: input.previousPackage ?? null,
-    skipPackageLoad: !input.previousPackage,
-    liveDeltas: adaptiveEvents,
-    companyName: input.companyName,
-  })
+  const memoryBundle =
+    input.runtimeContext != null
+      ? await input.runtimeContext.getMemory().catch(() => null)
+      : await resolveCanonicalHumanMemoryForLead(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          generatedAt: input.generatedAt,
+          researchSnapshot: input.snapshot,
+          packageSnapshot: input.previousPackage ?? null,
+          skipPackageLoad: !input.previousPackage,
+          liveDeltas: adaptiveEvents,
+          companyName: input.companyName,
+        })
+
+  if (!memoryBundle) {
+    throw new Error("Canonical human memory resolution failed for outreach preparation.")
+  }
 
   const companyNameRaw = lead.companyName ?? input.companyName ?? "this company"
   const verifiedEvidence = input.snapshot.evidenceSummary?.verifiedEvidence ?? []

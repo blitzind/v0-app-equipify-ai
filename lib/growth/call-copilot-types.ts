@@ -97,6 +97,10 @@ export type GrowthCallCopilotBriefing = {
     commitments: string[]
     riskFlags: string[]
   }
+  /** GE-AIOS-MISSION-ORCHESTRATION-1A — call workspace mission context */
+  canonicalMission?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalMission | null
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — single authoritative account narrative */
+  canonicalAccountNarrative?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-account-narrative-1a-types").GrowthCanonicalOperatorAccountNarrative | null
 }
 
 export type GrowthCallCopilotSession = {

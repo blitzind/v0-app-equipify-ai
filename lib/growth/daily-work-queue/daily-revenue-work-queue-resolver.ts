@@ -21,10 +21,15 @@ import type {
 import { adaptDailyRevenueWorkQueueToDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import { resolveLeadDailyWorkQueueStatus } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
+import { mapWithBoundedConcurrency } from "@/lib/growth/runtime-guardrails/growth-bounded-concurrency"
 import {
+  GROWTH_DAILY_WORK_QUEUE_IRE_LEARNING_LIMIT,
   GROWTH_DAILY_WORK_QUEUE_LEAD_BATCH_LIMIT,
+  GROWTH_DAILY_WORK_QUEUE_STRATEGY_CONCURRENCY_LIMIT,
 } from "@/lib/growth/relationship/relationship-scale-limits"
 import type { GrowthLead } from "@/lib/growth/types"
+import { loadIreOrgHistoricalLearningObservations } from "@/lib/growth/revenue-workflow/load-ire-historical-learning"
+import type { EmailLearningObservation } from "@/lib/growth/contact-verification/email-learning"
 import { shadowEvaluatePortfolioAllocation } from "@/lib/growth/portfolio-allocation/portfolio-allocation-facade"
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { flattenActionableDailyRevenueWorkQueueItems } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
@@ -54,14 +59,32 @@ export async function resolveDailyRevenueWorkQueueForLeads(input: {
   if (!isDailyRevenueWorkQueueEnabled()) return null
 
   const organizationId = getGrowthEngineAiOrgId()
-  const candidates: DailyRevenueWorkQueueCandidate[] = []
 
-  for (const lead of input.leads) {
-    const bundle = await resolveLeadCommunicationStrategyBundle(lead, {
-      organizationId,
-      admin: input.admin,
-    })
-    if (!bundle.bundle?.stack || !bundle.bundle.communication_strategy) continue
+  const preloadedOrgLearning: EmailLearningObservation[] | null =
+    organizationId && input.admin
+      ? await loadIreOrgHistoricalLearningObservations({
+          admin: input.admin,
+          organizationId,
+          limit: GROWTH_DAILY_WORK_QUEUE_IRE_LEARNING_LIMIT,
+        }).catch(() => null)
+      : null
+
+  const bundleResults = await mapWithBoundedConcurrency(
+    input.leads,
+    GROWTH_DAILY_WORK_QUEUE_STRATEGY_CONCURRENCY_LIMIT,
+    async (lead) =>
+      resolveLeadCommunicationStrategyBundle(lead, {
+        organizationId,
+        admin: input.admin,
+        preloadedOrgLearning,
+      }).catch(() => ({ enabled: true, bundle: null } as const)),
+  )
+
+  const candidates: DailyRevenueWorkQueueCandidate[] = []
+  for (let index = 0; index < input.leads.length; index += 1) {
+    const lead = input.leads[index]!
+    const bundle = bundleResults[index]
+    if (!bundle?.bundle?.stack || !bundle.bundle.communication_strategy) continue
 
     const { stack, communication_strategy, revenue_execution_plan } = bundle.bundle
     if (!revenue_execution_plan) continue

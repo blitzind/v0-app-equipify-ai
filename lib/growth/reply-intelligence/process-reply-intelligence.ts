@@ -8,6 +8,7 @@ import { processRevenueIntelligence } from "@/lib/growth/revenue-intelligence/pr
 import { applyReplyComplianceHardening } from "@/lib/growth/reply-intelligence/reply-compliance-hardening"
 import { buildReplyCopilotAssist, mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-service"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
+import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import { insertConversationTimelineEvent } from "@/lib/growth/reply-intelligence/reply-ingestion-repository"
 import { detectReplyObjections } from "@/lib/growth/reply-intelligence/objection-detection"
@@ -42,7 +43,6 @@ import {
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
-import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
 
 function trimPhone(value: string | null | undefined): boolean {
   return Boolean(value?.trim())
@@ -170,13 +170,33 @@ export async function processReplyIntelligence(
     }).catch(() => undefined)
   }
 
-  const memoryBundle = input.lead.organizationId
-    ? await resolveCanonicalHumanMemoryForLead(admin, {
-        organizationId: input.lead.organizationId,
-        leadId: input.lead.id,
-        companyName: input.lead.companyName,
-      }).catch(() => null)
-    : null
+  const replyRuntimeContext =
+    input.lead.organizationId != null
+      ? createGrowthAiOsRuntimeContext(admin, {
+          organizationId: input.lead.organizationId,
+          leadId: input.lead.id,
+          boundary: "reply_webhook",
+          cacheScope: "runtime-context",
+          generatedAt: input.reply.receivedAt,
+          companyName: input.lead.companyName,
+          materialEvent: {
+            id: input.reply.id,
+            at: input.reply.receivedAt,
+            kind: classified.intent,
+          },
+          bypassDecisionCache: true,
+        })
+      : null
+
+  const memoryBundle = replyRuntimeContext
+    ? await replyRuntimeContext.getMemory().catch(() => null)
+    : input.lead.organizationId
+      ? await resolveCanonicalHumanMemoryForLead(admin, {
+          organizationId: input.lead.organizationId,
+          leadId: input.lead.id,
+          companyName: input.lead.companyName,
+        }).catch(() => null)
+      : null
   const copilotMemory = memoryBundle?.influence ?? null
 
   const copilot = buildReplyCopilotAssist({
@@ -257,16 +277,9 @@ export async function processReplyIntelligence(
   })
 
   if (input.lead.organizationId) {
-    const canonicalResolution = await resolveGrowthCanonicalDecisionForLead(admin, {
-      organizationId: input.lead.organizationId,
-      leadId: input.lead.id,
-      generatedAt: input.reply.receivedAt,
-      materialEvent: {
-        id: input.reply.id,
-        at: input.reply.receivedAt,
-        kind: classified.intent,
-      },
-    }).catch(() => null)
+    const canonicalResolution = replyRuntimeContext
+      ? await replyRuntimeContext.getDecision().catch(() => null)
+      : null
 
     if (canonicalResolution) {
       invalidateCanonicalDecisionCacheForLead(input.lead.id, "material_reply_finalized")

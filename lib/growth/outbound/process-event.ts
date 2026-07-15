@@ -22,6 +22,8 @@ import { classifyReplyIntent } from "@/lib/growth/reply-intelligence/reply-inten
 import { ingestGrowthReplyFromWebhook } from "@/lib/growth/replies/reply-ingestion-pipeline"
 import { insertGrowthOutboundReply } from "@/lib/growth/outbound/reply-repository"
 import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-by-email"
+import { propagateCanonicalTerminalStateForLead } from "@/lib/growth/aios/approvals/completed-work-lifecycle-propagation"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 import { upsertGrowthSuppressionEntry } from "@/lib/growth/outbound/suppression-repository"
 import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import {
@@ -227,6 +229,15 @@ export async function processOutboundEvent(
       reason: "unsubscribe",
       messageEventId: messageEvent.id,
     })
+    const organizationId = resolveGrowthEngineWorkspaceOrganizationId()
+    if (organizationId) {
+      await propagateCanonicalTerminalStateForLead(admin, {
+        organizationId,
+        leadId: resolved.leadId,
+        reason: "unsubscribed",
+        idempotencyKey: `provider_webhook:unsubscribed:${messageEvent.id}`,
+      })
+    }
     void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
       admin,
       leadId: resolved.leadId,

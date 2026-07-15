@@ -16,6 +16,12 @@ import {
   isProspectResearchStale,
   shouldAutoQueueLeadResearch,
 } from "@/lib/growth/research/growth-lead-research-readiness"
+import {
+  buildLeadLifecycleSnapshotForAuthority,
+  evaluateCanonicalExecutionAuthorityForLead,
+  recheckCanonicalExecutionAuthorityForLead,
+} from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import { runProspectResearch } from "@/lib/growth/research/research-orchestrator"
 import { fetchActiveProspectResearchRun } from "@/lib/growth/research/research-repository"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
@@ -220,6 +226,40 @@ export async function executeGrowthLeadProspectResearch(
     }
   }
 
+  const explicitOperatorRequest =
+    force || input.trigger === "manual" || input.trigger === "drawer_opportunistic"
+  const generatedAt = input.generatedAt ?? new Date().toISOString()
+  const lifecycle = await buildLeadLifecycleSnapshotForAuthority(input.admin, lead)
+
+  const authority = await evaluateCanonicalExecutionAuthorityForLead(input.admin, {
+    organizationId,
+    leadId: lead.id,
+    actionKind: "persisted_research_run",
+    explicitOperatorRequest,
+    generatedAt,
+    lead,
+    lifecycle,
+  })
+
+  if (!isCanonicalExecutionAllowed(authority)) {
+    logGrowthEngine("growth_lead_research_authority_blocked", {
+      leadId: lead.id,
+      trigger: input.trigger,
+      disposition: authority.disposition,
+      reason_code: authority.reasonCode,
+      lifecycle_reason: authority.lifecycleReason,
+    })
+    return {
+      ok: false,
+      outcome: "skipped",
+      code:
+        authority.disposition === "deferred"
+          ? "execution_authority_deferred"
+          : "execution_authority_blocked",
+      message: authority.reasonCode,
+    }
+  }
+
   const active = await fetchActiveProspectResearchRun(input.admin, lead.id)
   if (active && !rebuild) {
     logGrowthEngine("growth_lead_research_active_reused", {
@@ -233,6 +273,23 @@ export async function executeGrowthLeadProspectResearch(
       run: active,
       lead,
       qualificationRan: false,
+    }
+  }
+
+  const prePersistAuthority = await recheckCanonicalExecutionAuthorityForLead(input.admin, {
+    organizationId,
+    leadId: lead.id,
+    actionKind: "persisted_research_run",
+    explicitOperatorRequest,
+    generatedAt,
+    lifecycle,
+  })
+  if (!isCanonicalExecutionAllowed(prePersistAuthority)) {
+    return {
+      ok: false,
+      outcome: "skipped",
+      code: "execution_authority_race_blocked",
+      message: prePersistAuthority.reasonCode,
     }
   }
 
@@ -282,11 +339,26 @@ export async function executeGrowthLeadProspectResearch(
     !research.cached
 
   if (shouldQualify) {
+    const qualificationAuthority = await recheckCanonicalExecutionAuthorityForLead(input.admin, {
+      organizationId,
+      leadId: lead.id,
+      actionKind: "qualification_mutation",
+      explicitOperatorRequest,
+      generatedAt,
+    })
+    if (!isCanonicalExecutionAllowed(qualificationAuthority)) {
+      logGrowthEngine("growth_lead_research_qualification_authority_blocked", {
+        leadId: lead.id,
+        trigger: input.trigger,
+        disposition: qualificationAuthority.disposition,
+        reason_code: qualificationAuthority.reasonCode,
+      })
+    } else {
     try {
       await runAutonomousQualificationManualEvaluation(input.admin, {
         organizationId,
         leadId: lead.id,
-        generatedAt: input.generatedAt ?? new Date().toISOString(),
+        generatedAt,
       })
       qualificationRan = true
     } catch (error) {
@@ -296,6 +368,7 @@ export async function executeGrowthLeadProspectResearch(
         trigger: input.trigger,
         message: message.slice(0, 240),
       })
+    }
     }
   }
 

@@ -9,6 +9,11 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import {
+  evaluateCanonicalExecutionAuthorityForLead,
+  recheckCanonicalExecutionAuthorityForLead,
+} from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
+import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
+import {
   authorizeDatamoonPersonEnrichment,
   buildDatamoonAudienceFiltersForDecisionMaker,
   buildDatamoonPersonSearchIdempotencyKey,
@@ -269,6 +274,33 @@ export async function evaluateAndEnrichDecisionMakerForLead(
     return decision
   }
 
+  const contactDiscoveryAuthority = await evaluateCanonicalExecutionAuthorityForLead(admin, {
+    organizationId: input.organizationId,
+    leadId: lead.id,
+    actionKind: "contact_discovery",
+    generatedAt,
+    lead,
+  })
+  if (!isCanonicalExecutionAllowed(contactDiscoveryAuthority)) {
+    const decision = decideDatamoonDecisionMakerEnrichment({
+      organizationId: input.organizationId,
+      leadId: lead.id,
+      requirement,
+      authorization: {
+        ...authorization,
+        authorized: false,
+        denyReason: contactDiscoveryAuthority.reasonCode,
+        reason: `Execution authority blocked contact discovery: ${contactDiscoveryAuthority.reasonCode}`,
+      },
+      providerCalled: false,
+      duplicateRequestPrevented: false,
+      idempotencyKey,
+      now: generatedAt,
+    })
+    await persistDecisionLedger(admin, decision)
+    return decision
+  }
+
   if (duplicateRecent && !input.forceProviderCall && !input.injectedRecords) {
     const decision = decideDatamoonDecisionMakerEnrichment({
       organizationId: input.organizationId,
@@ -402,6 +434,23 @@ export async function evaluateAndEnrichDecisionMakerForLead(
   // GE-AIOS-CONTACT-1A — persist all DataMoon contact channels into canonical person model
   // whenever a candidate is selected (do not wait until after ranking to retrieve channels).
   if (decision.selectedCandidate) {
+    const prePersistAuthority = await recheckCanonicalExecutionAuthorityForLead(admin, {
+      organizationId: input.organizationId,
+      leadId: lead.id,
+      actionKind: "contact_discovery",
+      generatedAt,
+      lead,
+    })
+    if (!isCanonicalExecutionAllowed(prePersistAuthority)) {
+      decision.selectedCandidate = null
+      decision.outcome = "stopped"
+      decision.authorized = false
+      decision.denyReason = "disqualified_lead"
+      decision.explainability.pipelineDisposition = `execution_authority_blocked:${prePersistAuthority.reasonCode}`
+      await persistDecisionLedger(admin, decision)
+      return decision
+    }
+
     const selected = decision.selectedCandidate
     try {
       const { persistDatamoonDecisionMakerCanonicalContacts } = await import(

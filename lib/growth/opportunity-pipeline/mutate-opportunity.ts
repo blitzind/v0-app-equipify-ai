@@ -2,6 +2,9 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { propagateCanonicalTerminalStateForLead } from "@/lib/growth/aios/approvals/completed-work-lifecycle-propagation"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 import { fetchGrowthRepByUserId } from "@/lib/growth/assignment/rep-roster-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import {
@@ -266,6 +269,29 @@ export async function updateGrowthOpportunityStage(
   }
 
   const leadId = row.lead_id as string
+  invalidateCanonicalDecisionCacheForLead(leadId, `opportunity_stage:${toStage}`)
+
+  const organizationId = resolveGrowthEngineWorkspaceOrganizationId()
+  if (organizationId) {
+    if (toStage === "closed_won") {
+      await propagateCanonicalTerminalStateForLead(admin, {
+        organizationId,
+        leadId,
+        reason: "closed_won",
+        idempotencyKey: `opportunity_closed_won:${input.opportunityId}`,
+      })
+    } else if (toStage === "closed_lost") {
+      await propagateCanonicalTerminalStateForLead(admin, {
+        organizationId,
+        leadId,
+        reason: "closed_lost",
+        idempotencyKey: `opportunity_closed_lost:${input.opportunityId}`,
+      })
+    } else if (isClosedStage(settings, fromStage) && !isClosedStage(settings, toStage)) {
+      invalidateCanonicalDecisionCacheForLead(leadId, "opportunity_reopened_requires_fresh_decision")
+    }
+  }
+
   const { routeLeadSignalEvent } = await import(
     "@/lib/growth/signal-intelligence/route-lead-signal-event"
   )

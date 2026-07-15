@@ -22,7 +22,12 @@ import {
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import {
+  createGrowthAiOsRuntimeContext,
+  type GrowthAiOsRuntimeContext,
+} from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { buildCanonicalMission } from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
 import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 
 function metaRecord(value: unknown): Record<string, unknown> {
@@ -77,6 +82,7 @@ export async function gatherMeetingPrepBundle(
 export async function gatherMeetingPrepBundleForMeeting(
   admin: SupabaseClient,
   meeting: GrowthMeeting,
+  options?: { runtimeContext?: GrowthAiOsRuntimeContext },
 ): Promise<GrowthMeetingPrepBundle | null> {
   const lead = await fetchGrowthLeadById(admin, meeting.leadId)
   if (!lead) return null
@@ -84,6 +90,18 @@ export async function gatherMeetingPrepBundleForMeeting(
   const metadata = metaRecord(lead.metadata)
   const workspaceOrg = resolveGrowthEngineWorkspaceOrganizationId()
   const organizationId = workspaceOrg?.organizationId ?? null
+
+  const runtimeContext =
+    options?.runtimeContext ??
+    (organizationId
+      ? createGrowthAiOsRuntimeContext(admin, {
+          organizationId,
+          leadId: lead.id,
+          boundary: "meeting_load",
+          cacheScope: "operator-surface",
+          companyName: lead.companyName,
+        })
+      : null)
 
   const [decisionMakers, research, contactIntelMap, memoryBundle] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
@@ -96,13 +114,15 @@ export async function gatherMeetingPrepBundleForMeeting(
         company_name: lead.companyName,
       },
     ]),
-    organizationId
-      ? resolveCanonicalHumanMemoryForLead(admin, {
-          organizationId,
-          leadId: lead.id,
-          companyName: lead.companyName,
-        }).catch(() => null)
-      : Promise.resolve(null),
+    runtimeContext
+      ? runtimeContext.getMemory()
+      : organizationId
+        ? resolveCanonicalHumanMemoryForLead(admin, {
+            organizationId,
+            leadId: lead.id,
+            companyName: lead.companyName,
+          }).catch(() => null)
+        : Promise.resolve(null),
   ])
 
   const memory = memoryBundle?.influence ?? null
@@ -110,13 +130,15 @@ export async function gatherMeetingPrepBundleForMeeting(
   const contactIntelligence = contactIntelMap.get(`growth_lead:${lead.id}`) ?? null
   const accountPlaybookContext = await loadMeetingPrepAccountPlaybookContext(admin, meeting)
 
-  const canonicalDecision = organizationId
-    ? await resolveGrowthCanonicalDecisionForLeadCached(admin, {
-        organizationId,
-        leadId: lead.id,
-        cacheScope: "operator-surface",
-      }).catch(() => null)
-    : null
+  const canonicalDecision = runtimeContext
+    ? await runtimeContext.getDecision()
+    : organizationId
+      ? await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+          organizationId,
+          leadId: lead.id,
+          cacheScope: "operator-surface",
+        }).catch(() => null)
+      : null
 
   const bundle = assembleMeetingPrepBundle({
     meeting,
@@ -163,8 +185,27 @@ export async function gatherMeetingPrepBundleForMeeting(
       }).catch(() => null)
     : null
 
+  const canonicalMission =
+    organizationId && canonicalDecision
+      ? buildCanonicalMission({
+          organizationId,
+          leadId: lead.id,
+          companyName: lead.companyName,
+          contactName: lead.contactName,
+          decisionResolution: canonicalDecision,
+          relationshipSummary: memory?.relationshipSummary ?? null,
+          conversationSummary: canonicalProjection?.whatToDo ?? null,
+          openCommitments: memory?.commitmentSummaries ?? [],
+          upcomingMeeting: {
+            at: meeting.scheduledAt,
+            objective: meeting.title ?? null,
+          },
+        })
+      : null
+
   return {
     ...enrichedBundle,
     canonicalMeetingBrief,
+    canonicalMission,
   }
 }

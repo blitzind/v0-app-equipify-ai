@@ -198,12 +198,26 @@ export function buildAvaSinceLastVisit(input: {
   return items.slice(0, 4)
 }
 
-/** GE-AIOS-7A — The single decision Ava needs (Phase 2 "one thing"), from existing approvals. */
+/** GE-AIOS-7A — The single decision Ava needs (Phase 2 "one thing"), from canonical operator task. */
 export function buildAvaPrimaryDecision(aiOsUx: GrowthHomeAiOsUxViewModel): {
   primaryDecision: GrowthHomeAvaHeroDecision | null
   additionalDecisionCount: number
   reviewAllHref: string | null
 } {
+  const canonical = aiOsUx.canonicalOperatorTask
+  if (canonical) {
+    return {
+      primaryDecision: {
+        id: canonical.id,
+        label: canonical.title,
+        detail: [canonical.detail, canonical.why].filter(Boolean).join(" · ") || null,
+        href: canonical.href ?? aiOsUx.approveItemsHref,
+      },
+      additionalDecisionCount: Math.max(0, aiOsUx.approveItemsCount - 1),
+      reviewAllHref: aiOsUx.approveItemsHref,
+    }
+  }
+
   const top = aiOsUx.waitingOnYou[0] ?? null
   const totalWaiting = Math.max(aiOsUx.approveItemsCount, aiOsUx.waitingOnYou.length)
 
@@ -296,7 +310,26 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
 
   const workManager = dailyBriefing.work_manager_result
   const canonicalHero = input.canonicalHeroDecision
-  const decision = canonicalHero
+  const canonicalTask = input.aiOsUx.canonicalOperatorTask
+  const canonicalFocus = input.aiOsUx.canonicalOperatorFocus
+  const decision = canonicalTask
+    ? {
+        primaryDecision: {
+          id: canonicalTask.id,
+          label: canonicalTask.title,
+          detail: [canonicalTask.detail, canonicalTask.why].filter(Boolean).join(" · ") || null,
+          href: canonicalTask.href ?? input.aiOsUx.approveItemsHref,
+          canonicalProjection: canonicalHero
+            ? projectCanonicalDecisionToHomePrimary({
+                decision: canonicalHero.decision,
+                freshness: canonicalHero.freshness,
+              }).projection
+            : null,
+        },
+        additionalDecisionCount: Math.max(0, input.aiOsUx.approveItemsCount - 1),
+        reviewAllHref: input.aiOsUx.approveItemsHref,
+      }
+    : canonicalHero
     ? (() => {
         const homePrimary = projectCanonicalDecisionToHomePrimary({
           decision: canonicalHero.decision,
@@ -315,7 +348,24 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
           reviewAllHref: input.aiOsUx.approveItemsHref,
         }
       })()
-    : workManager
+    : canonicalFocus
+      ? {
+          primaryDecision: {
+            id: `focus:${canonicalFocus.leadId}`,
+            label: canonicalFocus.title,
+            detail: canonicalFocus.detail,
+            href: canonicalFocus.href,
+            canonicalProjection: canonicalHero
+              ? projectCanonicalDecisionToHomePrimary({
+                  decision: canonicalHero.decision,
+                  freshness: canonicalHero.freshness,
+                }).projection
+              : null,
+          },
+          additionalDecisionCount: 0,
+          reviewAllHref: input.aiOsUx.approveItemsHref,
+        }
+      : workManager
       ? mapPrimaryDecision(buildPrimaryDecisionFromWorkManager(workManager, input.aiOsUx))
       : buildAvaPrimaryDecision(input.aiOsUx)
 

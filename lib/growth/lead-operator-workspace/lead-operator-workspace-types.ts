@@ -80,6 +80,9 @@ export type RevenueQueueCardView = {
   is_high_intent_visitor: boolean
   is_returning_account: boolean
   needs_review: boolean
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — navigation-only queue role */
+  queue_role: "navigation"
+  navigation_cta_label: string
 }
 
 /** @deprecated Use RevenueQueueCardView (GE-LEADS-CANONICAL-4G). */
@@ -202,6 +205,12 @@ export type GrowthLeadOperatorWorkspacePayload = {
   buying_stage: GrowthLeadOperatorBuyingStageSummary | null
   /** GE-AIOS-DECISION-ENGINE-1B — canonical next-best decision for this lead */
   canonical_decision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
+  /** GE-AIOS-OPERATOR-EXPERIENCE-1A — unified opportunity narrative for cross-surface consistency */
+  operator_opportunity_narrative?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalLeadOpportunityNarrative | null
+  /** GE-AIOS-OPERATOR-STORY-IMPLEMENTATION-1A — single authoritative account narrative */
+  canonical_account_narrative?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-account-narrative-1a-types").GrowthCanonicalOperatorAccountNarrative | null
+  /** GE-AIOS-MISSION-ORCHESTRATION-1A — canonical account mission projection */
+  canonical_mission?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalMission | null
 }
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const

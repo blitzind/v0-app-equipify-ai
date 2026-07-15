@@ -13,6 +13,7 @@ export const GROWTH_CANONICAL_PACKAGE_PREPARATION_OUTCOMES = [
   "decision_blocked_relationship_protection",
   "decision_blocked_lead_lifecycle",
   "decision_refresh_required",
+  "decision_deferred_resolution_unavailable",
 ] as const
 
 export type GrowthCanonicalPackagePreparationOutcome =
@@ -24,6 +25,7 @@ export const GROWTH_CANONICAL_SEQUENCE_SUPPRESSION_OUTCOMES = [
   "canonical_decision_pending_approval",
   "canonical_decision_relationship_protection",
   "canonical_decision_lifecycle_blocked",
+  "canonical_decision_resolution_unavailable",
 ] as const
 
 export type GrowthCanonicalSequenceSuppressionOutcome =
@@ -37,6 +39,7 @@ export const GROWTH_CANONICAL_TRANSPORT_BOUNDARY_OUTCOMES = [
   "transport_blocked_waiting_on_operator",
   "transport_blocked_lifecycle",
   "transport_blocked_canonical_suppression",
+  "transport_blocked_resolution_unavailable",
 ] as const
 
 export type GrowthCanonicalTransportBoundaryOutcome =
@@ -60,6 +63,8 @@ export type GrowthCanonicalPackagePreparationContext = {
   wakeCondition?: string | null
   isOperatorRebuild?: boolean
   isMaterialRefresh?: boolean
+  isPreviewOnly?: boolean
+  leadLifecycle?: import("@/lib/growth/aios/execution/growth-canonical-execution-authority-1a").GrowthCanonicalLeadLifecycleSnapshot
 }
 
 export type GrowthCanonicalPackagePreparationEnforcement = {
