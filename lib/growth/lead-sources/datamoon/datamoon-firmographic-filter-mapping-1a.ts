@@ -4,6 +4,12 @@ import type { AvaDatamoonCompanySize } from "@/lib/growth/ava-home/datamoon/ava-
 import type { BusinessProfileLeadDiscoveryProjection } from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import type { DatamoonOperationalTargetingTranslation } from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
+import {
+  DATAMOON_PRIMARY_INDUSTRY_FILTER_OMISSION_REASON_NO_PROVEN_TAXONOMY,
+  DATAMOON_PRIMARY_INDUSTRY_TAXONOMY_VERSION,
+  resolveDatamoonPrimaryIndustryTaxonomyFromCanonicalProjection,
+  type DatamoonPrimaryIndustryTaxonomyResolution,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-primary-industry-taxonomy-1a"
 
 export const GROWTH_DATAMOON_FIRMOGRAPHIC_FILTER_MAPPING_1A_QA_MARKER =
   "ge-aios-datamoon-firmographic-filter-integration-1a-v1" as const
@@ -63,6 +69,11 @@ export type DatamoonProviderFirmographicFilterField =
 export type DatamoonFirmographicFilterStrategyMetadata = {
   version: typeof DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION
   primaryIndustryValues: string[]
+  primaryIndustryFilterApplied: boolean
+  primaryIndustryFilterOmissionReason: string | null
+  primaryIndustryTaxonomyVersion: typeof DATAMOON_PRIMARY_INDUSTRY_TAXONOMY_VERSION
+  primaryIndustrySourceCluster: string
+  primaryIndustrySourceVerticalIds: string[]
   companyEmployeeCountBands: string[]
   companyRevenueBands: string[]
   companyDomainValues: string[]
@@ -72,7 +83,8 @@ export type DatamoonFirmographicFilterStrategyMetadata = {
   liveProviderEmployeeCountContractVersion: typeof DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION
 }
 
-const MAX_PRIMARY_INDUSTRY_FILTER_VALUES = 5 as const
+export { DATAMOON_PRIMARY_INDUSTRY_FILTER_OMISSION_REASON_NO_PROVEN_TAXONOMY }
+export type { DatamoonPrimaryIndustryTaxonomyResolution }
 
 function normalizeKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
@@ -340,47 +352,26 @@ export function translateRevenueIntentStringsToDatamoonCompanyRevenue(
   return DATAMOON_DOCUMENTED_COMPANY_REVENUE_BANDS.filter((band) => selected.has(band))
 }
 
-function industryAliasesForVerticalIds(
-  projection: BusinessProfileLeadDiscoveryProjection,
-  verticalIds: readonly string[],
-): string[] {
-  const idSet = new Set(verticalIds)
-  return uniqueStrings(
-    projection.supportedServiceVerticals
-      .filter((vertical) => idSet.has(vertical.id))
-      .flatMap((vertical) => vertical.industryAliases),
-  )
+function industryTaxonomyResolution(input: {
+  projection: BusinessProfileLeadDiscoveryProjection
+  operationalTargeting: DatamoonOperationalTargetingTranslation
+}): DatamoonPrimaryIndustryTaxonomyResolution {
+  return resolveDatamoonPrimaryIndustryTaxonomyFromCanonicalProjection(input)
 }
 
-/** Deterministic subset of SSV aliases aligned with OMT cluster rotation (max 5). */
+/** Proven DataMoon primary_industry taxonomy for the selected primary OMT cluster (no SSV alias fallback). */
 export function buildPrimaryIndustryFilterValuesFromCanonicalProjection(input: {
   projection: BusinessProfileLeadDiscoveryProjection
   operationalTargeting: DatamoonOperationalTargetingTranslation
 }): string[] {
-  const selected: string[] = []
-  const seen = new Set<string>()
+  return industryTaxonomyResolution(input).values
+}
 
-  const add = (value: string) => {
-    const trimmed = value.trim()
-    if (!trimmed) return
-    const key = normalizeKey(trimmed)
-    if (seen.has(key)) return
-    if (selected.length >= MAX_PRIMARY_INDUSTRY_FILTER_VALUES) return
-    seen.add(key)
-    selected.push(trimmed)
-  }
-
-  for (const alias of input.operationalTargeting.industryAliasesUsed) add(alias)
-
-  const clusterAliases = industryAliasesForVerticalIds(
-    input.projection,
-    input.operationalTargeting.selectedVerticalIds,
-  )
-  for (const alias of clusterAliases) add(alias)
-
-  for (const alias of input.projection.industryAliases) add(alias)
-
-  return selected
+export function resolvePrimaryIndustryFilterFromCanonicalProjection(input: {
+  projection: BusinessProfileLeadDiscoveryProjection
+  operationalTargeting: DatamoonOperationalTargetingTranslation
+}): DatamoonPrimaryIndustryTaxonomyResolution {
+  return industryTaxonomyResolution(input)
 }
 
 export function buildDatamoonFirmographicFilterStrategyMetadata(input: {
@@ -393,13 +384,19 @@ export function buildDatamoonFirmographicFilterStrategyMetadata(input: {
     companySizeRanges: input.companySizeRanges,
     workbenchCompanySize: input.projection.companySize,
   })
+  const primaryIndustry = industryTaxonomyResolution({
+    projection: input.projection,
+    operationalTargeting: input.operationalTargeting,
+  })
 
   return {
     version: DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION,
-    primaryIndustryValues: buildPrimaryIndustryFilterValuesFromCanonicalProjection({
-      projection: input.projection,
-      operationalTargeting: input.operationalTargeting,
-    }),
+    primaryIndustryValues: [...primaryIndustry.values],
+    primaryIndustryFilterApplied: primaryIndustry.applied,
+    primaryIndustryFilterOmissionReason: primaryIndustry.omissionReason,
+    primaryIndustryTaxonomyVersion: primaryIndustry.taxonomyVersion,
+    primaryIndustrySourceCluster: primaryIndustry.sourceCluster,
+    primaryIndustrySourceVerticalIds: [...primaryIndustry.sourceVerticalIds],
     companyEmployeeCountBands: employeeResolution.bands,
     companyRevenueBands: translateRevenueIntentStringsToDatamoonCompanyRevenue(input.companySizeRanges),
     companyDomainValues: uniqueStrings(input.targetCompanyDomains ?? []).slice(0, 5),
@@ -419,7 +416,7 @@ export function buildDatamoonFirmographicFiltersFromCanonicalProjection(input: {
   const strategy = buildDatamoonFirmographicFilterStrategyMetadata(input)
   const filters: DatamoonAudienceFilter[] = []
 
-  if (strategy.primaryIndustryValues.length > 0) {
+  if (strategy.primaryIndustryFilterApplied && strategy.primaryIndustryValues.length > 0) {
     filters.push({
       field: "primary_industry",
       operator: "in",
