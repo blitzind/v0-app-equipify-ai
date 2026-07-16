@@ -19,6 +19,9 @@ export const GROWTH_LEAD_INBOX_CANONICAL_INTAKE_CUTOVER_QA_MARKER =
 
 export const GROWTH_LEAD_INBOX_METADATA_GROWTH_LEAD_ID = "growth_lead_id" as const
 
+export const GROWTH_UNIFIED_INTAKE_EXTERNAL_DISCOVERY_ADMISSION_CLOSURE_1M_QA_MARKER =
+  "ge-aios-unified-intake-external-discovery-admission-closure-1m-v1" as const
+
 export type CanonicalInboxIntakeBridgeResult = {
   growth_lead_id: string
   lead_status: string
@@ -41,6 +44,9 @@ function readPresetGrowthLeadId(metadata: Record<string, unknown> | undefined): 
 
 export function resolveIntakeSourceFromInboxInput(input: GrowthLeadInboxCreateInput): LeadIntakeSource {
   const siteKey = asString(input.site_key)
+  // Autonomous external discovery pushes use site_key prospect_search_external_discovery.
+  // Classify as datamoon so Admission applies deferred operational keyword validation (GE-AIOS-1M).
+  if (siteKey === "prospect_search_external_discovery") return "datamoon"
   if (siteKey.startsWith("prospect_search")) return "saved_search"
   if (siteKey === "growth_audience") return "saved_search"
   return "website"
