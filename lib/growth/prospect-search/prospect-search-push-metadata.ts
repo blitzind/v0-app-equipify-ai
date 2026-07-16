@@ -31,6 +31,15 @@ export type GrowthProspectSearchPushItemResult = {
   growth_lead_id?: string | null
 }
 
+export type ProspectSearchAutonomousPushRevalidationContext = {
+  organization_id: string
+  approved_profile: import("@/lib/growth/business-profile/business-profile-types").BusinessProfileDraftContent
+  discovery_authority?: import("@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a").ProspectSearchDiscoveryAuthority
+  datamoon_run_id?: string | null
+  company_name?: string | null
+  generated_at?: string
+}
+
 export type GrowthProspectSearchBulkPushResult = {
   ok: boolean
   action: "bulk_push_to_lead_inbox"
@@ -41,6 +50,7 @@ export type GrowthProspectSearchBulkPushResult = {
   skipped_invalid: number
   suppressed: number
   failed: number
+  durable_disposition_count: number
   items: GrowthProspectSearchPushItemResult[]
   workspace_url?: string | null
 }

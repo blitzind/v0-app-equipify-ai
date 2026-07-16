@@ -62,7 +62,25 @@ export function readAutonomousRunIntakeLifecycleFields(
     intake_completed: meta.intake_completed,
     intake_completed_at: meta.intake_completed_at ?? null,
     intake_promotion_started_at: meta.intake_promotion_started_at ?? null,
+    intake_selected_count: meta.intake_selected_count ?? null,
+    intake_durable_disposition_count: meta.intake_durable_disposition_count ?? null,
+    intake_pushed_count: meta.intake_pushed_count ?? null,
+    intake_existing_count: meta.intake_existing_count ?? null,
+    intake_rejected_count: meta.intake_rejected_count ?? null,
+    intake_skipped_invalid_count: meta.intake_skipped_invalid_count ?? null,
+    intake_error_count: meta.intake_error_count ?? null,
+    intake_last_attempt_at: meta.intake_last_attempt_at ?? null,
+    intake_zero_survivor_reason: meta.intake_zero_survivor_reason ?? null,
+    intake_recovery_audit: meta.intake_recovery_audit ?? null,
   }
+}
+
+export async function patchAutonomousRunIntakeMetadataForRecovery(
+  admin: SupabaseClient,
+  runId: string,
+  patch: Partial<AutonomousRunIntakeLifecycleFields>,
+): Promise<DatamoonAudienceImportRun | null> {
+  return patchAutonomousRunIntakeMetadata(admin, runId, patch)
 }
 
 function mapRunRow(row: Record<string, unknown>): DatamoonAudienceImportRun {
@@ -156,6 +174,7 @@ export async function markAutonomousRunIntakeCompleted(
   admin: SupabaseClient,
   runId: string,
   generatedAt?: string,
+  extra?: Partial<AutonomousRunIntakeLifecycleFields>,
 ): Promise<DatamoonAudienceImportRun | null> {
   const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
   if (!existing) return null
@@ -165,6 +184,38 @@ export async function markAutonomousRunIntakeCompleted(
     intake_pending: false,
     intake_completed: true,
     intake_completed_at: generatedAt ?? new Date().toISOString(),
+    ...extra,
+  })
+}
+
+export async function recordAutonomousRunIntakePromotionAttempt(
+  admin: SupabaseClient,
+  runId: string,
+  input: {
+    generatedAt: string
+    selectedCount: number
+    durableDispositionCount: number
+    pushed: number
+    alreadyExists: number
+    rejected: number
+    skippedInvalid: number
+    errors: number
+  },
+): Promise<DatamoonAudienceImportRun | null> {
+  const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
+  if (!existing) return null
+  const intake = readAutonomousRunIntakeLifecycleFields(existing)
+  if (intake.intake_completed === true) return existing
+  return patchAutonomousRunIntakeMetadata(admin, runId, {
+    intake_pending: true,
+    intake_selected_count: input.selectedCount,
+    intake_durable_disposition_count: input.durableDispositionCount,
+    intake_pushed_count: input.pushed,
+    intake_existing_count: input.alreadyExists,
+    intake_rejected_count: input.rejected,
+    intake_skipped_invalid_count: input.skippedInvalid,
+    intake_error_count: input.errors,
+    intake_last_attempt_at: input.generatedAt,
   })
 }
 

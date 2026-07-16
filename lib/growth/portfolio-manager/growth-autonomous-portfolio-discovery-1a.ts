@@ -29,8 +29,14 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
 import { resolveAutonomousPortfolioDiscoveryExecutionPlan } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
 import {
+  shouldMarkAutonomousRunIntakeCompleted,
+  GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER,
+  PORTFOLIO_INTAKE_COMPLETION_INVARIANT_1I,
+} from "@/lib/growth/prospect-search/prospect-search-portfolio-intake-disposition-1i"
+import {
   markAutonomousRunIntakeCompleted,
   markAutonomousRunIntakePromotionStarted,
+  recordAutonomousRunIntakePromotionAttempt,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
 import { GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
 
@@ -40,10 +46,13 @@ export type AutonomousPortfolioDiscoveryTickResult = {
   ran: boolean
   skippedReason: string | null
   searched: number
+  selectedCount: number
   pushed: number
   alreadyExists: number
   suppressed: number
   failed: number
+  skippedInvalid: number
+  durableDispositionCount: number
   disposition?: AutonomousPortfolioDiscoveryDisposition
   executionAction?: AutonomousPortfolioDiscoveryExecutionAction
   datamoonJobActive?: boolean
@@ -54,6 +63,7 @@ export type AutonomousPortfolioDiscoveryTickResult = {
   datamoonRawCompanyCount?: number
   datamoonNormalizedCompanyCount?: number
   datamoonFilteredCompanyCount?: number
+  intakeTerminalized?: boolean
 }
 
 type DatamoonPortfolioSearchSignals = {
@@ -162,21 +172,26 @@ function buildPortfolioDiscoverySkippedReason(input: {
 }
 
 function shouldTerminalizeRunIntakeAfterBatch(input: {
-  batchSize: number
-  survivorCount: number
+  selectedCount: number
+  durableDispositionCount: number
+  postFilterSurvivorCount: number
   stopReason: string | null
 }): boolean {
-  if (input.stopReason === "datamoon_zero_results") return true
-  if (input.survivorCount === 0) return true
-  return input.survivorCount <= input.batchSize
+  return shouldMarkAutonomousRunIntakeCompleted({
+    selectedCount: input.selectedCount,
+    durableDispositionCount: input.durableDispositionCount,
+    postFilterSurvivorCount: input.postFilterSurvivorCount,
+    stopReason: input.stopReason,
+  })
 }
 
 async function terminalizeAutonomousRunIntakeIfEligible(
   admin: SupabaseClient,
   input: {
     runId: string | null
-    batchSize: number
-    survivorCount: number
+    selectedCount: number
+    durableDispositionCount: number
+    postFilterSurvivorCount: number
     stopReason: string | null
     generatedAt: string
   },
@@ -184,14 +199,21 @@ async function terminalizeAutonomousRunIntakeIfEligible(
   if (!input.runId) return false
   if (
     !shouldTerminalizeRunIntakeAfterBatch({
-      batchSize: input.batchSize,
-      survivorCount: input.survivorCount,
+      selectedCount: input.selectedCount,
+      durableDispositionCount: input.durableDispositionCount,
+      postFilterSurvivorCount: input.postFilterSurvivorCount,
       stopReason: input.stopReason,
     })
   ) {
     return false
   }
-  await markAutonomousRunIntakeCompleted(admin, input.runId, input.generatedAt)
+  await markAutonomousRunIntakeCompleted(admin, input.runId, input.generatedAt, {
+    intake_durable_disposition_count: input.durableDispositionCount,
+    intake_selected_count: input.selectedCount,
+    ...(input.postFilterSurvivorCount === 0 && input.selectedCount === 0
+      ? { intake_zero_survivor_reason: input.stopReason ?? "post_filter_zero_survivors" }
+      : {}),
+  })
   return true
 }
 
@@ -200,10 +222,13 @@ function buildPortfolioDiscoveryTickResult(input: {
   ran: boolean
   skippedReason: string | null
   searched: number
+  selectedCount: number
   pushed: number
   alreadyExists: number
   suppressed: number
   failed: number
+  skippedInvalid: number
+  durableDispositionCount: number
   executionAction: AutonomousPortfolioDiscoveryExecutionAction
   datamoon: DatamoonPortfolioSearchSignals
   filteredCompanyCount?: number
@@ -225,10 +250,13 @@ function buildPortfolioDiscoveryTickResult(input: {
     ran: input.ran,
     skippedReason: input.skippedReason,
     searched: input.searched,
+    selectedCount: input.selectedCount,
     pushed: input.pushed,
     alreadyExists: input.alreadyExists,
     suppressed: input.suppressed,
     failed: input.failed,
+    skippedInvalid: input.skippedInvalid,
+    durableDispositionCount: input.durableDispositionCount,
     disposition,
     executionAction: input.executionAction,
     datamoonJobActive: input.datamoon.datamoonJobActive,
@@ -239,6 +267,7 @@ function buildPortfolioDiscoveryTickResult(input: {
     datamoonRawCompanyCount: input.datamoon.datamoonRawCompanyCount,
     datamoonNormalizedCompanyCount: input.datamoon.datamoonNormalizedCompanyCount,
     datamoonFilteredCompanyCount: input.filteredCompanyCount ?? 0,
+    intakeTerminalized: input.intakeTerminalized,
   }
 }
 
@@ -286,10 +315,7 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   const datamoon = readDatamoonPortfolioSearchSignals(search)
   const effectiveExecutionAction: AutonomousPortfolioDiscoveryExecutionAction =
     datamoon.intakePendingResume ? "resume_intake_pending" : executionAction
-  const survivorCount =
-    search.total_companies ??
-    datamoon.datamoonNormalizedCompanyCount ??
-    search.companies.length
+  const postFilterSurvivorCount = search.companies.length
 
   if (datamoon.datamoonJobActive) {
     return buildPortfolioDiscoveryTickResult({
@@ -297,10 +323,13 @@ export async function runAutonomousPortfolioDiscoveryBatch(
       ran: true,
       skippedReason: buildPortfolioDiscoverySkippedReason(datamoon),
       searched: 0,
+      selectedCount: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      skippedInvalid: 0,
+      durableDispositionCount: 0,
       executionAction: effectiveExecutionAction,
       datamoon,
     })
@@ -315,8 +344,9 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   if (selected.length === 0) {
     const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {
       runId: datamoon.datamoonRunId,
-      batchSize,
-      survivorCount,
+      selectedCount: 0,
+      durableDispositionCount: 0,
+      postFilterSurvivorCount,
       stopReason: datamoon.datamoonStopReason,
       generatedAt: input.generatedAt,
     })
@@ -325,13 +355,16 @@ export async function runAutonomousPortfolioDiscoveryBatch(
       ran: true,
       skippedReason: buildPortfolioDiscoverySkippedReason(datamoon),
       searched: 0,
+      selectedCount: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      skippedInvalid: 0,
+      durableDispositionCount: 0,
       executionAction: effectiveExecutionAction,
       datamoon,
-      filteredCompanyCount: survivorCount,
+      filteredCompanyCount: postFilterSurvivorCount,
       intakeTerminalized,
     })
   }
@@ -345,7 +378,30 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     filters,
     discovery_mode: "discover_external",
     selected,
+    autonomous_push_context: datamoon.datamoonRunId
+      ? {
+          organization_id: input.organizationId,
+          approved_profile: input.approvedProfile,
+          discovery_authority: "autonomous_portfolio",
+          datamoon_run_id: datamoon.datamoonRunId,
+          company_name: input.companyName,
+          generated_at: input.generatedAt,
+        }
+      : undefined,
   })
+
+  if (datamoon.datamoonRunId) {
+    await recordAutonomousRunIntakePromotionAttempt(admin, datamoon.datamoonRunId, {
+      generatedAt: input.generatedAt,
+      selectedCount: selected.length,
+      durableDispositionCount: push.durable_disposition_count,
+      pushed: push.pushed,
+      alreadyExists: push.already_exists,
+      rejected: 0,
+      skippedInvalid: push.skipped_invalid,
+      errors: push.failed,
+    })
+  }
 
   const updatedMemory = recordPortfolioDiscoveryMemory({
     memory: input.memory,
@@ -371,8 +427,9 @@ export async function runAutonomousPortfolioDiscoveryBatch(
 
   const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {
     runId: datamoon.datamoonRunId,
-    batchSize,
-    survivorCount,
+    selectedCount: selected.length,
+    durableDispositionCount: push.durable_disposition_count,
+    postFilterSurvivorCount,
     stopReason: datamoon.datamoonStopReason,
     generatedAt: input.generatedAt,
   })
@@ -380,6 +437,8 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   logGrowthEngine("autonomous_portfolio_discovery_batch", {
     qa_marker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     intake_qa_marker: GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
+    push_revalidation_qa_marker: GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER,
+    completion_invariant: PORTFOLIO_INTAKE_COMPLETION_INVARIANT_1I,
     organization_id: input.organizationId,
     batch_size: batchSize,
     execution_action: effectiveExecutionAction,
@@ -392,8 +451,12 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     }),
     datamoon_run_id: datamoon.datamoonRunId,
     searched: selected.length,
+    selected_count: selected.length,
     pushed: push.pushed,
     already_exists: push.already_exists,
+    skipped_invalid: push.skipped_invalid,
+    durable_disposition_count: push.durable_disposition_count,
+    push_items: push.items,
     external_filter_diagnostics: search.external_filter_diagnostics ?? null,
     datamoon_normalization_stats:
       (search as { datamoon_autonomous_discovery_normalization_stats?: unknown })
@@ -405,13 +468,16 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     ran: true,
     skippedReason: null,
     searched: selected.length,
+    selectedCount: selected.length,
     pushed: push.pushed,
     alreadyExists: push.already_exists,
     suppressed: push.suppressed,
     failed: push.failed,
+    skippedInvalid: push.skipped_invalid,
+    durableDispositionCount: push.durable_disposition_count,
     executionAction: effectiveExecutionAction,
     datamoon,
-    filteredCompanyCount: survivorCount,
+    filteredCompanyCount: postFilterSurvivorCount,
     intakeTerminalized,
   })
 }
@@ -436,10 +502,13 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
       ran: false,
       skippedReason: "Approved Business Profile required.",
       searched: 0,
+      selectedCount: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      skippedInvalid: 0,
+      durableDispositionCount: 0,
       disposition: "discovery_skipped",
       executionAction: "skip",
     }
@@ -453,10 +522,13 @@ export async function tickAutonomousPortfolioDiscoveryReplenishment(
       ran: false,
       skippedReason: executionPlan.reason,
       searched: 0,
+      selectedCount: 0,
       pushed: 0,
       alreadyExists: 0,
       suppressed: 0,
       failed: 0,
+      skippedInvalid: 0,
+      durableDispositionCount: 0,
       disposition: "discovery_skipped",
       executionAction: "skip",
     }

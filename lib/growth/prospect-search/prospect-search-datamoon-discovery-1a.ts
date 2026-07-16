@@ -31,8 +31,12 @@ import {
   isDatamoonAutonomousDiscoveryRunFailed,
   markAutonomousRunIntakeCompleted,
   markAutonomousRunIntakePending,
+  readAutonomousProspectSearchDatamoonMetadata,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
-import { GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
+import {
+  GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
+  isCompletedProviderStatus,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
 import {
   DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
@@ -45,8 +49,9 @@ import type {
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { startDatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
-import { listDatamoonAudienceImportRecords } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-repository"
+import { listDatamoonAudienceImportRecords, fetchDatamoonAudienceImportRunById } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-repository"
 import type { DatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-portfolio-intake-disposition-1i"
 
 export type RunProspectSearchDatamoonAutonomousDiscoveryInput = {
   organizationId: string
@@ -243,6 +248,65 @@ function recordsToProspectCompanies(
   }
 }
 
+/** Read-only reload of a pinned completed DataMoon run for push revalidation (no lifecycle mutations). */
+export async function loadDatamoonRunProspectCompaniesForPushRevalidation(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    datamoonRunId: string
+    filters: GrowthProspectSearchFilters
+  },
+): Promise<RunProspectSearchDatamoonAutonomousDiscoveryResult | null> {
+  const runRow = await fetchDatamoonAudienceImportRunById(admin, input.datamoonRunId)
+  if (!runRow) return null
+
+  const meta = readAutonomousProspectSearchDatamoonMetadata(runRow)
+  if (!meta || meta.organization_id !== input.organizationId) return null
+  if (!isCompletedProviderStatus(runRow.status)) return null
+
+  const records = await listDatamoonAudienceImportRecords(admin, input.datamoonRunId)
+  const mapped = recordsToProspectCompanies(records, input.filters.industry ?? null)
+  const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
+
+  logGrowthEngine("prospect_search_datamoon_push_revalidation", {
+    qa_marker: GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER,
+    organization_id: input.organizationId,
+    run_id: input.datamoonRunId,
+    raw_record_count: records.length,
+    normalized_company_count: mapped.companies.length,
+  })
+
+  return {
+    qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+    companies: mapped.companies,
+    built_query: "",
+    stopReason,
+    jobActive: false,
+    jobReused: true,
+    jobCreated: false,
+    rawCompanyCount: records.length,
+    normalizedCompanyCount: mapped.companies.length,
+    normalizationStats: mapped.stats,
+    providerStatusLabel: "push_revalidation",
+    providerStatusMessage: `Push revalidation loaded ${mapped.companies.length} company candidate(s) from run ${input.datamoonRunId}.`,
+    runId: input.datamoonRunId,
+    intakePendingResume: false,
+    targetingSummary: null,
+  }
+}
+
+function isLegitimateZeroSurvivorCompletion(input: {
+  run: DatamoonAudienceImportRun
+  recordsLoaded: boolean
+  rawRecordCount: number
+  normalizedCompanyCount: number
+}): boolean {
+  if (!input.recordsLoaded) return false
+  if (!isCompletedProviderStatus(input.run.status)) return false
+  if (input.normalizedCompanyCount > 0) return false
+  return input.rawRecordCount >= 0
+}
+
 function providerBlockedResult(
   stopReason: DatamoonAutonomousDiscoveryStopReason,
   built_query: string,
@@ -333,8 +397,17 @@ async function resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(
     const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
     if (mapped.companies.length > 0) {
       await markAutonomousRunIntakePending(admin, run.id)
-    } else {
-      await markAutonomousRunIntakeCompleted(admin, run.id)
+    } else if (
+      isLegitimateZeroSurvivorCompletion({
+        run,
+        recordsLoaded: polled.ok,
+        rawRecordCount: polled.records.length,
+        normalizedCompanyCount: mapped.companies.length,
+      })
+    ) {
+      await markAutonomousRunIntakeCompleted(admin, run.id, undefined, {
+        intake_zero_survivor_reason: "canonical_normalization_zero_after_completed_poll",
+      })
     }
     logGrowthEngine("prospect_search_datamoon_autonomous_discovery_normalized", {
       qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
@@ -402,9 +475,7 @@ async function resumeAutonomousProspectSearchDatamoonDiscoveryFromIntakePendingR
   const mapped = recordsToProspectCompanies(records, input.filters.industry ?? null)
   const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
 
-  if (mapped.companies.length === 0) {
-    await markAutonomousRunIntakeCompleted(admin, input.intakePendingRun.id, input.generatedAt)
-  }
+  // Zero-survivor terminalization deferred to Portfolio Manager after external filters.
 
   logGrowthEngine("prospect_search_datamoon_intake_pending_resume", {
     qa_marker: GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,

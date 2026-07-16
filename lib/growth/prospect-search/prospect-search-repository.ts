@@ -28,7 +28,10 @@ import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-sea
 import {
   isAutonomousProspectDiscoveryAuthority,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
-import { runProspectSearchDatamoonAutonomousDiscovery } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-1a"
+import {
+  runProspectSearchDatamoonAutonomousDiscovery,
+  loadDatamoonRunProspectCompaniesForPushRevalidation,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-1a"
 import { GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { mapProspectSearchCompaniesToDiscoverResults } from "@/lib/growth/prospect-search/prospect-search-discover-results"
 import { applyProspectSearchContactFirstHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-contact-first-orchestration"
@@ -88,6 +91,8 @@ export type RunProspectSearchInput = {
   discoveries_today?: number
   maximum_daily_discovery?: number
   generated_at?: string
+  /** Pin push revalidation to a completed DataMoon run — no new provider audience. */
+  push_revalidation_datamoon_run_id?: string | null
 }
 
 
@@ -183,20 +188,64 @@ export async function runProspectSearch(
         }, [])
       }
 
-      const datamoonDiscovery = await runProspectSearchDatamoonAutonomousDiscovery(admin, {
-        organizationId: input.organization_id,
-        approvedProfile: input.approved_profile,
-        companyName: input.company_name,
-        query: input.query,
-        filters: mergedFilters,
-        limit: external_limit,
-        generatedAt: input.generated_at ?? new Date().toISOString(),
-        createdBy: input.created_by,
-        authority: input.discovery_authority ?? "autonomous_portfolio",
-        readOnlyProof: input.read_only_proof,
-        discoveriesToday: input.discoveries_today,
-        maximumDailyDiscovery: input.maximum_daily_discovery,
-      })
+      let datamoonDiscovery: Awaited<ReturnType<typeof runProspectSearchDatamoonAutonomousDiscovery>>
+
+      if (input.push_revalidation_datamoon_run_id) {
+        const revalidation = await loadDatamoonRunProspectCompaniesForPushRevalidation(admin, {
+          organizationId: input.organization_id,
+          datamoonRunId: input.push_revalidation_datamoon_run_id,
+          filters: mergedFilters,
+        })
+        if (!revalidation) {
+          return attachTerritoryIntelligenceToSearchResult(
+            admin,
+            {
+              qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+              discovery_mode,
+              sort_by,
+              signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+              query: input.query,
+              parsed_query: parsed,
+              filters: mergedFilters,
+              companies: [],
+              raw_provider_companies: [],
+              discover_results: [],
+              filtered_discover_results: [],
+              people: [],
+              people_rows: [],
+              total_companies: 0,
+              total_people: 0,
+              page: 1,
+              page_size: external_limit,
+              has_next_page: false,
+              people_cursor: null,
+              people_next_cursor: null,
+              source_counts: buildSourceCounts([]),
+              provider_status_label: "push_revalidation_run_not_found",
+              provider_status_message: "Push revalidation could not load the pinned DataMoon run.",
+              datamoon_autonomous_discovery_qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+              datamoon_autonomous_discovery_run_id: input.push_revalidation_datamoon_run_id,
+            },
+            [],
+          )
+        }
+        datamoonDiscovery = revalidation
+      } else {
+        datamoonDiscovery = await runProspectSearchDatamoonAutonomousDiscovery(admin, {
+          organizationId: input.organization_id,
+          approvedProfile: input.approved_profile,
+          companyName: input.company_name,
+          query: input.query,
+          filters: mergedFilters,
+          limit: external_limit,
+          generatedAt: input.generated_at ?? new Date().toISOString(),
+          createdBy: input.created_by,
+          authority: input.discovery_authority ?? "autonomous_portfolio",
+          readOnlyProof: input.read_only_proof,
+          discoveriesToday: input.discoveries_today,
+          maximumDailyDiscovery: input.maximum_daily_discovery,
+        })
+      }
 
       const externalEnrichment = await enrichProspectSearchExternalCompanies(
         admin,
@@ -678,6 +727,7 @@ export async function resolveProspectSearchCompanyResultsForPush(
     filters?: GrowthProspectSearchFilters
     discovery_mode?: GrowthProspectSearchDiscoveryMode
     selected: Array<{ source_type: GrowthProspectSearchSourceType; id: string }>
+    autonomous_push_context?: import("@/lib/growth/prospect-search/prospect-search-push-metadata").ProspectSearchAutonomousPushRevalidationContext
   },
 ): Promise<Map<string, import("@/lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult>> {
   const { prospectSearchSelectionKey } = await import(
@@ -696,6 +746,33 @@ export async function resolveProspectSearchCompanyResultsForPush(
 
   const parsed = parseProspectSearchQuery(input.query)
   const mergedFilters = normalizeProspectSearchFilters(input.filters ?? {})
+  const autonomousContext = input.autonomous_push_context
+
+  if (
+    autonomousContext?.datamoon_run_id &&
+    autonomousContext.organization_id &&
+    autonomousContext.approved_profile
+  ) {
+    const search = await runProspectSearch(admin, {
+      query: input.query,
+      filters: input.filters,
+      discovery_mode: input.discovery_mode ?? "discover_external",
+      discovery_authority: autonomousContext.discovery_authority ?? "autonomous_portfolio",
+      organization_id: autonomousContext.organization_id,
+      approved_profile: autonomousContext.approved_profile,
+      company_name: autonomousContext.company_name,
+      generated_at: autonomousContext.generated_at,
+      push_revalidation_datamoon_run_id: autonomousContext.datamoon_run_id,
+      page: 1,
+      page_size: 200,
+    })
+
+    for (const company of search.companies) {
+      map.set(prospectSearchSelectionKey(company), company)
+    }
+
+    return map
+  }
 
   const materializedAvailable = await isProspectSearchMaterializedIndexAvailable(admin)
   const stats = materializedAvailable

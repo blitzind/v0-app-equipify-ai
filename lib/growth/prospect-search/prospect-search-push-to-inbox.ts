@@ -13,10 +13,14 @@ import {
   type GrowthProspectSearchBulkPushResult,
   type GrowthProspectSearchPushItemResult,
   type GrowthProspectSearchPushOutcome,
+  type ProspectSearchAutonomousPushRevalidationContext,
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-metadata"
 import { resolveProspectSearchCompanyResultsForPush } from "@/lib/growth/prospect-search/prospect-search-repository"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
+import {
+  countDurablePortfolioIntakeDispositions,
+} from "@/lib/growth/prospect-search/prospect-search-portfolio-intake-disposition-1i"
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchDiscoveryMode,
@@ -32,6 +36,7 @@ export {
   type GrowthProspectSearchBulkPushResult,
   type GrowthProspectSearchPushItemResult,
   type GrowthProspectSearchPushOutcome,
+  type ProspectSearchAutonomousPushRevalidationContext,
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-metadata"
 
@@ -204,6 +209,7 @@ export async function resolveProspectSearchCompaniesForPush(
     filters?: GrowthProspectSearchFilters
     discovery_mode?: GrowthProspectSearchDiscoveryMode
     selected: ProspectSearchSelectionRef[]
+    autonomous_push_context?: ProspectSearchAutonomousPushRevalidationContext
   },
 ): Promise<Map<string, GrowthProspectSearchCompanyResult>> {
   return resolveProspectSearchCompanyResultsForPush(admin, {
@@ -211,6 +217,7 @@ export async function resolveProspectSearchCompaniesForPush(
     filters: input.filters,
     discovery_mode: input.discovery_mode,
     selected: input.selected,
+    autonomous_push_context: input.autonomous_push_context,
   })
 }
 
@@ -221,6 +228,7 @@ export async function executeBulkPushToLeadInbox(
     filters?: GrowthProspectSearchFilters
     discovery_mode?: GrowthProspectSearchDiscoveryMode
     selected: ProspectSearchSelectionRef[]
+    autonomous_push_context?: ProspectSearchAutonomousPushRevalidationContext
   },
 ): Promise<GrowthProspectSearchBulkPushResult> {
   const selected = input.selected.filter(
@@ -238,6 +246,7 @@ export async function executeBulkPushToLeadInbox(
       skipped_invalid: 0,
       suppressed: 0,
       failed: 0,
+      durable_disposition_count: 0,
       items: [],
     }
   }
@@ -247,6 +256,7 @@ export async function executeBulkPushToLeadInbox(
     filters: input.filters,
     discovery_mode: input.discovery_mode,
     selected,
+    autonomous_push_context: input.autonomous_push_context,
   })
 
   const sortedSelected = [...selected].sort((a, b) => {
@@ -312,6 +322,9 @@ export async function executeBulkPushToLeadInbox(
   }
 
   const selected_total = selected.length
+  const durable_disposition_count = countDurablePortfolioIntakeDispositions(
+    items.map((item) => item.outcome),
+  )
   const message = formatBulkPushSummary({
     selected_total,
     pushed,
@@ -331,6 +344,7 @@ export async function executeBulkPushToLeadInbox(
     skipped_invalid,
     suppressed,
     failed,
+    durable_disposition_count,
     items,
     workspace_url: pushed > 0 ? "/admin/growth/queue" : null,
   }

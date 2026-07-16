@@ -14,6 +14,19 @@ export type AutonomousRunIntakeLifecycleFields = {
   intake_completed_at?: string | null
   /** Set when promotion batch begins — idempotency witness for concurrent ticks. */
   intake_promotion_started_at?: string | null
+  /** Last promotion attempt counters (GE-AIOS-PORTFOLIO-INTAKE-PUSH-REVALIDATION-FIX-1I). */
+  intake_selected_count?: number | null
+  intake_durable_disposition_count?: number | null
+  intake_pushed_count?: number | null
+  intake_existing_count?: number | null
+  intake_rejected_count?: number | null
+  intake_skipped_invalid_count?: number | null
+  intake_error_count?: number | null
+  intake_last_attempt_at?: string | null
+  /** Evidence for legitimate zero-survivor terminalization. */
+  intake_zero_survivor_reason?: string | null
+  /** Recovery / audit payload — no new table. */
+  intake_recovery_audit?: Record<string, unknown> | null
 }
 
 export type AutonomousRunIntakeLifecycleState =
@@ -60,7 +73,7 @@ export const PORTFOLIO_INTAKE_IDEMPOTENCY_DESIGN = {
   survivorPromotion:
     "createLeadCandidate dedupe_hash + intent_session_id — duplicate ticks yield already_exists, not duplicate leads",
   runTerminalization:
-    "intake_completed persisted on run metadata after promotion batch — subsequent ticks skip run via findLatestIntakePending",
+    "intake_completed persisted only when durableDispositionCount === selectedCount (GE-AIOS-PORTFOLIO-INTAKE-PUSH-REVALIDATION-FIX-1I)",
   intakePendingWitness:
     "intake_pending set on provider completion with survivors — legacy completed runs without flag remain eligible until intake_completed",
   concurrentTicks:
