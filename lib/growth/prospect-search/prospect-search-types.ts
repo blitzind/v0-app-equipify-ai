@@ -290,6 +290,15 @@ export type GrowthProspectSearchIndexPerson = {
   verification_status: string
 }
 
+/** DataMoon provider taxonomy → SSV ICP alias bridge (GE-AIOS-PROSPECT-SEARCH-PROVIDER-INDUSTRY-BRIDGE-1A). */
+export type DatamoonProviderIndustryIcpBridgeMetadata = {
+  providerIndustry: string | null
+  mappedSSVAliases: string[]
+  bridgeApplied: boolean
+  bridgeVersion: string
+  bridgeReason: string | null
+}
+
 export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientFields & {
   id: string
   source_type: GrowthProspectSearchSourceType
@@ -382,6 +391,8 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   committee_completion?: GrowthProspectSearchCommitteeCompletion | null
   /** Keyword hints for external discovery industry matching. */
   keywords?: string[]
+  /** DataMoon provider taxonomy → SSV ICP alias bridge metadata (diagnostic only). */
+  datamoon_provider_industry_icp_bridge?: DatamoonProviderIndustryIcpBridgeMetadata | null
   notes?: string | null
   /** Contact-first reachable human scoring overlay. */
   reachable_human?: import("@/lib/growth/prospect-search/prospect-search-reachable-human-scoring").ProspectSearchReachableHumanSnapshot | null

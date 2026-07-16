@@ -953,6 +953,7 @@
     "probe:ge-aios-portfolio-intake-orphan-root-cause-1e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-portfolio-intake-orphan-root-cause-1e.ts",
     "test:ge-aios-portfolio-intake-pending-state-1f": "tsx scripts/test-ge-aios-portfolio-intake-pending-state-1f.ts",
     "test:ge-aios-portfolio-intake-push-revalidation-fix-1i": "tsx scripts/test-ge-aios-portfolio-intake-push-revalidation-fix-1i.ts",
+    "test:ge-aios-external-discovery-keyword-deferral-production-closure-1k": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-external-discovery-keyword-deferral-production-closure-1k.ts",
     "probe:ge-aios-portfolio-intake-push-revalidation-fix-1i": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-portfolio-intake-push-revalidation-fix-1i.ts",
     "repair:ge-aios-portfolio-intake-premature-completion-1i": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/repair-ge-aios-portfolio-intake-premature-completion-1i.ts",
     "probe:ge-aios-portfolio-intake-pending-state-1f": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-portfolio-intake-pending-state-1f.ts",

@@ -17,10 +17,23 @@ import {
   type GrowthLeadAdmissionEvaluation,
   type GrowthLeadAdmissionState,
 } from "@/lib/growth/revenue-workflow/growth-lead-admission-types"
+import { isExternalDiscoveryLeadIntakeSource } from "@/lib/growth/revenue-workflow/growth-operational-keyword-validation-1a"
 
 export type GrowthLeadAdmissionContext = {
   approvedProfile: BusinessProfileDraftContent | null
   activeMissionTitle?: string | null
+}
+
+export type GrowthLeadAdmissionEvaluateOptions = {
+  /** Post-research operational keyword validation (external discovery only). */
+  operationalKeywordValidation?: {
+    pass: boolean
+    reason?: string | null
+    matchedKeywords?: string[]
+    missingKeywords?: string[]
+  } | null
+  /** Prospect Search industry gate result carried from external discovery normalization. */
+  prospectSearchIndustryGatePassed?: boolean | null
 }
 
 export type GrowthLeadAdmissionIntakeInput = Pick<
@@ -234,6 +247,7 @@ function evaluateIcpFit(input: {
 export function evaluateGrowthLeadAdmission(
   intake: GrowthLeadAdmissionIntakeInput,
   context: GrowthLeadAdmissionContext,
+  options?: GrowthLeadAdmissionEvaluateOptions,
 ): GrowthLeadAdmissionEvaluation {
   const businessEmail =
     typeof intake.metadata?.business_email === "string" ? intake.metadata.business_email : null
@@ -279,6 +293,50 @@ export function evaluateGrowthLeadAdmission(
     })
     state = icp.state
     reasons.push(...icp.reasons)
+  }
+
+  const externalDiscovery = isExternalDiscoveryLeadIntakeSource(intake.source)
+  if (externalDiscovery && state !== "invalid") {
+    const industryGatePassed = options?.prospectSearchIndustryGatePassed !== false
+    if (!industryGatePassed) {
+      state = "rejected"
+      reasons.push("prospect_search_industry_gate_failed")
+    }
+
+    const keywordValidation = options?.operationalKeywordValidation
+    if (keywordValidation == null) {
+      if (state === "accepted") {
+        state = "review"
+      }
+      reasons.push("pending_operational_keyword_validation")
+    } else if (!keywordValidation.pass) {
+      state = "rejected"
+      reasons.push("operational_keyword_validation_failed")
+      if (keywordValidation.reason?.trim()) {
+        reasons.push(keywordValidation.reason.trim())
+      }
+    } else {
+      reasons.push("operational_keyword_validation_passed")
+      if (
+        industryGatePassed &&
+        state !== "rejected" &&
+        !reasons.some(
+          (reason) =>
+            reason.startsWith("negative_keyword:") ||
+            reason.startsWith("profile_disqualifier:") ||
+            reason.startsWith("known_icp_mismatch:"),
+        )
+      ) {
+        const hasBlockingReviewReason = reasons.some(
+          (reason) =>
+            reason === "missing_credible_business_domain" ||
+            reason === "missing_approved_profile" ||
+            reason === "identity_uncertain" ||
+            reason === "industry_not_in_approved_profile",
+        )
+        state = hasBlockingReviewReason ? "review" : "accepted"
+      }
+    }
   }
 
   const requiresHumanReview =

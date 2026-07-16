@@ -168,6 +168,28 @@ function matchesProspectSearchIndustryGate(
   return aliases.some((alias) => matchesProspectSearchIndustryFilter(row, alias))
 }
 
+/** External discovery operational keyword match — SOME required (canonical ICP rule). */
+export function evaluateExternalDiscoveryOperationalKeywordMatch(
+  blob: string,
+  keywords: readonly string[],
+): { pass: boolean; matchedKeywords: string[]; missingKeywords: string[] } {
+  const required = keywords.map((keyword) => keyword.trim()).filter(Boolean)
+  const matchedKeywords = required.filter((keyword) => includesFold(blob, keyword))
+  const missingKeywords = required.filter((keyword) => !includesFold(blob, keyword))
+  return {
+    pass: required.length === 0 || matchedKeywords.length > 0,
+    matchedKeywords,
+    missingKeywords,
+  }
+}
+
+export function evaluateProspectSearchIndustryGatePass(
+  row: ProspectSearchIndustryEvidenceRow,
+  filters: GrowthProspectSearchFilters,
+): boolean {
+  return matchesProspectSearchIndustryGate(row, filters)
+}
+
 export function explainProspectSearchFilterDrop<
   T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
 >(row: T, filters: GrowthProspectSearchFilters, options?: ProspectSearchFilterOptions): string | null {

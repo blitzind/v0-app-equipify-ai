@@ -2,10 +2,14 @@
  * GE-AIOS-PORTFOLIO-INTAKE-PUSH-REVALIDATION-FIX-1I — Durable intake disposition model (client-safe).
  */
 
+import type { GrowthProspectSearchExternalFilterDiagnostics } from "@/lib/growth/prospect-search/prospect-search-external-filters"
 import type { GrowthProspectSearchPushOutcome } from "@/lib/growth/prospect-search/prospect-search-push-metadata"
 
 export const GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER =
   "ge-aios-portfolio-intake-push-revalidation-fix-1i-v1" as const
+
+export const GROWTH_EXTERNAL_DISCOVERY_KEYWORD_DEFERRAL_PRODUCTION_CLOSURE_1K_QA_MARKER =
+  "ge-aios-external-discovery-keyword-deferral-production-closure-1k-v1" as const
 
 /** Canonical durable disposition categories for portfolio intake survivors. */
 export const PORTFOLIO_INTAKE_DURABLE_DISPOSITION_CATEGORIES = [
@@ -56,6 +60,22 @@ export function countDurablePortfolioIntakeDispositions(
   return outcomes.filter(isDurablePortfolioIntakeDisposition).length
 }
 
+export function isPreResearchKeywordGateZeroSurvivorCollapse(input: {
+  normalizedCompanyCount: number
+  postFilterSurvivorCount: number
+  filterDiagnostics?: Pick<
+    GrowthProspectSearchExternalFilterDiagnostics,
+    "dropped_reasons" | "operational_keywords_deferred"
+  > | null
+}): boolean {
+  return (
+    input.normalizedCompanyCount > 0 &&
+    input.postFilterSurvivorCount === 0 &&
+    (input.filterDiagnostics?.dropped_reasons?.keywords ?? 0) > 0 &&
+    input.filterDiagnostics?.operational_keywords_deferred !== true
+  )
+}
+
 /**
  * Required invariant before writing intake_completed = true for a bounded batch.
  *
@@ -72,13 +92,30 @@ export function shouldMarkAutonomousRunIntakeCompleted(input: {
   durableDispositionCount: number
   postFilterSurvivorCount: number
   stopReason: string | null
+  normalizedCompanyCount?: number
+  filterDiagnostics?: Pick<
+    GrowthProspectSearchExternalFilterDiagnostics,
+    "dropped_reasons" | "operational_keywords_deferred"
+  > | null
 }): boolean {
+  if (
+    isPreResearchKeywordGateZeroSurvivorCollapse({
+      normalizedCompanyCount: input.normalizedCompanyCount ?? 0,
+      postFilterSurvivorCount: input.postFilterSurvivorCount,
+      filterDiagnostics: input.filterDiagnostics,
+    })
+  ) {
+    return false
+  }
   if (input.stopReason === "datamoon_zero_results") return true
   if (input.selectedCount === 0) {
     return input.postFilterSurvivorCount === 0
   }
   return input.durableDispositionCount === input.selectedCount
 }
+
+export const PORTFOLIO_INTAKE_KEYWORD_DEFERRAL_COMPLETION_INVARIANT_1K =
+  "autonomous external discovery must not terminalize on pre-research keyword gate collapse when normalizedCompanyCount > 0" as const
 
 export const PORTFOLIO_INTAKE_COMPLETION_INVARIANT_1I =
   "durableDispositionCount === selectedCount when selectedCount > 0; true zero survivors only when postFilterSurvivorCount === 0" as const

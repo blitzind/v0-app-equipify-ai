@@ -359,6 +359,12 @@ assert.equal(
   "keywords",
 )
 
+const keywordDeferredFiltered = applyProspectSearchExternalCompanyFilters([keywordOnlyMiss], keywordOnlyFilters)
+assert.equal(keywordDeferredFiltered.companies.length, 1)
+assert.equal(keywordDeferredFiltered.diagnostics.operational_keywords_deferred, true)
+assert.equal(keywordDeferredFiltered.diagnostics.keyword_rejected_count, 0)
+console.log("  ✓ Phase 3a — External discovery defers operational keywords to post-research validation")
+
 const filtered = applyProspectSearchExternalCompanyFilters(
   [
     texasCompany,
@@ -372,7 +378,8 @@ const filtered = applyProspectSearchExternalCompanyFilters(
 )
 assert.equal(filtered.companies.length, 5)
 assert.equal(filtered.diagnostics.geography_accepted_count, 5)
-assert.ok((filtered.diagnostics.keyword_accepted_count ?? 0) >= 5)
+assert.ok((filtered.diagnostics.keywords_deferred_count ?? 0) >= 5)
+assert.equal(filtered.diagnostics.keyword_accepted_count, 0)
 console.log("  ✓ Phase 3 — External ICP evaluates structured provider evidence")
 
 // Phase 4 — Contact consolidation

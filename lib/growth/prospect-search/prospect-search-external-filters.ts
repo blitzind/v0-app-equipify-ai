@@ -27,7 +27,22 @@ export type GrowthProspectSearchExternalFilterDiagnostics = {
   geography_rejected_count?: number
   keyword_accepted_count?: number
   keyword_rejected_count?: number
+  /** Companies passing industry/geography with operational keywords pending post-research validation. */
+  keywords_deferred_count?: number
   company_identity_missing_count?: number
+  /** Operational keywords deferred to post-research validation (GE-AIOS-EXTERNAL-DISCOVERY-POST-RESEARCH-KEYWORD-VALIDATION-1A). */
+  operational_keywords_deferred?: boolean
+}
+
+export function explainExternalDiscoveryProspectSearchFilterDrop(
+  row: GrowthProspectSearchCompanyResult,
+  filters: GrowthProspectSearchFilters,
+): string | null {
+  const filtersWithoutKeywords: GrowthProspectSearchFilters = {
+    ...filters,
+    keywords: undefined,
+  }
+  return explainProspectSearchFilterDrop(row, filtersWithoutKeywords, { external_discovery: true })
 }
 
 export function applyProspectSearchExternalCompanyFilters(
@@ -43,10 +58,12 @@ export function applyProspectSearchExternalCompanyFilters(
   let geography_rejected_count = 0
   let keyword_accepted_count = 0
   let keyword_rejected_count = 0
+  let keywords_deferred_count = 0
   let company_identity_missing_count = 0
+  const operationalKeywordsDeferred = Boolean(filters.keywords?.length)
 
   for (const row of companies) {
-    const reason = explainProspectSearchFilterDrop(row, filters, { external_discovery: true })
+    const reason = explainExternalDiscoveryProspectSearchFilterDrop(row, filters)
     if (companyIdentityMissing(row)) {
       company_identity_missing_count += 1
     }
@@ -61,7 +78,11 @@ export function applyProspectSearchExternalCompanyFilters(
     }
     kept.push(row)
     geography_accepted_count += 1
-    keyword_accepted_count += 1
+    if (operationalKeywordsDeferred) {
+      keywords_deferred_count += 1
+    } else {
+      keyword_accepted_count += 1
+    }
   }
 
   return {
@@ -73,9 +94,11 @@ export function applyProspectSearchExternalCompanyFilters(
       dropped_reasons,
       geography_accepted_count,
       geography_rejected_count,
-      keyword_accepted_count,
-      keyword_rejected_count,
+      keyword_accepted_count: operationalKeywordsDeferred ? 0 : keyword_accepted_count,
+      keyword_rejected_count: operationalKeywordsDeferred ? 0 : keyword_rejected_count,
+      keywords_deferred_count: operationalKeywordsDeferred ? keywords_deferred_count : 0,
       company_identity_missing_count,
+      operational_keywords_deferred: operationalKeywordsDeferred,
     },
   }
 }

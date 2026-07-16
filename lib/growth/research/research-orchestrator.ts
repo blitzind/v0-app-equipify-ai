@@ -20,6 +20,7 @@ import { promoteCompanyEvidenceToCompanyIntelligence } from "@/lib/growth/compan
 import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons/canonical-person-repository"
 import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import { reconcileExternalDiscoveryPostResearchAdmission } from "@/lib/growth/revenue-workflow/growth-operational-keyword-validation-server-1a"
 import { buildCompanySignals } from "@/lib/growth/research/company-signal-builder"
 import { classifyProspectIndustry } from "@/lib/growth/research/industry-classifier"
 import { detectProspectPainSignals } from "@/lib/growth/research/pain-signal-detector"
@@ -393,6 +394,23 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
 
     await markLeadProspectResearchCompleted(input.admin, lead.id, run)
     await recomputeGrowthLeadWorkflowSignals(input.admin, lead.id)
+
+    const postResearchAdmission = await reconcileExternalDiscoveryPostResearchAdmission({
+      admin: input.admin,
+      lead,
+      admissionContext,
+      evidenceBundle: companyEvidenceBundle,
+      websiteCrawlText: scrape.plainText,
+    })
+    if (postResearchAdmission.applied) {
+      logProspectResearch("external_discovery_post_research_admission", {
+        leadId: lead.id,
+        runId: run.id,
+        admissionState: postResearchAdmission.admissionState,
+        keywordValidationPass: postResearchAdmission.keywordValidationPass,
+        industryGatePassed: postResearchAdmission.industryGatePassed,
+      })
+    }
 
     void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
       admin: input.admin,

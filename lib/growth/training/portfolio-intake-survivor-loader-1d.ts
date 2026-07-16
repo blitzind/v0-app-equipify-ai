@@ -6,22 +6,23 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
-import { buildProspectSearchFiltersFromBusinessProfile } from "@/lib/growth/business-profile/business-profile-prospect-search-projection-1b"
 import {
-  resolveDatamoonCompanyGeography,
-  resolveDatamoonCompanyName,
-  resolveDatamoonCompanyWebsite,
+  buildCanonicalProspectSearchFiltersFromBusinessProfile,
+  buildProspectSearchQueryFromBusinessProfile,
+} from "@/lib/growth/business-profile/business-profile-prospect-search-canonical-filters-1k"
+import {
   resolveDatamoonProspectCompanyIdentityKey,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
 import { normalizeDatamoonAudienceRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-normalizer"
 import type { DatamoonAudienceImportRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
-import { applyDatamoonProviderIndustryIcpBridge } from "@/lib/growth/lead-sources/datamoon/datamoon-provider-industry-icp-bridge-1a"
 import { DEFAULT_PORTFOLIO_REPLENISH_BATCH_SIZE } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import {
   isRunEligibleForIntakePromotion,
   type AutonomousRunIntakeLifecycleFields,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
-import { applyProspectSearchExternalCompanyFilters } from "@/lib/growth/prospect-search/prospect-search-external-filters"
+import { recordsToProspectCompanies } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-1a"
+import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
+import { parseProspectSearchQuery } from "@/lib/growth/prospect-search/prospect-search-query-parser"
 import { prospectSearchDedupeHash } from "@/lib/growth/prospect-search/prospect-search-index"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -39,18 +40,6 @@ export type LoadedPortfolioIntakeSurvivor = {
   dedupeHash: string
   runIntake: AutonomousRunIntakeLifecycleFields
   runEligibleForIntakePromotion: boolean
-}
-
-function buildProviderEvidenceKeywords(
-  normalized: ReturnType<typeof normalizeDatamoonAudienceRecord>,
-): string[] {
-  return [
-    normalized.primary_industry,
-    normalized.job_title,
-    normalized.department,
-    ...(normalized.naics_codes ?? []).map((code) => `naics ${code}`),
-    ...(normalized.sic_codes ?? []).map((code) => `sic ${code}`),
-  ].filter((value): value is string => Boolean(value?.trim()))
 }
 
 function resolveImportRecordNormalized(input: {
@@ -71,85 +60,6 @@ function resolveImportRecordNormalized(input: {
     naics_codes: normalizedPayload.naics_codes ?? baseNormalized.naics_codes,
     sic_codes: normalizedPayload.sic_codes ?? baseNormalized.sic_codes,
   }
-}
-
-function recordToProspectCompany(
-  record: DatamoonAudienceImportRecord,
-  index: number,
-): GrowthProspectSearchCompanyResult {
-  const normalized = record.normalized
-  const companyGeo = resolveDatamoonCompanyGeography(normalized)
-  const providerKeywords = buildProviderEvidenceKeywords(normalized)
-  const bridge = applyDatamoonProviderIndustryIcpBridge({
-    providerIndustry: normalized.primary_industry,
-    keywords: providerKeywords,
-    signals: [
-      "Discovered via DataMoon audience search",
-      ...(normalized.job_title ? [`Contact role: ${normalized.job_title}`] : []),
-      ...(normalized.primary_industry ? [`Provider industry: ${normalized.primary_industry}`] : []),
-    ],
-  })
-
-  return {
-    id:
-      resolveDatamoonProspectCompanyIdentityKey(normalized) ??
-      record.dedupeKey?.trim() ??
-      record.id,
-    source_type: "external_discovered",
-    company_name: resolveDatamoonCompanyName(normalized),
-    website: resolveDatamoonCompanyWebsite(normalized),
-    industry: normalized.primary_industry ?? null,
-    subindustry: normalized.department,
-    city: companyGeo.city,
-    state: companyGeo.state,
-    country: companyGeo.country,
-    employees: null,
-    revenue_range: null,
-    location: companyGeo.location,
-    intent_score: null,
-    buying_stage: null,
-    lead_score: null,
-    confidence: normalized.source_confidence === "provider" ? 0.75 : 0.5,
-    company_match_confidence: null,
-    decision_maker_coverage: null,
-    verification_status: "external_unverified",
-    signals: bridge.signals,
-    search_intent_category: null,
-    growth_lead_id: record.matchedLeadId,
-    prospect_id: null,
-    customer_id: null,
-    rank_score: Math.max(0.1, 100 - index) * 0.01,
-    match_reasoning: [
-      "Discovered via DataMoon — routed through canonical Prospect Search.",
-      ...(bridge.metadata.bridgeApplied
-        ? [`Provider industry bridge: ${bridge.metadata.mappedSSVAliases.join(", ")}`]
-        : []),
-    ],
-    discovery_provider_type: "datamoon",
-    discovery_provider_name: "DataMoon",
-    discovery_source_badge: "DataMoon",
-    keywords: bridge.keywords,
-    notes: null,
-  }
-}
-
-function consolidateImportRecords(records: DatamoonAudienceImportRecord[]) {
-  const eligible = records.filter((row) => row.status === "preview" || row.status === "duplicate")
-  const grouped = new Map<string, DatamoonAudienceImportRecord[]>()
-  for (const record of eligible) {
-    const key =
-      resolveDatamoonProspectCompanyIdentityKey(record.normalized) ??
-      record.dedupeKey?.trim() ??
-      record.id
-    const bucket = grouped.get(key) ?? []
-    bucket.push(record)
-    grouped.set(key, bucket)
-  }
-  const consolidated: DatamoonAudienceImportRecord[] = []
-  for (const bucket of grouped.values()) {
-    consolidated.push(bucket[0]!)
-  }
-  return { consolidated }
 }
 
 function readRunIntakeLifecycle(providerMetadata: Record<string, unknown>): AutonomousRunIntakeLifecycleFields {
@@ -186,7 +96,12 @@ export async function loadPortfolioIntakeSurvivorsFromProduction(input: {
   const approved = await getActiveApprovedBusinessProfile(input.admin, input.organizationId)
   const profile = approved?.profile ?? null
   if (!profile) throw new Error("no_active_business_profile")
-  const filters = buildProspectSearchFiltersFromBusinessProfile(profile)
+  const query = buildProspectSearchQueryFromBusinessProfile(profile, approved?.companyName ?? null)
+  const canonicalFilters = await buildCanonicalProspectSearchFiltersFromBusinessProfile(input.admin, {
+    profile,
+    query,
+  })
+  const parsed = parseProspectSearchQuery(query)
 
   const { data: runs } = await input.admin
     .schema("growth")
@@ -233,12 +148,13 @@ export async function loadPortfolioIntakeSurvivorsFromProduction(input: {
       }
     })
 
-    const { consolidated } = consolidateImportRecords(importRecords)
-    const companies = consolidated
-      .map((record, index) => recordToProspectCompany(record, index))
-      .sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0))
-    const filtered = applyProspectSearchExternalCompanyFilters(companies, filters)
-    const runSurvivors = filtered.companies
+    const mapped = recordsToProspectCompanies(importRecords, canonicalFilters.industry ?? null)
+    const enriched = await enrichProspectSearchExternalCompanies(input.admin, mapped.companies, {
+      query,
+      filters: canonicalFilters,
+      parsed,
+    })
+    const runSurvivors = enriched.companies
     const providerMetadata = (run.provider_metadata as Record<string, unknown>) ?? {}
     const batchSizeAtRun =
       readBatchSizeFromRunMetadata(providerMetadata) ?? DEFAULT_PORTFOLIO_REPLENISH_BATCH_SIZE

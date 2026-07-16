@@ -72,6 +72,9 @@ export function readAutonomousRunIntakeLifecycleFields(
     intake_last_attempt_at: meta.intake_last_attempt_at ?? null,
     intake_zero_survivor_reason: meta.intake_zero_survivor_reason ?? null,
     intake_recovery_audit: meta.intake_recovery_audit ?? null,
+    intake_recovery_attempt_count: meta.intake_recovery_attempt_count ?? null,
+    intake_recovery_last_attempt_at: meta.intake_recovery_last_attempt_at ?? null,
+    intake_enrichment_diagnostic: meta.intake_enrichment_diagnostic ?? null,
   }
 }
 
@@ -216,6 +219,31 @@ export async function recordAutonomousRunIntakePromotionAttempt(
     intake_skipped_invalid_count: input.skippedInvalid,
     intake_error_count: input.errors,
     intake_last_attempt_at: input.generatedAt,
+  })
+}
+
+export async function recordAutonomousRunIntakeEnrichmentDiagnostic(
+  admin: SupabaseClient,
+  runId: string,
+  input: {
+    generatedAt: string
+    normalizedCompanyCount: number
+    postFilterSurvivorCount: number
+    filterDiagnostics: import("@/lib/growth/prospect-search/prospect-search-external-filters").GrowthProspectSearchExternalFilterDiagnostics | null
+    reason: string
+  },
+): Promise<DatamoonAudienceImportRun | null> {
+  return patchAutonomousRunIntakeMetadata(admin, runId, {
+    intake_pending: true,
+    intake_completed: false,
+    intake_enrichment_diagnostic: {
+      qa_marker: "ge-aios-external-discovery-keyword-deferral-production-closure-1k-v1",
+      recorded_at: input.generatedAt,
+      normalized_company_count: input.normalizedCompanyCount,
+      post_filter_survivor_count: input.postFilterSurvivorCount,
+      filter_diagnostics: input.filterDiagnostics,
+      reason: input.reason,
+    },
   })
 }
 

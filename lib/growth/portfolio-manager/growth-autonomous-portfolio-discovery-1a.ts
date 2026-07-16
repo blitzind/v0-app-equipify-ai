@@ -32,11 +32,16 @@ import {
   shouldMarkAutonomousRunIntakeCompleted,
   GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER,
   PORTFOLIO_INTAKE_COMPLETION_INVARIANT_1I,
+  GROWTH_EXTERNAL_DISCOVERY_KEYWORD_DEFERRAL_PRODUCTION_CLOSURE_1K_QA_MARKER,
+  PORTFOLIO_INTAKE_KEYWORD_DEFERRAL_COMPLETION_INVARIANT_1K,
+  isPreResearchKeywordGateZeroSurvivorCollapse,
 } from "@/lib/growth/prospect-search/prospect-search-portfolio-intake-disposition-1i"
+import type { GrowthProspectSearchExternalFilterDiagnostics } from "@/lib/growth/prospect-search/prospect-search-external-filters"
 import {
   markAutonomousRunIntakeCompleted,
   markAutonomousRunIntakePromotionStarted,
   recordAutonomousRunIntakePromotionAttempt,
+  recordAutonomousRunIntakeEnrichmentDiagnostic,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
 import { GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
 
@@ -176,12 +181,19 @@ function shouldTerminalizeRunIntakeAfterBatch(input: {
   durableDispositionCount: number
   postFilterSurvivorCount: number
   stopReason: string | null
+  normalizedCompanyCount?: number
+  filterDiagnostics?: Pick<
+    GrowthProspectSearchExternalFilterDiagnostics,
+    "dropped_reasons" | "operational_keywords_deferred"
+  > | null
 }): boolean {
   return shouldMarkAutonomousRunIntakeCompleted({
     selectedCount: input.selectedCount,
     durableDispositionCount: input.durableDispositionCount,
     postFilterSurvivorCount: input.postFilterSurvivorCount,
     stopReason: input.stopReason,
+    normalizedCompanyCount: input.normalizedCompanyCount,
+    filterDiagnostics: input.filterDiagnostics,
   })
 }
 
@@ -194,15 +206,37 @@ async function terminalizeAutonomousRunIntakeIfEligible(
     postFilterSurvivorCount: number
     stopReason: string | null
     generatedAt: string
+    normalizedCompanyCount?: number
+    filterDiagnostics?: GrowthProspectSearchExternalFilterDiagnostics | null
   },
 ): Promise<boolean> {
   if (!input.runId) return false
+
+  if (
+    isPreResearchKeywordGateZeroSurvivorCollapse({
+      normalizedCompanyCount: input.normalizedCompanyCount ?? 0,
+      postFilterSurvivorCount: input.postFilterSurvivorCount,
+      filterDiagnostics: input.filterDiagnostics,
+    })
+  ) {
+    await recordAutonomousRunIntakeEnrichmentDiagnostic(admin, input.runId, {
+      generatedAt: input.generatedAt,
+      normalizedCompanyCount: input.normalizedCompanyCount ?? 0,
+      postFilterSurvivorCount: input.postFilterSurvivorCount,
+      filterDiagnostics: input.filterDiagnostics ?? null,
+      reason: "pre_research_keyword_gate_collapse",
+    })
+    return false
+  }
+
   if (
     !shouldTerminalizeRunIntakeAfterBatch({
       selectedCount: input.selectedCount,
       durableDispositionCount: input.durableDispositionCount,
       postFilterSurvivorCount: input.postFilterSurvivorCount,
       stopReason: input.stopReason,
+      normalizedCompanyCount: input.normalizedCompanyCount,
+      filterDiagnostics: input.filterDiagnostics,
     })
   ) {
     return false
@@ -316,6 +350,18 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   const effectiveExecutionAction: AutonomousPortfolioDiscoveryExecutionAction =
     datamoon.intakePendingResume ? "resume_intake_pending" : executionAction
   const postFilterSurvivorCount = search.companies.length
+  const normalizedCompanyCount = datamoon.datamoonNormalizedCompanyCount
+  const filterDiagnostics = search.external_filter_diagnostics ?? null
+  const terminalizationInput = {
+    runId: datamoon.datamoonRunId,
+    selectedCount: 0,
+    durableDispositionCount: 0,
+    postFilterSurvivorCount,
+    stopReason: datamoon.datamoonStopReason,
+    generatedAt: input.generatedAt,
+    normalizedCompanyCount,
+    filterDiagnostics,
+  }
 
   if (datamoon.datamoonJobActive) {
     return buildPortfolioDiscoveryTickResult({
@@ -342,14 +388,7 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   }))
 
   if (selected.length === 0) {
-    const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {
-      runId: datamoon.datamoonRunId,
-      selectedCount: 0,
-      durableDispositionCount: 0,
-      postFilterSurvivorCount,
-      stopReason: datamoon.datamoonStopReason,
-      generatedAt: input.generatedAt,
-    })
+    const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, terminalizationInput)
     return buildPortfolioDiscoveryTickResult({
       organizationId: input.organizationId,
       ran: true,
@@ -426,19 +465,18 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   }).catch(() => 0)
 
   const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {
-    runId: datamoon.datamoonRunId,
+    ...terminalizationInput,
     selectedCount: selected.length,
     durableDispositionCount: push.durable_disposition_count,
-    postFilterSurvivorCount,
-    stopReason: datamoon.datamoonStopReason,
-    generatedAt: input.generatedAt,
   })
 
   logGrowthEngine("autonomous_portfolio_discovery_batch", {
     qa_marker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     intake_qa_marker: GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
     push_revalidation_qa_marker: GROWTH_PORTFOLIO_INTAKE_PUSH_REVALIDATION_FIX_1I_QA_MARKER,
+    keyword_deferral_qa_marker: GROWTH_EXTERNAL_DISCOVERY_KEYWORD_DEFERRAL_PRODUCTION_CLOSURE_1K_QA_MARKER,
     completion_invariant: PORTFOLIO_INTAKE_COMPLETION_INVARIANT_1I,
+    keyword_deferral_invariant: PORTFOLIO_INTAKE_KEYWORD_DEFERRAL_COMPLETION_INVARIANT_1K,
     organization_id: input.organizationId,
     batch_size: batchSize,
     execution_action: effectiveExecutionAction,

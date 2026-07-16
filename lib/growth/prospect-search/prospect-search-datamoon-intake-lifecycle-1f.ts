@@ -27,6 +27,10 @@ export type AutonomousRunIntakeLifecycleFields = {
   intake_zero_survivor_reason?: string | null
   /** Recovery / audit payload — no new table. */
   intake_recovery_audit?: Record<string, unknown> | null
+  intake_recovery_attempt_count?: number | null
+  intake_recovery_last_attempt_at?: string | null
+  /** Blocked enrichment diagnostic — keeps intake_pending when keyword gate collapses cohort. */
+  intake_enrichment_diagnostic?: Record<string, unknown> | null
 }
 
 export type AutonomousRunIntakeLifecycleState =

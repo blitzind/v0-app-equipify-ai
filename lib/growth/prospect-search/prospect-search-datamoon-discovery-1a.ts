@@ -222,7 +222,7 @@ function consolidateDatamoonAudienceImportRecords(
   return { records: consolidated, duplicateContactsConsolidated }
 }
 
-function recordsToProspectCompanies(
+export function recordsToProspectCompanies(
   records: DatamoonAudienceImportRecord[],
   filterIndustry?: string | null,
 ): { companies: GrowthProspectSearchCompanyResult[]; stats: DatamoonProspectSearchNormalizationStats } {

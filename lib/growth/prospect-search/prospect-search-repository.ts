@@ -6,6 +6,7 @@ import {
   filterProspectPeopleByTitle,
   normalizeProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-filters"
+import { buildCanonicalProspectSearchFiltersFromBusinessProfile } from "@/lib/growth/business-profile/business-profile-prospect-search-canonical-filters-1k"
 import { buildProspectSearchIndex } from "@/lib/growth/prospect-search/prospect-search-index"
 import {
   getProspectSearchMaterializedIndexStats,
@@ -118,10 +119,17 @@ export async function runProspectSearch(
   input: RunProspectSearchInput,
 ): Promise<GrowthProspectSearchResult> {
   const parsed = parseProspectSearchQuery(input.query)
-  const baseFilters = mergeParsedQueryIntoFilters(parsed, input.filters ?? {}) as GrowthProspectSearchFilters
-  const mergedFilters = normalizeProspectSearchFilters(
-    await applyTerritoryFiltersToSearchInput(admin, baseFilters),
-  )
+  const mergedFilters = input.approved_profile
+    ? await buildCanonicalProspectSearchFiltersFromBusinessProfile(admin, {
+        profile: input.approved_profile,
+        query: input.query,
+      })
+    : normalizeProspectSearchFilters(
+        await applyTerritoryFiltersToSearchInput(
+          admin,
+          mergeParsedQueryIntoFilters(parsed, input.filters ?? {}) as GrowthProspectSearchFilters,
+        ),
+      )
 
   const discovery_mode = input.discovery_mode ?? "internal"
   const sort_by: GrowthProspectSearchSortBy = input.sort_by ?? "rank"
