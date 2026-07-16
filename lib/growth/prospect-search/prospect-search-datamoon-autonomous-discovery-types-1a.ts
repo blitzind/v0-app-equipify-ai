@@ -1,5 +1,7 @@
 /** GE-AIOS-DATAMOON-AUTONOMOUS-DISCOVERY-CUTOVER-1A — Autonomous DataMoon discovery types (client-safe). */
 
+import type { AutonomousRunIntakeLifecycleFields } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
+
 export const GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER =
   "ge-aios-datamoon-autonomous-discovery-cutover-1a-v1" as const
 
@@ -56,7 +58,7 @@ export type AutonomousProspectSearchDatamoonRunMetadata = {
   purpose: "prospect_search_intake"
   read_only_proof: boolean
   authority: ProspectSearchDiscoveryAuthority
-}
+} & AutonomousRunIntakeLifecycleFields
 
 export type AutonomousProspectDiscoveryProviderPolicy = {
   qaMarker: typeof GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER

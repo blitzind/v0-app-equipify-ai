@@ -91,6 +91,7 @@ export type AutonomousPortfolioDiscoveryExecutionAction =
   | "skip"
   | "start_new"
   | "resume_active"
+  | "resume_intake_pending"
 
 export type AutonomousPortfolioDiscoveryDisposition =
   | "discovery_skipped"
@@ -99,6 +100,8 @@ export type AutonomousPortfolioDiscoveryDisposition =
   | "active_discovery_still_building"
   | "active_discovery_completed"
   | "active_discovery_failed"
+  | "intake_pending_resumed"
+  | "intake_completed"
 
 export type GrowthPortfolioManagerOperatorProjection = {
   qaMarker: typeof GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER

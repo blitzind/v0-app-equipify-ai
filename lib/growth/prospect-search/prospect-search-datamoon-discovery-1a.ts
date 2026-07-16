@@ -12,6 +12,7 @@ import {
   resolveDatamoonProspectCompanyIdentityKey,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
 import { normalizeDatamoonAudienceRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-normalizer"
+import { applyDatamoonProviderIndustryIcpBridge } from "@/lib/growth/lead-sources/datamoon/datamoon-provider-industry-icp-bridge-1a"
 import { pollDatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
 import type { DatamoonAudienceImportRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
@@ -24,10 +25,14 @@ import {
   buildAutonomousProspectSearchDatamoonProviderMetadata,
   countAutonomousProspectSearchDatamoonRunsForOrganization,
   findActiveAutonomousProspectSearchDatamoonRun,
+  findLatestIntakePendingAutonomousProspectSearchDatamoonRun,
   isDatamoonAutonomousDiscoveryRunActive,
   isDatamoonAutonomousDiscoveryRunCompleted,
   isDatamoonAutonomousDiscoveryRunFailed,
+  markAutonomousRunIntakeCompleted,
+  markAutonomousRunIntakePending,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
+import { GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
 import {
   DATAMOON_AUTONOMOUS_SINGLE_FLIGHT_ACTIVE_RUN_ERROR,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
@@ -40,6 +45,8 @@ import type {
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { startDatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
+import { listDatamoonAudienceImportRecords } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-repository"
+import type { DatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 
 export type RunProspectSearchDatamoonAutonomousDiscoveryInput = {
   organizationId: string
@@ -78,6 +85,7 @@ export type RunProspectSearchDatamoonAutonomousDiscoveryResult = {
   providerStatusLabel: string
   providerStatusMessage: string
   runId: string | null
+  intakePendingResume?: boolean
   targetingSummary: ReturnType<
     typeof buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile
   >["targetingSummary"] | null
@@ -108,6 +116,15 @@ function datamoonRecordToProspectCompany(
     `datamoon-${record.id}`
   const providerKeywords = buildProviderEvidenceKeywords(normalized)
   const industry = normalized.primary_industry ?? filterIndustry ?? null
+  const bridge = applyDatamoonProviderIndustryIcpBridge({
+    providerIndustry: normalized.primary_industry,
+    keywords: providerKeywords,
+    signals: [
+      "Discovered via DataMoon audience search",
+      ...(normalized.job_title ? [`Contact role: ${normalized.job_title}`] : []),
+      ...(normalized.primary_industry ? [`Provider industry: ${normalized.primary_industry}`] : []),
+    ],
+  })
 
   return {
     id,
@@ -129,11 +146,7 @@ function datamoonRecordToProspectCompany(
     company_match_confidence: null,
     decision_maker_coverage: null,
     verification_status: "external_unverified",
-    signals: [
-      "Discovered via DataMoon audience search",
-      ...(normalized.job_title ? [`Contact role: ${normalized.job_title}`] : []),
-      ...(normalized.primary_industry ? [`Provider industry: ${normalized.primary_industry}`] : []),
-    ],
+    signals: bridge.signals,
     search_intent_category: null,
     growth_lead_id: record.matchedLeadId,
     prospect_id: null,
@@ -148,7 +161,8 @@ function datamoonRecordToProspectCompany(
     discovery_provider_type: "datamoon",
     discovery_provider_name: "DataMoon",
     discovery_source_badge: "DataMoon",
-    keywords: providerKeywords,
+    keywords: bridge.keywords,
+    datamoon_provider_industry_icp_bridge: bridge.metadata,
     notes: [
       normalized.provider_company_id ? `Provider company id: ${normalized.provider_company_id}` : null,
       normalized.company_linkedin_url ? `Company LinkedIn: ${normalized.company_linkedin_url}` : null,
@@ -317,6 +331,11 @@ async function resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(
   if (isDatamoonAutonomousDiscoveryRunCompleted(run)) {
     const mapped = recordsToProspectCompanies(polled.records, input.filters.industry ?? null)
     const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
+    if (mapped.companies.length > 0) {
+      await markAutonomousRunIntakePending(admin, run.id)
+    } else {
+      await markAutonomousRunIntakeCompleted(admin, run.id)
+    }
     logGrowthEngine("prospect_search_datamoon_autonomous_discovery_normalized", {
       qa_marker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
       organization_id: input.organizationId,
@@ -345,6 +364,75 @@ async function resumeAutonomousProspectSearchDatamoonDiscoveryFromActiveRun(
   }
 
   return null
+}
+
+async function resumeAutonomousProspectSearchDatamoonDiscoveryFromIntakePendingRun(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    query: string
+    filters: GrowthProspectSearchFilters
+    intakePendingRun: DatamoonAudienceImportRun
+    generatedAt: string
+    readOnlyProof?: boolean
+  },
+): Promise<RunProspectSearchDatamoonAutonomousDiscoveryResult> {
+  if (input.readOnlyProof) {
+    return {
+      qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+      companies: [],
+      built_query: input.query,
+      stopReason: null,
+      jobActive: false,
+      jobReused: true,
+      jobCreated: false,
+      rawCompanyCount: 0,
+      normalizedCompanyCount: 0,
+      normalizationStats: null,
+      providerStatusLabel: "intake_pending_resume",
+      providerStatusMessage: "Intake-pending run — read-only proof skips promotion reload.",
+      runId: input.intakePendingRun.id,
+      intakePendingResume: true,
+      targetingSummary: null,
+    }
+  }
+
+  await markAutonomousRunIntakePending(admin, input.intakePendingRun.id, input.generatedAt)
+  const records = await listDatamoonAudienceImportRecords(admin, input.intakePendingRun.id)
+  const mapped = recordsToProspectCompanies(records, input.filters.industry ?? null)
+  const stopReason = mapped.companies.length === 0 ? "datamoon_zero_results" : null
+
+  if (mapped.companies.length === 0) {
+    await markAutonomousRunIntakeCompleted(admin, input.intakePendingRun.id, input.generatedAt)
+  }
+
+  logGrowthEngine("prospect_search_datamoon_intake_pending_resume", {
+    qa_marker: GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
+    organization_id: input.organizationId,
+    run_id: input.intakePendingRun.id,
+    normalized_company_count: mapped.companies.length,
+  })
+
+  return {
+    qaMarker: GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
+    companies: mapped.companies,
+    built_query: input.query,
+    stopReason,
+    jobActive: false,
+    jobReused: true,
+    jobCreated: false,
+    rawCompanyCount: records.length,
+    normalizedCompanyCount: mapped.companies.length,
+    normalizationStats: mapped.stats,
+    providerStatusLabel: stopReason ?? "intake_pending_resume",
+    providerStatusMessage:
+      stopReason != null
+        ? autonomousDiscoveryStopReasonMessage(stopReason)
+        : `Resumed intake-pending run with ${mapped.companies.length} company candidate(s).`,
+    runId: input.intakePendingRun.id,
+    intakePendingResume: true,
+    targetingSummary: null,
+  }
 }
 
 function buildAutonomousProspectSearchDatamoonRunMetadata(
@@ -401,6 +489,21 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
       readOnlyProof: input.readOnlyProof,
     })
     if (resumed) return resumed
+  }
+
+  const intakePendingRun = await findLatestIntakePendingAutonomousProspectSearchDatamoonRun(
+    admin,
+    input.organizationId,
+  )
+  if (intakePendingRun) {
+    return resumeAutonomousProspectSearchDatamoonDiscoveryFromIntakePendingRun(admin, {
+      organizationId: input.organizationId,
+      query: input.query,
+      filters: input.filters,
+      intakePendingRun,
+      generatedAt: input.generatedAt,
+      readOnlyProof: input.readOnlyProof,
+    })
   }
 
   const reservationMetadata = buildAutonomousProspectSearchDatamoonRunMetadata(

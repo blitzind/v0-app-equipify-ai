@@ -14,6 +14,11 @@ import {
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
   type AutonomousProspectSearchDatamoonRunMetadata,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
+import {
+  GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
+  isRunEligibleForIntakePromotion,
+  type AutonomousRunIntakeLifecycleFields,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-intake-lifecycle-1f"
 
 const ACTIVE_STATUSES = new Set(["pending_build", "building"])
 
@@ -46,6 +51,159 @@ export function readAutonomousProspectSearchDatamoonMetadata(
   return meta as AutonomousProspectSearchDatamoonRunMetadata
 }
 
+export function readAutonomousRunIntakeLifecycleFields(
+  run: DatamoonAudienceImportRun,
+): AutonomousRunIntakeLifecycleFields {
+  const meta = readAutonomousProspectSearchDatamoonMetadata(run)
+  if (!meta) return {}
+  return {
+    intake_pending: meta.intake_pending,
+    intake_pending_at: meta.intake_pending_at ?? null,
+    intake_completed: meta.intake_completed,
+    intake_completed_at: meta.intake_completed_at ?? null,
+    intake_promotion_started_at: meta.intake_promotion_started_at ?? null,
+  }
+}
+
+function mapRunRow(row: Record<string, unknown>): DatamoonAudienceImportRun {
+  return {
+    id: row.id as string,
+    runName: row.run_name as string,
+    datamoonAudienceId: (row.datamoon_audience_id as string | null) ?? null,
+    providerMode: row.provider_mode,
+    audienceType: row.audience_type,
+    filters: Array.isArray(row.filters) ? row.filters : [],
+    topicIds: Array.isArray(row.topic_ids) ? row.topic_ids.map(String) : [],
+    requestedLimit: row.requested_limit as number | null,
+    audienceName: (row.audience_name as string | null) ?? null,
+    websiteId: (row.website_id as string | null) ?? null,
+    status: row.status as DatamoonAudienceImportRun["status"],
+    recordCount: (row.record_count as number | null) ?? 0,
+    loadingCount: (row.loading_count as number | null) ?? 0,
+    previewCount: (row.preview_count as number | null) ?? 0,
+    importedCount: (row.imported_count as number | null) ?? 0,
+    duplicateCount: (row.duplicate_count as number | null) ?? 0,
+    skippedCount: (row.skipped_count as number | null) ?? 0,
+    errorCount: (row.error_count as number | null) ?? 0,
+    providerMetadata: (row.provider_metadata as Record<string, unknown>) ?? {},
+    errorMessage: (row.error_message as string | null) ?? null,
+    dryRun: row.dry_run === true,
+    createdBy: (row.created_by as string | null) ?? null,
+    lastPolledAt: (row.last_polled_at as string | null) ?? null,
+    completedAt: (row.completed_at as string | null) ?? null,
+    importedAt: (row.imported_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
+
+async function patchAutonomousRunIntakeMetadata(
+  admin: SupabaseClient,
+  runId: string,
+  patch: Partial<AutonomousRunIntakeLifecycleFields>,
+): Promise<DatamoonAudienceImportRun | null> {
+  const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
+  if (!existing) return null
+  const meta = readAutonomousProspectSearchDatamoonMetadata(existing)
+  if (!meta) return null
+
+  const nextMeta: AutonomousProspectSearchDatamoonRunMetadata = {
+    ...meta,
+    ...patch,
+  }
+
+  return updateDatamoonAudienceImportRun(admin, runId, {
+    providerMetadata: {
+      ...existing.providerMetadata,
+      [AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_METADATA_KEY]: nextMeta,
+      ge_aios_portfolio_intake_pending_state_1f: GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER,
+    },
+  })
+}
+
+export async function markAutonomousRunIntakePending(
+  admin: SupabaseClient,
+  runId: string,
+  generatedAt?: string,
+): Promise<DatamoonAudienceImportRun | null> {
+  const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
+  if (!existing) return null
+  const intake = readAutonomousRunIntakeLifecycleFields(existing)
+  if (intake.intake_completed === true) return existing
+  if (intake.intake_pending === true) return existing
+  return patchAutonomousRunIntakeMetadata(admin, runId, {
+    intake_pending: true,
+    intake_pending_at: generatedAt ?? new Date().toISOString(),
+  })
+}
+
+export async function markAutonomousRunIntakePromotionStarted(
+  admin: SupabaseClient,
+  runId: string,
+  generatedAt?: string,
+): Promise<DatamoonAudienceImportRun | null> {
+  const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
+  if (!existing) return null
+  const intake = readAutonomousRunIntakeLifecycleFields(existing)
+  if (intake.intake_completed === true) return existing
+  if (intake.intake_promotion_started_at) return existing
+  return patchAutonomousRunIntakeMetadata(admin, runId, {
+    intake_promotion_started_at: generatedAt ?? new Date().toISOString(),
+  })
+}
+
+export async function markAutonomousRunIntakeCompleted(
+  admin: SupabaseClient,
+  runId: string,
+  generatedAt?: string,
+): Promise<DatamoonAudienceImportRun | null> {
+  const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
+  if (!existing) return null
+  const intake = readAutonomousRunIntakeLifecycleFields(existing)
+  if (intake.intake_completed === true) return existing
+  return patchAutonomousRunIntakeMetadata(admin, runId, {
+    intake_pending: false,
+    intake_completed: true,
+    intake_completed_at: generatedAt ?? new Date().toISOString(),
+  })
+}
+
+export async function findLatestIntakePendingAutonomousProspectSearchDatamoonRun(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<DatamoonAudienceImportRun | null> {
+  const { data, error } = await runsTable(admin)
+    .select("*")
+    .like("run_name", `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:%`)
+    .in("status", ["completed", "imported", "imported_partial"])
+    .filter(
+      "provider_metadata->autonomous_prospect_search_1a->>organization_id",
+      "eq",
+      organizationId,
+    )
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .limit(30)
+
+  if (error || !data) return null
+
+  for (const row of data) {
+    const run = mapRunRow(row as Record<string, unknown>)
+    const intake = readAutonomousRunIntakeLifecycleFields(run)
+    if (
+      isRunEligibleForIntakePromotion({
+        runStatus: run.status,
+        intake,
+      })
+    ) {
+      return run
+    }
+  }
+
+  return null
+}
+
+export { GROWTH_PORTFOLIO_INTAKE_PENDING_STATE_1F_QA_MARKER }
+
 export function isAutonomousProspectSearchDatamoonRun(run: DatamoonAudienceImportRun): boolean {
   return (
     run.runName.startsWith(`${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:`) ||
@@ -67,35 +225,7 @@ export async function findActiveAutonomousProspectSearchDatamoonRun(
   if (error || !data) return null
 
   for (const row of data) {
-    const run = {
-      id: row.id as string,
-      runName: row.run_name as string,
-      datamoonAudienceId: (row.datamoon_audience_id as string | null) ?? null,
-      providerMode: row.provider_mode,
-      audienceType: row.audience_type,
-      filters: Array.isArray(row.filters) ? row.filters : [],
-      topicIds: Array.isArray(row.topic_ids) ? row.topic_ids.map(String) : [],
-      requestedLimit: row.requested_limit as number | null,
-      audienceName: (row.audience_name as string | null) ?? null,
-      websiteId: (row.website_id as string | null) ?? null,
-      status: row.status,
-      recordCount: row.record_count ?? 0,
-      loadingCount: row.loading_count ?? 0,
-      previewCount: row.preview_count ?? 0,
-      importedCount: row.imported_count ?? 0,
-      duplicateCount: row.duplicate_count ?? 0,
-      skippedCount: row.skipped_count ?? 0,
-      errorCount: row.error_count ?? 0,
-      providerMetadata: (row.provider_metadata as Record<string, unknown>) ?? {},
-      errorMessage: (row.error_message as string | null) ?? null,
-      dryRun: row.dry_run === true,
-      createdBy: (row.created_by as string | null) ?? null,
-      lastPolledAt: (row.last_polled_at as string | null) ?? null,
-      completedAt: (row.completed_at as string | null) ?? null,
-      importedAt: (row.imported_at as string | null) ?? null,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
-    } satisfies DatamoonAudienceImportRun
+    const run = mapRunRow(row as Record<string, unknown>)
 
     const meta = readAutonomousProspectSearchDatamoonMetadata(run)
     if (meta?.organization_id === organizationId) return run
