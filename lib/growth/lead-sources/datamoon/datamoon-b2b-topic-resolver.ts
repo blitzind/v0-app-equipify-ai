@@ -6,8 +6,10 @@ import { logGrowthEngine } from "@/lib/growth/access"
 import {
   expandDatamoonB2bTopicSearchQueries,
   GROWTH_DATAMOON_B2B_QUERY_BROADEN_1_QA_MARKER,
+  GROWTH_DATAMOON_B2B_TOPIC_RANKING_NEUTRALIZATION_1A_QA_MARKER,
   selectBroadenedDatamoonB2bTopics,
   type DatamoonB2bTopicCandidate,
+  type DatamoonB2bTopicRankingSignals,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-broadening"
 import {
   GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_1_QA_MARKER,
@@ -179,6 +181,7 @@ export async function resolveDatamoonB2bTopicQueries(
     env?: NodeJS.ProcessEnv
     clusterBroadeningAnchors?: readonly string[]
     multiVerticalProfile?: boolean
+    topicRankingSignals?: DatamoonB2bTopicRankingSignals
   },
 ): Promise<{
   matches: DatamoonResolvedB2bTopic[]
@@ -202,11 +205,12 @@ export async function resolveDatamoonB2bTopicQueries(
     }
   }
 
-  const selected = selectBroadenedDatamoonB2bTopics(candidates)
+  const selected = selectBroadenedDatamoonB2bTopics(candidates, options?.topicRankingSignals)
 
   logGrowthEngine("datamoon_b2b_topic_resolution", {
     qa_marker: GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_1_QA_MARKER,
     broaden_qa_marker: GROWTH_DATAMOON_B2B_QUERY_BROADEN_1_QA_MARKER,
+    ranking_qa_marker: GROWTH_DATAMOON_B2B_TOPIC_RANKING_NEUTRALIZATION_1A_QA_MARKER,
     query_count: queries.length,
     broadened_query_count: broadenedTopicSearchQueries.length,
     candidate_count: candidates.length,

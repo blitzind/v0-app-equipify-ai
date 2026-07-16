@@ -4,6 +4,7 @@ import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import { DATAMOON_EXT_OUTPUT_FIELDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { DATAMOON_PROVIDER_FIRMOGRAPHIC_FILTER_FIELDS } from "@/lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a"
 import type { DatamoonResolvedB2bTopic } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
+import type { DatamoonB2bTopicRankingSignals } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-broadening"
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
 export {
@@ -59,6 +60,7 @@ export type DatamoonAudienceImportWorkbenchContext = {
   topics?: string[]
   supplementalTopicSearchQueries?: string[]
   clusterBroadeningAnchors?: string[]
+  topicRankingSignals?: DatamoonB2bTopicRankingSignals
   broadenedTopicSearchQueries?: string[]
   resolvedB2bTopics?: DatamoonResolvedB2bTopic[]
   companySize?: string

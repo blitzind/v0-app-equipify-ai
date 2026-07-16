@@ -132,6 +132,11 @@ assert.equal(
   buildDatamoonOperationalTargetingStrategyMetadata(rotation0).selectedVerticalCluster,
   rotation0.operationalCluster,
 )
+assert.match(projectionSource, /topicRankingSignals/)
+assert.deepEqual(
+  requestProjection.request.workbench_context?.topicRankingSignals?.topicPhrases,
+  rotation0.topicPhrases,
+)
 console.log("  ✓ request wiring + metadata persistence fields")
 
 const prospectFiltersBefore = buildProspectSearchFiltersFromBusinessProfile(equipifyProfile())

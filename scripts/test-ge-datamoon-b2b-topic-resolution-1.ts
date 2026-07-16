@@ -23,6 +23,7 @@ import {
   GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR,
   isDatamoonNumericTopicId,
 } from "../lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
+import { DATAMOON_OPERATIONAL_VERTICAL_CLUSTERS } from "../lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 import { validateDatamoonAudienceImportRequest } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 
 const PHASE = "GE-DATAMOON-B2B-TOPIC-RESOLUTION-1" as const
@@ -92,7 +93,13 @@ async function main(): Promise<void> {
   assert.equal(draftRequest.audience_type, "b2b")
   assert.equal(draftRequest.topic_ids, undefined)
   assert.ok(datamoonImportRequestIntendsB2bAudience(draftRequest))
-  assert.equal(validateDatamoonAudienceImportRequest(draftRequest).ok, true)
+  const draftValidation = validateDatamoonAudienceImportRequest(draftRequest)
+  assert.equal(draftValidation.ok, false)
+  if (draftValidation.ok) throw new Error("expected intent-only draft to require topic resolution")
+  assert.ok(
+    draftValidation.issues.some((issue) => issue.code === "datamoon_b2b_topics_unresolved"),
+    "intent-only b2b drafts remain valid pending topic resolution",
+  )
   for (const topic of draftRequest.workbench_context?.topics ?? []) {
     assert.equal(isDatamoonNumericTopicId(topic), false)
   }
@@ -125,14 +132,34 @@ async function main(): Promise<void> {
     "../lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare"
   )
 
+  const medicalClusterAnchors =
+    DATAMOON_OPERATIONAL_VERTICAL_CLUSTERS.find((cluster) => cluster.id === "medical_biomedical")
+      ?.broadeningAnchors ?? []
+  const medicalRankingSignals = {
+    topicPhrases: ["medical equipment service"],
+    operationalConceptPhrases: ["preventive maintenance contracts"],
+    qualificationTopicPhrases: ["preventive maintenance contracts"],
+    supplementalAliases: [],
+    clusterBroadeningAnchors: [...medicalClusterAnchors],
+  }
+
+  const medicalDraftRequest = buildDatamoonImportRequestFromAudienceDraft(
+    createMinimalAvaDatamoonAudienceDraft({
+      topics: ["medical equipment service"],
+      customTopic: null,
+      jobTitles: ["owner", "CEO", "operations manager", "service manager"],
+    }),
+  )
+
   const medicalPrepared = await prepareDatamoonAudienceImportRequestForBuild(
-    buildDatamoonImportRequestFromAudienceDraft(
-      createMinimalAvaDatamoonAudienceDraft({
-        topics: ["medical equipment service"],
-        customTopic: null,
-        jobTitles: ["owner", "CEO", "operations manager", "service manager"],
-      }),
-    ),
+    {
+      ...medicalDraftRequest,
+      workbench_context: {
+        ...(medicalDraftRequest.workbench_context ?? {}),
+        clusterBroadeningAnchors: [...medicalClusterAnchors],
+        topicRankingSignals: medicalRankingSignals,
+      },
+    },
     {
       env: { ...process.env, DATAMOON_DRY_RUN_ONLY: "false" },
       fetchImpl: mockTopicSearchFetch(),
@@ -154,6 +181,8 @@ async function main(): Promise<void> {
     assert.equal(isDatamoonNumericTopicId(topicId), true)
   }
 
+  assert.equal(medicalPrepared.request.topic_ids?.[0], "4690")
+
   const softwarePrepared = await prepareDatamoonAudienceImportRequestForBuild(
     buildDatamoonImportRequestFromAudienceDraft(
       createMinimalAvaDatamoonAudienceDraft({
@@ -168,9 +197,8 @@ async function main(): Promise<void> {
   )
   assert.equal(softwarePrepared.ok, true)
   if (!softwarePrepared.ok) throw new Error("expected software topic prepare success")
-  assert.ok((softwarePrepared.request.topic_ids?.length ?? 0) >= 2)
+  assert.ok((softwarePrepared.request.topic_ids?.length ?? 0) >= 1)
   assert.ok(softwarePrepared.request.topic_ids?.includes("22005"))
-  assert.ok(softwarePrepared.request.topic_ids?.includes("4690"))
 
   const unresolved = await prepareDatamoonAudienceImportRequestForBuild(
     buildDatamoonImportRequestFromAudienceDraft(

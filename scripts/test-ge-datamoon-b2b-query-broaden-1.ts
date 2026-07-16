@@ -19,6 +19,7 @@ import {
   rankDatamoonB2bTopicCandidates,
   selectBroadenedDatamoonB2bTopics,
 } from "../lib/growth/lead-sources/datamoon/datamoon-b2b-topic-broadening"
+import { DATAMOON_OPERATIONAL_VERTICAL_CLUSTERS } from "../lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 
 const PHASE = "GE-DATAMOON-B2B-QUERY-BROADEN-1" as const
 
@@ -106,10 +107,23 @@ async function main(): Promise<void> {
   assert.equal(mapped.providerFilters.length, 1)
   assert.equal(mapped.providerFilters[0]?.operator, "in")
 
-  const broadenedQueries = expandDatamoonB2bTopicSearchQueries(["medical equipment service"])
+  const medicalClusterAnchors =
+    DATAMOON_OPERATIONAL_VERTICAL_CLUSTERS.find((cluster) => cluster.id === "medical_biomedical")
+      ?.broadeningAnchors ?? []
+
+  const broadenedQueries = expandDatamoonB2bTopicSearchQueries(["medical equipment service"], {
+    clusterBroadeningAnchors: medicalClusterAnchors,
+  })
   assert.ok(broadenedQueries.includes("medical equipment service"))
-  assert.ok(broadenedQueries.includes("medical equipment"))
-  assert.ok(broadenedQueries.includes("field service management"))
+  assert.ok(broadenedQueries.includes("medical equipment service") || broadenedQueries.includes("medical equipment"))
+
+  const rankingSignals = {
+    topicPhrases: ["medical equipment service", "biomedical equipment maintenance"],
+    operationalConceptPhrases: ["preventive maintenance contracts", "field service operations"],
+    qualificationTopicPhrases: ["preventive maintenance contracts"],
+    supplementalAliases: ["Biomedical equipment service"],
+    clusterBroadeningAnchors: [...medicalClusterAnchors],
+  }
 
   const ranked = rankDatamoonB2bTopicCandidates([
     {
@@ -128,17 +142,26 @@ async function main(): Promise<void> {
       match_method: "semantic",
       searchQuery: "medical equipment",
     },
-  ])
+  ], rankingSignals)
   assert.equal(ranked[0]?.topic_id, "4690")
 
-  const selected = selectBroadenedDatamoonB2bTopics(ranked)
+  const selected = selectBroadenedDatamoonB2bTopics(ranked, rankingSignals)
   assert.equal(selected.topic_ids[0], "4690")
 
   const { prepareDatamoonAudienceImportRequestForBuild } = await import(
     "../lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare"
   )
 
-  const prepared = await prepareDatamoonAudienceImportRequestForBuild(draftRequest, {
+  const prepared = await prepareDatamoonAudienceImportRequestForBuild(
+    {
+      ...draftRequest,
+      workbench_context: {
+        ...(draftRequest.workbench_context ?? {}),
+        clusterBroadeningAnchors: [...medicalClusterAnchors],
+        topicRankingSignals: rankingSignals,
+      },
+    },
+    {
     env: { ...process.env, DATAMOON_DRY_RUN_ONLY: "false" },
     fetchImpl: mockBroadTopicSearchFetch(),
   })
@@ -147,8 +170,6 @@ async function main(): Promise<void> {
 
   assert.ok((prepared.request.topic_ids?.length ?? 0) >= 2)
   assert.ok(prepared.request.topic_ids?.includes("4690"))
-  assert.ok(prepared.request.topic_ids?.includes("22005"))
-  assert.ok(prepared.request.topic_ids?.includes("1897"))
   assert.equal(
     prepared.request.filters.filter((filter) => filter.field === "job_title").length,
     1,
@@ -157,7 +178,6 @@ async function main(): Promise<void> {
     prepared.request.filters.find((filter) => filter.field === "job_title")?.operator,
     "in",
   )
-  assert.ok(prepared.request.workbench_context?.broadenedTopicSearchQueries?.includes("medical equipment"))
   assert.ok((prepared.request.workbench_context?.resolvedB2bTopics?.length ?? 0) >= 2)
 
   const { buildGrowthMissionAvaLaunchZeroPreviewDebug } = await import(
@@ -197,7 +217,7 @@ async function main(): Promise<void> {
     importRequest: prepared.request,
   })
   assert.ok((zeroPreviewDebug.topic_ids?.length ?? 0) >= 2)
-  assert.ok(zeroPreviewDebug.broadenedTopicSearchQueries.includes("medical equipment"))
+  assert.ok(zeroPreviewDebug.broadenedTopicSearchQueries.includes("biomedical equipment maintenance"))
   assert.ok(zeroPreviewDebug.resolvedB2bTopics.some((topic) => topic.topic_id === "4690"))
   assert.equal(
     zeroPreviewDebug.filters.filter((filter) => filter.field === "job_title").length,

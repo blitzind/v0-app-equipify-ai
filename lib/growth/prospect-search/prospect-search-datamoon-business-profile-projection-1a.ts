@@ -110,6 +110,13 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     topics: operationalTargeting.topicPhrases,
     supplementalTopicSearchQueries: operationalTargeting.industryAliasesUsed,
     clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
+    topicRankingSignals: {
+      topicPhrases: operationalTargeting.topicPhrases,
+      operationalConceptPhrases: operationalTargeting.operationalConcepts,
+      qualificationTopicPhrases: operationalTargeting.qualificationTopics,
+      supplementalAliases: operationalTargeting.industryAliasesUsed,
+      clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
+    },
   }
 
   const fingerprint = hashFingerprint([

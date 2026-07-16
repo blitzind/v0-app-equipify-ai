@@ -10,6 +10,9 @@ import {
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { resolveDatamoonB2bTopicQueries } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolver"
 import {
+  buildDatamoonB2bTopicRankingSignalsFromWorkbenchContext,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-broadening"
+import {
   GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import type { DatamoonFetchImpl } from "@/lib/growth/providers/datamoon/datamoon-http"
@@ -45,10 +48,18 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
     }
   }
 
+  const topicRankingSignals = buildDatamoonB2bTopicRankingSignalsFromWorkbenchContext({
+    topics: input.workbench_context?.topics,
+    supplementalTopicSearchQueries: input.workbench_context?.supplementalTopicSearchQueries,
+    clusterBroadeningAnchors: input.workbench_context?.clusterBroadeningAnchors,
+    topicRankingSignals: input.workbench_context?.topicRankingSignals,
+  })
+
   const resolution = await resolveDatamoonB2bTopicQueries(topicQueries, {
     ...options,
     clusterBroadeningAnchors: input.workbench_context?.clusterBroadeningAnchors,
     multiVerticalProfile: (input.workbench_context?.clusterBroadeningAnchors?.length ?? 0) > 0,
+    topicRankingSignals,
   })
   if (resolution.topic_ids.length === 0) {
     return {
