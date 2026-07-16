@@ -10,10 +10,15 @@ import { buildProspectSearchFiltersFromBusinessProfile } from "../lib/growth/bus
 import type { BusinessProfileDraftContent } from "../lib/growth/business-profile/business-profile-types"
 import { buildLive1bEquipifyCompanyProfileContent } from "../lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
 import {
+  DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP,
   DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION,
+  DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS,
+  DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION,
+  DATAMOON_LIVE_MODULE_REJECTED_DOC_EMPLOYEE_COUNT_BANDS,
   GROWTH_DATAMOON_FIRMOGRAPHIC_FILTER_MAPPING_1A_QA_MARKER,
   buildDatamoonFirmographicFilterStrategyMetadata,
   buildDatamoonFirmographicFiltersFromCanonicalProjection,
+  resolveLiveModuleCompanyEmployeeCountBands,
   translateCompanySizeRangeStringsToDatamoonEmployeeBands,
   translateEquipifyCompanySizeIntentToDatamoonEmployeeBands,
   translateRevenueIntentStringsToDatamoonCompanyRevenue,
@@ -37,6 +42,16 @@ function equipifyProfile(): BusinessProfileDraftContent {
   return buildLive1bEquipifyCompanyProfileContent()
 }
 
+function assertNeverEmitsRejectedBands(bands: readonly string[], label: string) {
+  for (const rejected of DATAMOON_LIVE_MODULE_REJECTED_DOC_EMPLOYEE_COUNT_BANDS) {
+    assert.equal(
+      bands.includes(rejected),
+      false,
+      `${label} must not emit rejected band ${rejected}`,
+    )
+  }
+}
+
 console.log(`[${GROWTH_DATAMOON_FIRMOGRAPHIC_FILTER_MAPPING_1A_QA_MARKER}] firmographic filter integration certification\n`)
 
 const firmographicSource = readSource("lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a.ts")
@@ -48,25 +63,59 @@ assert.doesNotMatch(firmographicSource, /buildAudience|topic_id/)
 assert.doesNotMatch(ssvSource, /datamoon-firmographic-filter-mapping-1a/)
 assert.doesNotMatch(omtSource, /datamoon-firmographic-filter-mapping-1a/)
 assert.doesNotMatch(prospectSearchSource, /datamoon-firmographic-filter-mapping-1a/)
-console.log("  ✓ Business Profile / SSV / OMT / Prospect Search remain provider-neutral")
+console.log("  ✓ Scenario F — Business Profile / SSV / OMT / Prospect Search remain provider-neutral")
+
+assert.deepEqual(DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS, [
+  "1 to 10",
+  "501 to 1000",
+  "1001 to 5000",
+  "5001 to 10000",
+  "10000+",
+])
+assert.match(firmographicSource, /11 to 50.*rejected|rejects them/)
+console.log("  ✓ live module employee-count contract replaces documented middle bands")
 
 assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("1-10"), ["1 to 10"])
-assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("11-50"), ["11 to 50"])
-assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("51-200"), ["51 to 200"])
-assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("201-500"), ["201 to 500"])
+assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("11-50"), [])
+assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("51-200"), [])
+assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("201-500"), [])
+assert.ok(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("500+").includes("501 to 1000"))
 assert.ok(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("500+").includes("10000+"))
-assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("smb"), ["1 to 10", "11 to 50"])
-console.log("  ✓ employee count intent translation")
+assert.deepEqual(translateEquipifyCompanySizeIntentToDatamoonEmployeeBands("smb"), [])
+console.log("  ✓ workbench size intent uses live module contract only")
 
-assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["10-50 employees"]), ["11 to 50"])
-assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["51-200 employees"]), ["51 to 200"])
-assert.ok(
-  translateCompanySizeRangeStringsToDatamoonEmployeeBands(["201-1000 employees"]).includes("201 to 500"),
-)
-assert.ok(
-  translateCompanySizeRangeStringsToDatamoonEmployeeBands(["201-1000 employees"]).includes("501 to 1000"),
-)
-console.log("  ✓ Business Profile companySizeRanges → DataMoon employee bands")
+const scenarioA = resolveLiveModuleCompanyEmployeeCountBands({
+  companySizeRanges: ["10-50 employees", "51-200 employees", "201-1000 employees"],
+})
+assert.deepEqual(scenarioA.bands, [])
+assert.equal(scenarioA.omissionReason, DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP)
+assertNeverEmitsRejectedBands(scenarioA.bands, "Scenario A")
+console.log("  ✓ Scenario A — Equipify ranges omit employee-count filter")
+
+assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["1-10 employees"]), ["1 to 10"])
+console.log("  ✓ Scenario B — 1–10 maps to 1 to 10")
+
+assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["501-1000 employees"]), [
+  "501 to 1000",
+])
+console.log("  ✓ Scenario C — explicit 501–1000 maps to 501 to 1000 only")
+
+const scenarioD = translateCompanySizeRangeStringsToDatamoonEmployeeBands(["501-5000 employees"])
+assert.deepEqual(scenarioD, ["501 to 1000", "1001 to 5000"])
+assertNeverEmitsRejectedBands(scenarioD, "Scenario D")
+console.log("  ✓ Scenario D — multiple proven upper bands when range is fully coverable")
+
+for (const rejected of DATAMOON_LIVE_MODULE_REJECTED_DOC_EMPLOYEE_COUNT_BANDS) {
+  assert.equal(
+    DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS.includes(rejected as never),
+    false,
+    `live contract must not include ${rejected}`,
+  )
+}
+assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["10-50 employees"]), [])
+assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["51-200 employees"]), [])
+assert.deepEqual(translateCompanySizeRangeStringsToDatamoonEmployeeBands(["201-500 employees"]), [])
+console.log("  ✓ Scenario E — rejected middle ranges are never emitted")
 
 assert.deepEqual(translateRevenueIntentStringsToDatamoonCompanyRevenue(["11-50 employees"]), [])
 assert.deepEqual(translateRevenueIntentStringsToDatamoonCompanyRevenue(["1-10 million revenue"]), [
@@ -105,11 +154,23 @@ const firmographicFilters = buildDatamoonFirmographicFiltersFromCanonicalProject
 assert.equal(firmographicStrategy.version, DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION)
 assert.ok(firmographicStrategy.primaryIndustryValues.length > 0)
 assert.ok(firmographicStrategy.primaryIndustryValues.length <= 5)
-assert.ok(firmographicStrategy.companyEmployeeCountBands.length > 0)
+assert.deepEqual(firmographicStrategy.companyEmployeeCountBands, [])
+assert.equal(firmographicStrategy.employeeCountFilterApplied, false)
+assert.equal(
+  firmographicStrategy.employeeCountFilterOmissionReason,
+  DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP,
+)
+assert.equal(
+  firmographicStrategy.liveProviderEmployeeCountContractVersion,
+  DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION,
+)
 assert.equal(firmographicStrategy.companyDomainValues.length, 0)
 assert.ok(firmographicFilters.some((filter) => filter.field === "primary_industry"))
-assert.ok(firmographicFilters.some((filter) => filter.field === "company_employee_count"))
-console.log("  ✓ deterministic industry subset + employee filters from canonical projection")
+assert.equal(
+  firmographicFilters.some((filter) => filter.field === "company_employee_count"),
+  false,
+)
+console.log("  ✓ Equipify firmographic metadata + filters omit employee count with reason")
 
 const requestProjection = buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile({
   profile,
@@ -121,7 +182,10 @@ const requestProjection = buildDatamoonAutonomousDiscoveryRequestFromBusinessPro
 })
 
 assert.ok(requestProjection.request.filters.some((filter) => filter.field === "primary_industry"))
-assert.ok(requestProjection.request.filters.some((filter) => filter.field === "company_employee_count"))
+assert.equal(
+  requestProjection.request.filters.some((filter) => filter.field === "company_employee_count"),
+  false,
+)
 assert.ok(requestProjection.request.filters.some((filter) => filter.field === "contact_country"))
 assert.ok(requestProjection.request.filters.some((filter) => filter.field === "job_title"))
 assert.equal(requestProjection.request.workbench_context?.intentLevels?.length, 2)
@@ -130,13 +194,21 @@ assert.equal(
   DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION,
 )
 assert.equal(
+  requestProjection.targetingSummary.firmographicStrategy?.employeeCountFilterApplied,
+  false,
+)
+assert.equal(
+  requestProjection.targetingSummary.firmographicStrategy?.employeeCountFilterOmissionReason,
+  DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP,
+)
+assert.equal(
   requestProjection.targetingSummary.targetingStrategy?.version,
   "1a-v1",
 )
 
 const validation = validateDatamoonAudienceImportRequest(requestProjection.request)
 assert.equal(validation.ok, true, JSON.stringify(validation))
-console.log("  ✓ autonomous build request includes firmographic filters and passes validation")
+console.log("  ✓ autonomous build request passes validation without rejected employee bands")
 
 const prospectFilters = buildProspectSearchFiltersFromBusinessProfile(profile)
 assert.equal(prospectFilters.industry, null)

@@ -10,20 +10,32 @@ export const GROWTH_DATAMOON_FIRMOGRAPHIC_FILTER_MAPPING_1A_QA_MARKER =
 
 export const DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION = "1a-v1" as const
 
-/** Documented DataMoon `company_employee_count` multiselect values (docs.datamoon.com/api). */
-export const DATAMOON_DOCUMENTED_COMPANY_EMPLOYEE_COUNT_BANDS = [
+/**
+ * Proven live DataMoon **module** `company_employee_count` values (Production server probe 2026-07-15).
+ * Provider docs also list `11 to 50`, `51 to 200`, and `201 to 500`, but the live module endpoint rejects them.
+ */
+export const DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS = [
   "1 to 10",
-  "11 to 50",
-  "51 to 200",
-  "201 to 500",
   "501 to 1000",
   "1001 to 5000",
   "5001 to 10000",
   "10000+",
 ] as const
 
-export type DatamoonDocumentedCompanyEmployeeCountBand =
-  (typeof DATAMOON_DOCUMENTED_COMPANY_EMPLOYEE_COUNT_BANDS)[number]
+export type DatamoonLiveModuleCompanyEmployeeCountBand =
+  (typeof DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS)[number]
+
+export const DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION = "module-2026-07-15" as const
+
+export const DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP =
+  "live_module_enum_cannot_represent_canonical_ranges_without_material_precision_loss" as const
+
+/** Certification guard — never emit these live-module-rejected documented bands. */
+export const DATAMOON_LIVE_MODULE_REJECTED_DOC_EMPLOYEE_COUNT_BANDS = [
+  "11 to 50",
+  "51 to 200",
+  "201 to 500",
+] as const
 
 /** Documented DataMoon `company_revenue` multiselect values (docs.datamoon.com/api). */
 export const DATAMOON_DOCUMENTED_COMPANY_REVENUE_BANDS = [
@@ -55,6 +67,9 @@ export type DatamoonFirmographicFilterStrategyMetadata = {
   companyRevenueBands: string[]
   companyDomainValues: string[]
   sourceCompanySizeRanges: string[]
+  employeeCountFilterApplied: boolean
+  employeeCountFilterOmissionReason: string | null
+  liveProviderEmployeeCountContractVersion: typeof DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION
 }
 
 const MAX_PRIMARY_INDUSTRY_FILTER_VALUES = 5 as const
@@ -77,29 +92,8 @@ function uniqueStrings(values: readonly string[]): string[] {
   return output
 }
 
-/** Equipify workbench intent → documented DataMoon employee bands. */
-export function translateEquipifyCompanySizeIntentToDatamoonEmployeeBands(
-  companySize: AvaDatamoonCompanySize,
-): DatamoonDocumentedCompanyEmployeeCountBand[] {
-  switch (companySize) {
-    case "1-10":
-      return ["1 to 10"]
-    case "11-50":
-      return ["11 to 50"]
-    case "51-200":
-      return ["51 to 200"]
-    case "201-500":
-      return ["201 to 500"]
-    case "500+":
-      return ["501 to 1000", "1001 to 5000", "5001 to 10000", "10000+"]
-    case "smb":
-    default:
-      return ["1 to 10", "11 to 50"]
-  }
-}
-
 function extractNumericRange(value: string): { min: number; max: number } | null {
-  const normalized = value.toLowerCase().replace(/,/g, "")
+  const normalized = value.toLowerCase().replace(/,/g, "").replace(/\u2013/g, "-")
   const between = normalized.match(/(\d+)\s*(?:-|to)\s*(\d+)/)
   if (between) {
     const min = Number(between[1])
@@ -116,19 +110,13 @@ function extractNumericRange(value: string): { min: number; max: number } | null
   return null
 }
 
-function datamoonEmployeeBandRange(band: DatamoonDocumentedCompanyEmployeeCountBand): {
+function datamoonLiveEmployeeBandRange(band: DatamoonLiveModuleCompanyEmployeeCountBand): {
   min: number
   max: number
 } {
   switch (band) {
     case "1 to 10":
       return { min: 1, max: 10 }
-    case "11 to 50":
-      return { min: 11, max: 50 }
-    case "51 to 200":
-      return { min: 51, max: 200 }
-    case "201 to 500":
-      return { min: 201, max: 500 }
     case "501 to 1000":
       return { min: 501, max: 1000 }
     case "1001 to 5000":
@@ -140,52 +128,156 @@ function datamoonEmployeeBandRange(band: DatamoonDocumentedCompanyEmployeeCountB
   }
 }
 
-function bandIncludedInEmployeeRange(
-  parsed: { min: number; max: number },
-  band: DatamoonDocumentedCompanyEmployeeCountBand,
-): boolean {
-  const bandRange = datamoonEmployeeBandRange(band)
-  const overlapMin = Math.max(parsed.min, bandRange.min)
-  const overlapMax = Math.min(parsed.max, bandRange.max)
-  if (overlapMax < overlapMin) return false
-  if (parsed.min >= 10 && bandRange.max <= 10) return false
-  return true
+function mergeAdjacentEmployeeIntervals(
+  intervals: readonly { min: number; max: number }[],
+): { min: number; max: number }[] {
+  if (intervals.length === 0) return []
+  const sorted = [...intervals].sort((a, b) => a.min - b.min)
+  const merged: { min: number; max: number }[] = [{ ...sorted[0]! }]
+  for (let i = 1; i < sorted.length; i += 1) {
+    const current = sorted[i]!
+    const last = merged[merged.length - 1]!
+    if (current.min <= last.max + 1) {
+      last.max = Math.max(last.max, current.max)
+      continue
+    }
+    merged.push({ ...current })
+  }
+  return merged
 }
 
-/** Map canonical Business Profile company-size range strings → documented DataMoon bands. */
-export function translateCompanySizeRangeStringsToDatamoonEmployeeBands(
-  ranges: readonly string[],
-): DatamoonDocumentedCompanyEmployeeCountBand[] {
-  const selected = new Set<DatamoonDocumentedCompanyEmployeeCountBand>()
+/** Greedy cover using only live-module bands fully contained in the canonical interval. */
+function resolveLiveModuleBandsForCanonicalInterval(
+  canonical: { min: number; max: number },
+): DatamoonLiveModuleCompanyEmployeeCountBand[] | null {
+  const selected: DatamoonLiveModuleCompanyEmployeeCountBand[] = []
+  let cursor = canonical.min
+
+  while (cursor <= canonical.max) {
+    const candidates = DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS.filter((band) => {
+      const range = datamoonLiveEmployeeBandRange(band)
+      return (
+        range.min <= cursor &&
+        range.max >= cursor &&
+        range.min >= canonical.min &&
+        range.max <= canonical.max
+      )
+    })
+
+    if (candidates.length === 0) return null
+
+    const pick = candidates.reduce((best, band) => {
+      const bestMax = datamoonLiveEmployeeBandRange(best).max
+      const bandMax = datamoonLiveEmployeeBandRange(band).max
+      return bandMax < bestMax ? band : best
+    })
+
+    selected.push(pick)
+    cursor = datamoonLiveEmployeeBandRange(pick).max + 1
+  }
+
+  return DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS.filter((band) => selected.includes(band))
+}
+
+function workbenchCompanySizeToCanonicalRange(
+  companySize: AvaDatamoonCompanySize,
+): { min: number; max: number } | null {
+  switch (companySize) {
+    case "1-10":
+      return { min: 1, max: 10 }
+    case "11-50":
+      return { min: 11, max: 50 }
+    case "51-200":
+      return { min: 51, max: 200 }
+    case "201-500":
+      return { min: 201, max: 500 }
+    case "500+":
+      return { min: 501, max: Number.MAX_SAFE_INTEGER }
+    case "smb":
+      return { min: 1, max: 50 }
+    default:
+      return null
+  }
+}
+
+function parseEmployeeSizeIntervalsFromRangeStrings(ranges: readonly string[]): { min: number; max: number }[] {
+  const intervals: { min: number; max: number }[] = []
 
   for (const entry of ranges) {
     const normalized = entry.trim().toLowerCase()
     if (!normalized || /million|billion|revenue|\$/.test(normalized)) continue
 
     if (/enterprise|500\+|500 plus/.test(normalized)) {
-      for (const band of ["501 to 1000", "1001 to 5000", "5001 to 10000", "10000+"] as const) {
-        selected.add(band)
-      }
+      intervals.push({ min: 501, max: Number.MAX_SAFE_INTEGER })
       continue
     }
 
     const numericRange = extractNumericRange(entry)
     if (numericRange) {
-      for (const band of DATAMOON_DOCUMENTED_COMPANY_EMPLOYEE_COUNT_BANDS) {
-        if (bandIncludedInEmployeeRange(numericRange, band)) {
-          selected.add(band)
-        }
-      }
+      intervals.push(numericRange)
       continue
     }
 
     if (/smb|small|mid/.test(normalized)) {
-      selected.add("1 to 10")
-      selected.add("11 to 50")
+      intervals.push({ min: 1, max: 50 })
     }
   }
 
-  return DATAMOON_DOCUMENTED_COMPANY_EMPLOYEE_COUNT_BANDS.filter((band) => selected.has(band))
+  return intervals
+}
+
+export function resolveLiveModuleCompanyEmployeeCountBands(input: {
+  companySizeRanges: readonly string[]
+  workbenchCompanySize?: AvaDatamoonCompanySize
+}): {
+  bands: DatamoonLiveModuleCompanyEmployeeCountBand[]
+  omissionReason: string | null
+} {
+  let intervals = parseEmployeeSizeIntervalsFromRangeStrings(input.companySizeRanges)
+
+  if (intervals.length === 0 && input.workbenchCompanySize) {
+    const fallback = workbenchCompanySizeToCanonicalRange(input.workbenchCompanySize)
+    if (fallback) intervals = [fallback]
+  }
+
+  if (intervals.length === 0) {
+    return { bands: [], omissionReason: null }
+  }
+
+  const merged = mergeAdjacentEmployeeIntervals(intervals)
+  const selected = new Set<DatamoonLiveModuleCompanyEmployeeCountBand>()
+
+  for (const interval of merged) {
+    const covered = resolveLiveModuleBandsForCanonicalInterval(interval)
+    if (!covered) {
+      return {
+        bands: [],
+        omissionReason: DATAMOON_EMPLOYEE_COUNT_FILTER_OMISSION_REASON_LIVE_MODULE_GAP,
+      }
+    }
+    for (const band of covered) selected.add(band)
+  }
+
+  return {
+    bands: DATAMOON_LIVE_MODULE_COMPANY_EMPLOYEE_COUNT_BANDS.filter((band) => selected.has(band)),
+    omissionReason: null,
+  }
+}
+
+/** Equipify workbench intent → live module employee bands when fully representable. */
+export function translateEquipifyCompanySizeIntentToDatamoonEmployeeBands(
+  companySize: AvaDatamoonCompanySize,
+): DatamoonLiveModuleCompanyEmployeeCountBand[] {
+  const canonical = workbenchCompanySizeToCanonicalRange(companySize)
+  if (!canonical) return []
+  return resolveLiveModuleBandsForCanonicalInterval(canonical) ?? []
+}
+
+/** Map canonical Business Profile company-size range strings → live module employee bands. */
+export function translateCompanySizeRangeStringsToDatamoonEmployeeBands(
+  ranges: readonly string[],
+): DatamoonLiveModuleCompanyEmployeeCountBand[] {
+  return resolveLiveModuleCompanyEmployeeCountBands({ companySizeRanges: ranges }).bands
 }
 
 function normalizeRevenuePhrase(value: string): DatamoonDocumentedCompanyRevenueBand | null {
@@ -297,11 +389,10 @@ export function buildDatamoonFirmographicFilterStrategyMetadata(input: {
   companySizeRanges: readonly string[]
   targetCompanyDomains?: readonly string[]
 }): DatamoonFirmographicFilterStrategyMetadata {
-  const employeeFromRanges = translateCompanySizeRangeStringsToDatamoonEmployeeBands(input.companySizeRanges)
-  const employeeBands =
-    employeeFromRanges.length > 0
-      ? employeeFromRanges
-      : translateEquipifyCompanySizeIntentToDatamoonEmployeeBands(input.projection.companySize)
+  const employeeResolution = resolveLiveModuleCompanyEmployeeCountBands({
+    companySizeRanges: input.companySizeRanges,
+    workbenchCompanySize: input.projection.companySize,
+  })
 
   return {
     version: DATAMOON_FIRMOGRAPHIC_FILTER_STRATEGY_VERSION,
@@ -309,10 +400,13 @@ export function buildDatamoonFirmographicFilterStrategyMetadata(input: {
       projection: input.projection,
       operationalTargeting: input.operationalTargeting,
     }),
-    companyEmployeeCountBands: employeeBands,
+    companyEmployeeCountBands: employeeResolution.bands,
     companyRevenueBands: translateRevenueIntentStringsToDatamoonCompanyRevenue(input.companySizeRanges),
     companyDomainValues: uniqueStrings(input.targetCompanyDomains ?? []).slice(0, 5),
     sourceCompanySizeRanges: uniqueStrings(input.companySizeRanges),
+    employeeCountFilterApplied: employeeResolution.bands.length > 0,
+    employeeCountFilterOmissionReason: employeeResolution.omissionReason,
+    liveProviderEmployeeCountContractVersion: DATAMOON_LIVE_MODULE_EMPLOYEE_COUNT_CONTRACT_VERSION,
   }
 }
 
@@ -333,7 +427,7 @@ export function buildDatamoonFirmographicFiltersFromCanonicalProjection(input: {
     })
   }
 
-  if (strategy.companyEmployeeCountBands.length > 0) {
+  if (strategy.employeeCountFilterApplied && strategy.companyEmployeeCountBands.length > 0) {
     filters.push({
       field: "company_employee_count",
       operator: "in",
