@@ -307,7 +307,8 @@ export async function resolveGrowthCanonicalDecisionForLead(
   }
 
   const packageState = mapPackageState(pkg)
-  const approvalPending = pkg?.pendingHumanApproval === true
+  const approvalPending =
+    pkg?.pendingHumanApproval === true && pkg?.packageApprovalDecision !== "approved"
 
   const postCall = storedClosure
     ? mapStoredClosureToDecisionPostCall(storedClosure.closure)

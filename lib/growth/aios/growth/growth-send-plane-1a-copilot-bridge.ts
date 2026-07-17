@@ -22,7 +22,15 @@ import { GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER } from "@/lib/growth/aios/growth/gr
 import type { RunGrowthAiCopilotGenerationInput } from "@/lib/growth/run-ai-copilot-generation"
 import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { evaluateCanonicalCopilotMaterializationConsistency } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-enforcement"
-import { GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
+import {
+  GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
+  type CanonicalCopilotMaterializationConsistency,
+} from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
+import { findAutonomousOutreachPreparationRunByPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import { resolveTransportAssetFromPackage } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
+
+export const GROWTH_AIOS_SUPERVISED_OPERATOR_MATERIALIZATION_1H_QA_MARKER =
+  "ge-aios-supervised-operator-materialization-1h-v1" as const
 
 export async function tryMaterializeCanonicalCopilotGeneration(input: {
   admin: SupabaseClient
@@ -44,28 +52,68 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
   const organizationId = input.request.organizationId ?? getGrowthEngineAiOrgId()
   if (!organizationId) return null
 
-  const pkg = await resolveCanonicalOutreachPackageForLead(input.admin, {
+  let pkg = await resolveCanonicalOutreachPackageForLead(input.admin, {
     organizationId,
     leadId: input.request.leadId,
   })
+
+  if (
+    input.request.supervisedExecutionRequestFulfillment &&
+    input.request.executionRequestPackageId
+  ) {
+    const run = await findAutonomousOutreachPreparationRunByPackageId(
+      input.admin,
+      organizationId,
+      input.request.executionRequestPackageId,
+    )
+    if (run?.approvalPackage) {
+      pkg = run.approvalPackage
+    }
+  }
+
   const brief = pkg?.salesStrategyBrief
   if (!brief) return null
 
-  const resolution = await resolveGrowthCanonicalDecisionForLeadCached(input.admin, {
-    organizationId,
-    leadId: input.request.leadId,
-    packageSnapshot: pkg,
-    cacheScope: `copilot-materialization:${input.request.generationType}`,
-  }).catch(() => null)
-  const consistency = evaluateCanonicalCopilotMaterializationConsistency(resolution, {
-    channel,
-    generationType: input.request.generationType,
-  })
-  if (consistency.blocked) {
-    return {
-      ok: false,
-      code: "canonical_decision_materialization_blocked",
-      message: consistency.reason,
+  const companyName = pkg.companyName ?? brief.companyName
+  const frozenTransportAsset = pkg
+    ? resolveTransportAssetFromPackage(pkg, channel, companyName)
+    : null
+
+  const supervisedApprovedOperatorFastPath =
+    input.request.supervisedExecutionRequestFulfillment === true &&
+    pkg?.packageApprovalDecision === "approved" &&
+    frozenTransportAsset != null &&
+    frozenTransportAsset.source === "approved_operator" &&
+    frozenTransportAsset.channel === channel
+
+  let consistency: CanonicalCopilotMaterializationConsistency
+
+  if (supervisedApprovedOperatorFastPath) {
+    consistency = {
+      qaMarker: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
+      allowedForReview: true,
+      blocked: false,
+      refreshRequired: false,
+      reason: "Supervised execution request — operator-approved frozen asset.",
+      outcome: "allowed",
+    }
+  } else {
+    const resolution = await resolveGrowthCanonicalDecisionForLeadCached(input.admin, {
+      organizationId,
+      leadId: input.request.leadId,
+      packageSnapshot: pkg,
+      cacheScope: `copilot-materialization:${input.request.generationType}`,
+    }).catch(() => null)
+    consistency = evaluateCanonicalCopilotMaterializationConsistency(resolution, {
+      channel,
+      generationType: input.request.generationType,
+    })
+    if (consistency.blocked) {
+      return {
+        ok: false,
+        code: "canonical_decision_materialization_blocked",
+        message: consistency.reason,
+      }
     }
   }
 
@@ -91,6 +139,22 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
     primary: "canonical_send_plane",
   }
 
+  const playbookAttribution = {
+    sendPlane: GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
+    packageId: pkg.packageId,
+    channel,
+    canonicalDecisionEnforcement: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
+    materializationOutcome: consistency.outcome,
+    refreshRequired: consistency.refreshRequired,
+    ...(supervisedApprovedOperatorFastPath
+      ? {
+          supervisedOperatorMaterialization: GROWTH_AIOS_SUPERVISED_OPERATOR_MATERIALIZATION_1H_QA_MARKER,
+          materializationSource: "approved_operator" as const,
+          frozenTransportAssetVersionStatus: frozenTransportAsset!.versionStatus,
+        }
+      : {}),
+  }
+
   if (!input.storeGenerations) {
     return {
       ok: true,
@@ -108,14 +172,7 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
         sourceReplyId: input.request.sourceReplyId ?? null,
         inputHash: `send-plane:${pkg.packageId}:${input.request.generationType}`,
         playbookInfluenceScore: 0,
-        playbookAttribution: {
-          sendPlane: GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
-          packageId: pkg.packageId,
-          channel,
-          canonicalDecisionEnforcement: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
-          materializationOutcome: consistency.outcome,
-          refreshRequired: consistency.refreshRequired,
-        },
+        playbookAttribution,
         approvedAt: null,
         approvedBy: null,
         sentAt: null,
@@ -137,14 +194,7 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
     sourceReplyId: input.request.sourceReplyId ?? null,
     inputHash: `send-plane:${pkg.packageId}:${input.request.generationType}`,
     playbookInfluenceScore: 0,
-    playbookAttribution: {
-      sendPlane: GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
-      packageId: pkg.packageId,
-      channel,
-      canonicalDecisionEnforcement: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
-      materializationOutcome: consistency.outcome,
-      refreshRequired: consistency.refreshRequired,
-    },
+    playbookAttribution,
     createdBy: input.actingUserId,
   })
 

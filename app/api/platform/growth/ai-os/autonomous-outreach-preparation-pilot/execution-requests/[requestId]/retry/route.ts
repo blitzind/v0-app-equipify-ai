@@ -6,6 +6,7 @@ import {
 } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-service"
 import { GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-types"
 import { GE_AIOS_SUPERVISED_SEQUENCE_HANDOFF_1F_QA_MARKER } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-1f"
+import { SUPERVISED_ENROLLMENT_REUSE_CONFLICT_PREFIX } from "@/lib/growth/mission-center/growth-ava-outreach-enrollment-reuse-1i-types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -22,7 +23,8 @@ function retryErrorStatus(error: string): number {
   if (
     error === "execution_request_already_fulfilled" ||
     error === "execution_request_not_retryable" ||
-    error === "outreach_package_not_approved"
+    error === "outreach_package_not_approved" ||
+    error.startsWith(SUPERVISED_ENROLLMENT_REUSE_CONFLICT_PREFIX)
   ) {
     return 409
   }

@@ -100,6 +100,8 @@ export async function queueSequenceStepTransportJob(
     actingUserId: string
     actingUserEmail: string
     dryRun: boolean
+    supervisedExecutionRequestFulfillment?: boolean
+    executionRequestPackageId?: string | null
   },
 ): Promise<QueueSequenceStepTransportJobResult> {
   const idempotencyKey = buildSequenceSchedulerIdempotencyKey(input.enrollmentId, input.step.id)
@@ -433,6 +435,8 @@ export async function queueSequenceStepTransportJob(
         sequencePatternStepId: input.step.sequencePatternStepId,
         sequencePatternId: enrollment?.sequencePatternId ?? null,
         organizationId: getGrowthEngineAiOrgId(),
+        supervisedExecutionRequestFulfillment: input.supervisedExecutionRequestFulfillment,
+        executionRequestPackageId: input.executionRequestPackageId ?? null,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

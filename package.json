@@ -743,6 +743,7 @@
     "test:ge-ava-autonomy-completion-run-1": "tsx scripts/test-ge-ava-autonomy-completion-run-1.ts",
     "test:ge-ava-autonomy-execution-request-1": "tsx scripts/test-ge-ava-autonomy-execution-request-1.ts",
     "test:ge-aios-supervised-sequence-handoff-1f": "tsx scripts/test-ge-aios-supervised-sequence-handoff-1f.ts",
+    "test:ge-aios-supervised-enrollment-reuse-1i": "tsx scripts/test-ge-aios-supervised-enrollment-reuse-1i.ts",
     "test:ge-ava-operator-workspace-1": "tsx scripts/test-ge-ava-operator-workspace-1.ts",
     "test:ge-ava-persistence-1": "tsx scripts/test-ge-ava-persistence-1.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",

@@ -80,6 +80,9 @@ export type RunGrowthAiCopilotGenerationInput = {
   sequencePatternStepId?: string | null
   sequencePatternId?: string | null
   organizationId?: string | null
+  /** Supervised Ava execution-request fulfillment — reuse frozen operator-approved assets. */
+  supervisedExecutionRequestFulfillment?: boolean
+  executionRequestPackageId?: string | null
 }
 
 export type RunGrowthAiCopilotGenerationResult =

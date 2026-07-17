@@ -68,6 +68,7 @@ export async function ensureApprovedPackageSequenceHandoffForLead(
     recommendedSequence: string | null | undefined
     recommendedChannel: string | null | undefined
     executionRequestId?: string | null
+    boundSequenceEnrollmentId?: string | null
   },
 ): Promise<ApprovedPackageSequenceHandoffResult> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
@@ -150,6 +151,7 @@ export async function ensureApprovedPackageSequenceHandoffForLead(
   const refreshedLead = (await fetchGrowthLeadById(admin, input.leadId)) ?? lead
   const preflight = await runSequenceEnrollmentPreflight(admin, refreshedLead, {
     patternId,
+    excludeEnrollmentId: input.boundSequenceEnrollmentId ?? null,
   })
 
   if (!preflight.allowed) {

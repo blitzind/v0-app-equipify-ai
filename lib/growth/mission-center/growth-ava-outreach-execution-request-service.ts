@@ -412,6 +412,7 @@ export async function retryAvaOutreachExecutionRequestFulfillment(
     recommendedSequence: pkg.recommendedSequence ?? existing.recommendedCadence,
     recommendedChannel: pkg.recommendedChannel,
     executionRequestId: existing.requestId,
+    boundSequenceEnrollmentId: existing.sequenceEnrollmentId,
   })
 
   const priorStatus = existing.executionStatus
