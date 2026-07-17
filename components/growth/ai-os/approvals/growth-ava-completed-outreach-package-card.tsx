@@ -17,6 +17,7 @@ import type { GrowthAvaOutreachExecutionRequest } from "@/lib/growth/mission-cen
 import {
   buildAvaOperatorPackageActionApiPath,
   buildAvaOperatorPackageDraftsApiPath,
+  buildAvaOperatorExecutionRequestRetryApiPath,
   GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS,
 } from "@/lib/growth/mission-center/growth-ava-operator-workspace-contract"
 import { GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
@@ -29,7 +30,9 @@ import {
   type GrowthAvaCompletedOutreachPackageCard,
 } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { AvaOutreachPackageReadiness } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-1f"
 import { GrowthAvaMemoryReviewSection } from "@/components/growth/ai-os/approvals/growth-ava-memory-review-section"
+import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER,
@@ -115,6 +118,9 @@ export function GrowthAvaCompletedOutreachPackageCard({
   const [executionRequest, setExecutionRequest] = useState<GrowthAvaOutreachExecutionRequest | null>(
     null,
   )
+  const [executionReadiness, setExecutionReadiness] = useState<AvaOutreachPackageReadiness | null>(
+    null,
+  )
   const [strategyEdit, setStrategyEdit] = useState("")
   const [draftEdits, setDraftEdits] = useState<Record<string, string>>({})
 
@@ -163,8 +169,16 @@ export function GrowthAvaCompletedOutreachPackageCard({
         const body = (await response.json()) as {
           ok?: boolean
           packet?: Approvals2AOperatorReviewPacket
+          executionReadiness?: AvaOutreachPackageReadiness
+          executionRequest?: GrowthAvaOutreachExecutionRequest | null
         }
         if (!cancelled && body.ok && body.packet) setPacket(body.packet)
+        if (!cancelled && body.ok && body.executionReadiness) {
+          setExecutionReadiness(body.executionReadiness)
+        }
+        if (!cancelled && body.ok && body.executionRequest) {
+          setExecutionRequest(body.executionRequest)
+        }
       } catch {
         // keep fallback packet
       }
@@ -352,7 +366,42 @@ export function GrowthAvaCompletedOutreachPackageCard({
     [card.company, card.leadId, card.packageId, onDecided, view?.company.name],
   )
 
-  const approved = Boolean(executionRequest)
+  const retryFulfillment = useCallback(async () => {
+    if (!card.leadId || !executionRequest?.requestId) return
+    setBusy("approve")
+    setError(null)
+    try {
+      const response = await fetch(
+        buildAvaOperatorExecutionRequestRetryApiPath(executionRequest.requestId),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId: card.leadId }),
+        },
+      )
+      const payload = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        message?: string
+        executionRequest?: GrowthAvaOutreachExecutionRequest
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? payload.message ?? "Retry failed.")
+      }
+      setExecutionRequest(payload.executionRequest ?? null)
+      onDecided()
+    } catch (retryError) {
+      setError(retryError instanceof Error ? retryError.message : "Retry failed.")
+    } finally {
+      setBusy(null)
+    }
+  }, [card.leadId, executionRequest?.requestId, onDecided])
+
+  const approved = Boolean(
+    executionRequest || packageBody?.packageApprovalDecision === "approved",
+  )
+  const authorizeBlocked =
+    executionReadiness != null && !executionReadiness.executionReady && !approved
 
   return (
     <li
@@ -788,19 +837,59 @@ export function GrowthAvaCompletedOutreachPackageCard({
         remain.
       </p>
 
+      {executionReadiness ? (
+        <div className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
+          <p className="font-medium text-foreground">
+            {executionReadiness.executionReady ? "Execution-ready" : "Review-ready only"}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {executionReadiness.executionReady
+              ? executionReadiness.confidenceSource === "lead_sequence_intelligence"
+                ? "Canonical lead sequence recommendation is ready for enrollment."
+                : `Approved package cadence (${executionReadiness.recommendedCadence ?? card.recommendedSequence}) maps to sequence pattern ${executionReadiness.resolvedPatternKey ?? "catalog"}.`
+              : (executionReadiness.blockReason ??
+                "Sequence enrollment is not ready — Authorize would fail fulfillment preflight.")}
+          </p>
+        </div>
+      ) : null}
+
       {approved ? (
         <div className="mt-4 space-y-3 rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
             <Check className="size-4" aria-hidden />
             <p className="text-sm font-semibold">Package authorized</p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Execution request created. Sequence transport still needs your approval before anything
-            sends.
-          </p>
-          <Button asChild size="sm">
-            <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review sequence gate</Link>
-          </Button>
+          {executionRequest?.executionStatus === "failed" ? (
+            <div className="space-y-2 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+              <p className="font-medium text-amber-900 dark:text-amber-100">
+                Fulfillment failed: {executionRequest.fulfillmentError ?? "unknown_error"}
+              </p>
+              <p className="text-muted-foreground">
+                Operator approval and frozen assets are preserved. Retry fulfillment after sequence
+                readiness is repaired — no re-approval required.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy !== null || !executionRequest.requestId}
+                onClick={() => void retryFulfillment()}
+              >
+                {busy === "approve" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
+                Retry fulfillment
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Execution request created. Sequence transport still needs your approval before anything
+                sends.
+              </p>
+              <Button asChild size="sm">
+                <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review sequence gate</Link>
+              </Button>
+            </>
+          )}
           <ol className="space-y-1 border-t border-emerald-200/60 pt-2 text-xs text-muted-foreground dark:border-emerald-900/40">
             {GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS.map((step) => (
               <li key={step} className="flex items-center gap-2">
@@ -815,12 +904,17 @@ export function GrowthAvaCompletedOutreachPackageCard({
           <Button
             type="button"
             size="sm"
-            disabled={busy !== null || !card.leadId}
+            disabled={busy !== null || !card.leadId || authorizeBlocked}
             onClick={() => void submit("approve")}
           >
             {busy === "approve" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
             Authorize
           </Button>
+          {authorizeBlocked ? (
+            <p className="w-full text-xs text-amber-700 dark:text-amber-300">
+              Authorize is blocked until sequence enrollment readiness is satisfied.
+            </p>
+          ) : null}
           <Button
             type="button"
             size="sm"

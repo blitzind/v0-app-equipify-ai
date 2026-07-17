@@ -62,13 +62,16 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
     request: GrowthAvaOutreachExecutionRequest
     actingUserId: string
     actingUserEmail: string
+    sequencePatternId?: string | null
   },
 ): Promise<GrowthAvaOutreachExecutionRequest> {
   const channel = normalizeRecommendedChannel(input.request.recommendedChannel)
+  const sequencePatternId = input.sequencePatternId ?? input.request.sequencePatternId ?? null
 
   if (MANUAL_CHANNELS.has(channel)) {
     return {
       ...input.request,
+      sequencePatternId,
       executionStatus: "awaiting_manual_channel",
       fulfillmentError: null,
       fulfilledAt: new Date().toISOString(),
@@ -78,6 +81,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
   if (!TRANSPORT_CHANNELS.has(channel)) {
     return {
       ...input.request,
+      sequencePatternId,
       executionStatus: "failed",
       fulfillmentError: "unsupported_recommended_channel",
       fulfilledAt: new Date().toISOString(),
@@ -87,6 +91,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
   try {
     const draft = await createGrowthSequenceEnrollmentDraft(admin, {
       leadId: input.request.leadId,
+      patternId: sequencePatternId,
       actingUserId: input.actingUserId,
       actingUserEmail: input.actingUserEmail,
     })
@@ -95,6 +100,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
     if (!step) {
       return {
         ...input.request,
+        sequencePatternId,
         executionStatus: "failed",
         sequenceEnrollmentId: draft.id,
         fulfillmentError: "sequence_step_not_found_for_channel",
@@ -118,6 +124,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
     if (existingJob) {
       return {
         ...input.request,
+        sequencePatternId,
         executionStatus: "queued",
         sequenceEnrollmentId: draft.id,
         sequenceStepId: step.id,
@@ -138,6 +145,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
     if (!queued.queued || !queued.jobId) {
       return {
         ...input.request,
+        sequencePatternId,
         executionStatus: "failed",
         sequenceEnrollmentId: draft.id,
         sequenceStepId: step.id,
@@ -157,6 +165,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
 
     return {
       ...input.request,
+      sequencePatternId,
       executionStatus: "queued",
       sequenceEnrollmentId: draft.id,
       sequenceStepId: step.id,
@@ -168,6 +177,7 @@ export async function fulfillAvaOutreachExecutionRequestViaSequence(
     const detail = error instanceof Error ? error.message : String(error)
     return {
       ...input.request,
+      sequencePatternId,
       executionStatus: "failed",
       fulfillmentError: detail.slice(0, 500),
       fulfilledAt: new Date().toISOString(),

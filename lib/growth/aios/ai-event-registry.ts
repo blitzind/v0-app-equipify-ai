@@ -159,6 +159,8 @@ export const AI_EVENT_REGISTRY: readonly AiEventRegistryEntry[] = [
   { eventType: "growth.research.became_stale", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Prospect research became stale — Draft Factory wake" },
   { eventType: "growth.budget.window_reset", category: "budget", eventVersion: 1, schemaVersion: "1.0", description: "Runtime budget window reset — capacity wake" },
   { eventType: "growth.ava.outreach_package_approval", category: "approval", eventVersion: 1, schemaVersion: "1.0", description: "Ava outreach package approval decision" },
+  { eventType: "growth.ava.outreach_execution_request", category: "approval", eventVersion: 1, schemaVersion: "1.0", description: "Ava outreach execution request fulfillment transition" },
+  { eventType: "growth.ava.outreach_execution_retry", category: "approval", eventVersion: 1, schemaVersion: "1.0", description: "Ava outreach execution request fulfillment retry" },
   { eventType: "ai_os.event.correction", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Corrective event superseding prior emission" },
 ] as const
 

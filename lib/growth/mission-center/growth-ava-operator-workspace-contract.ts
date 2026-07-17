@@ -11,6 +11,10 @@ export function buildAvaOperatorPackageActionApiPath(packageId: string): string 
   return `${GROWTH_AVA_OPERATOR_PACKAGE_ACTION_API_PREFIX}/${encodeURIComponent(packageId)}/action`
 }
 
+export function buildAvaOperatorExecutionRequestRetryApiPath(requestId: string): string {
+  return `/api/platform/growth/ai-os/autonomous-outreach-preparation-pilot/execution-requests/${encodeURIComponent(requestId)}/retry`
+}
+
 export function buildAvaOperatorPackageDraftsApiPath(packageId: string): string {
   return `${GROWTH_AVA_OPERATOR_PACKAGE_ACTION_API_PREFIX}/${encodeURIComponent(packageId)}/drafts`
 }

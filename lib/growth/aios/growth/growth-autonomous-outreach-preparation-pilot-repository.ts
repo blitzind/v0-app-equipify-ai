@@ -310,6 +310,7 @@ export async function markOutreachPreparationPackageApprovalDecision(
     ...existing.approvalPackage,
     packageApprovalDecision: input.decision,
     executionRequestId: input.executionRequestId ?? null,
+    pendingHumanApproval: input.decision === "approved" ? false : existing.approvalPackage.pendingHumanApproval,
   }
 
   const updatedRun: GrowthAutonomousOutreachPreparationRunRecord = {

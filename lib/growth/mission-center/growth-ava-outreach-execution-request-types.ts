@@ -15,6 +15,9 @@ export const GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_EVENT =
 export const GROWTH_AVA_OUTREACH_PACKAGE_APPROVAL_EVENT =
   "growth.ava.outreach_package_approval" as const
 
+export const GROWTH_AVA_OUTREACH_EXECUTION_RETRY_EVENT =
+  "growth.ava.outreach_execution_retry" as const
+
 export const GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_STATUSES = [
   "pending_fulfillment",
   "queued",
@@ -40,6 +43,17 @@ export type GrowthAvaOutreachExecutionRequestChannel =
 
 export type GrowthAvaOutreachPackageApprovalDecision = "approve" | "reject"
 
+export type GrowthAvaOutreachExecutionRequestRetryRecord = {
+  attemptedAt: string
+  operatorUserId: string
+  priorExecutionStatus: GrowthAvaOutreachExecutionRequestStatus
+  priorFulfillmentError: string | null
+  resultExecutionStatus: GrowthAvaOutreachExecutionRequestStatus
+  resultFulfillmentError: string | null
+  sequencePatternId: string | null
+  sequenceJobId: string | null
+}
+
 export type GrowthAvaOutreachExecutionRequest = {
   qa_marker: typeof GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER
   requestId: string
@@ -50,12 +64,14 @@ export type GrowthAvaOutreachExecutionRequest = {
   approvedAt: string
   recommendedChannel: GrowthAvaOutreachExecutionRequestChannel
   recommendedCadence: string | null
+  sequencePatternId: string | null
   executionStatus: GrowthAvaOutreachExecutionRequestStatus
   sequenceJobId: string | null
   sequenceEnrollmentId: string | null
   sequenceStepId: string | null
   fulfillmentError: string | null
   fulfilledAt: string | null
+  retryHistory?: GrowthAvaOutreachExecutionRequestRetryRecord[]
 }
 
 export type GrowthAvaOutreachPackageApprovalResult = {
