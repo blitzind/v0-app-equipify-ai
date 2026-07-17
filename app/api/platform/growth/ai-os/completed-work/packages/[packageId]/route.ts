@@ -8,10 +8,8 @@ import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib
 import { GROWTH_AIOS_APPROVALS_2A_QA_MARKER } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
 import { loadApprovals2AOperatorReviewPacket } from "@/lib/growth/aios/approvals/approvals-operator-review-service"
 import { findAutonomousOutreachPreparationRunByPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
-import {
-  evaluateAvaOutreachExecutionReadinessForPackage,
-  fetchAvaOutreachExecutionRequestByPackageId,
-} from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-service"
+import { fetchAvaOutreachExecutionRequestByPackageId } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-service"
+import { evaluateAvaOutreachExecutionReadinessForPackage } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-service-1f"
 import { GE_AIOS_SUPERVISED_SEQUENCE_HANDOFF_1F_QA_MARKER } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-1f"
 
 export const runtime = "nodejs"
