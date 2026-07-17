@@ -42,6 +42,15 @@ function actionErrorStatus(error: string): number {
   ) {
     return 409
   }
+  if (
+    error === "execution_not_ready" ||
+    error === "no_sequence_pattern" ||
+    error === "fatigue_blocked" ||
+    error === "low_confidence" ||
+    error === "preflight_blocked"
+  ) {
+    return 422
+  }
   return 500
 }
 

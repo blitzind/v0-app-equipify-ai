@@ -7,6 +7,12 @@ import { z } from "zod"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { GROWTH_AIOS_APPROVALS_2A_QA_MARKER } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
 import { loadApprovals2AOperatorReviewPacket } from "@/lib/growth/aios/approvals/approvals-operator-review-service"
+import { findAutonomousOutreachPreparationRunByPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import {
+  evaluateAvaOutreachExecutionReadinessForPackage,
+  fetchAvaOutreachExecutionRequestByPackageId,
+} from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-service"
+import { GE_AIOS_SUPERVISED_SEQUENCE_HANDOFF_1F_QA_MARKER } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-1f"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -40,6 +46,19 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   try {
+    const run = await findAutonomousOutreachPreparationRunByPackageId(
+      access.admin,
+      organizationId,
+      packageId,
+    )
+    const approvalPackage = run?.approvalPackage
+    if (!approvalPackage || approvalPackage.leadId !== leadId) {
+      return NextResponse.json(
+        { ok: false, qaMarker: GROWTH_AIOS_APPROVALS_2A_QA_MARKER, error: "package_not_found" },
+        { status: 404 },
+      )
+    }
+
     const packet = await loadApprovals2AOperatorReviewPacket(access.admin, {
       organizationId,
       packageId,
@@ -52,12 +71,25 @@ export async function GET(request: Request, context: RouteContext) {
       )
     }
 
+    const executionReadiness = await evaluateAvaOutreachExecutionReadinessForPackage(access.admin, {
+      leadId,
+      recommendedSequence: approvalPackage.recommendedSequence,
+      recommendedChannel: approvalPackage.recommendedChannel,
+    })
+    const executionRequest = await fetchAvaOutreachExecutionRequestByPackageId(access.admin, {
+      leadId,
+      packageId,
+    })
+
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
+      handoffQaMarker: GE_AIOS_SUPERVISED_SEQUENCE_HANDOFF_1F_QA_MARKER,
       packet,
+      executionReadiness,
+      executionRequest,
       transportBlocked: true,
-      pendingHumanApproval: true,
+      pendingHumanApproval: approvalPackage.pendingHumanApproval ?? true,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
