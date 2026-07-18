@@ -8,6 +8,7 @@ import { GrowthWorkspaceShellPreferencesProvider, useGrowthWorkspaceShellPrefere
 import { GrowthBreadcrumbProvider } from "@/components/growth/shell/growth-breadcrumb-context"
 import { GrowthBreadcrumbs } from "@/components/growth/shell/growth-breadcrumbs"
 import { GROWTH_WORKSPACE_SHELL_QA_MARKER } from "@/components/growth/shell/growth-brand"
+import { isGrowthWorkspaceFirstUx1aShellNavActive } from "@/lib/growth/navigation/growth-workspace-shell-navigation"
 import { GrowthMobileNavDrawer } from "@/components/growth/shell/growth-mobile-nav-drawer"
 import { GrowthWorkspaceActivityTracker } from "@/components/growth/workspace/growth-workspace-activity-tracker"
 import { GrowthSidebar } from "@/components/growth/shell/growth-sidebar"
@@ -38,6 +39,7 @@ type GrowthWorkspaceShellProps = {
 function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { personal } = useGrowthWorkspaceShellPreferences()
+  const ux1aNavActive = isGrowthWorkspaceFirstUx1aShellNavActive()
 
   return (
     <GrowthBreadcrumbProvider>
@@ -48,6 +50,7 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
           personal.reducedMotion && "[&_*]:!transition-none [&_*]:!animate-none",
         )}
         data-qa-marker={GROWTH_WORKSPACE_SHELL_QA_MARKER}
+        data-growth-workspace-first-ux-1a={ux1aNavActive ? "true" : "false"}
         data-growth-workspace-settings-consumption-marker={GROWTH_WORKSPACE_SETTINGS_CONSUMPTION_QA_MARKER}
         data-growth-compact={personal.compactMode ? "true" : "false"}
         data-growth-reduced-motion={personal.reducedMotion ? "true" : "false"}

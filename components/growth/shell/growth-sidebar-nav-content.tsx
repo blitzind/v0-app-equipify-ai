@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronDown, ChevronLeft } from "lucide-react"
@@ -14,9 +14,12 @@ import {
   NAV_SIDEBAR_ACTIVE_INDICATOR,
 } from "@/lib/navigation-chrome"
 import {
-  GROWTH_SHELL_NAV_GROUPS,
+  buildGrowthWorkspaceShellNavGroups,
   isGrowthShellNavItemActive,
+  resolveGrowthWorkspaceShellNavQaMarker,
+  isGrowthWorkspaceFirstUx1aShellNavActive,
 } from "@/components/growth/shell/growth-shell-navigation"
+import { GROWTH_WORKSPACE_FIRST_UX_1A_SIDEBAR_ARIA_LABEL } from "@/lib/growth/navigation/growth-workspace-first-ux-1a-labels"
 import {
   readWorkspaceSidebarCollapsedSections,
   toggleWorkspaceSidebarCollapsedSection,
@@ -43,6 +46,8 @@ export function GrowthSidebarNavContent({
   collapsed = false,
 }: GrowthSidebarNavContentProps) {
   const pathname = usePathname()
+  const navGroups = useMemo(() => buildGrowthWorkspaceShellNavGroups(), [])
+  const ux1aNavActive = isGrowthWorkspaceFirstUx1aShellNavActive()
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
@@ -51,20 +56,20 @@ export function GrowthSidebarNavContent({
 
   useEffect(() => {
     setCollapsedGroups((prev) => {
-      if (GROWTH_SHELL_NAV_GROUPS.length === 0) return prev
-      const allVisibleGroupsCollapsed = GROWTH_SHELL_NAV_GROUPS.every((group) => prev.has(group.id))
+      if (navGroups.length === 0) return prev
+      const allVisibleGroupsCollapsed = navGroups.every((group) => prev.has(group.id))
       if (!allVisibleGroupsCollapsed) return prev
       const next = new Set<string>()
       writeWorkspaceSidebarCollapsedSections(WORKSPACE_GROWTH_SIDEBAR_SECTIONS_STORAGE_KEY, next)
       return next
     })
-  }, [])
+  }, [navGroups])
 
   useEffect(() => {
     setCollapsedGroups((prev) => {
       let mutated = false
       const next = new Set(prev)
-      for (const group of GROWTH_SHELL_NAV_GROUPS) {
+      for (const group of navGroups) {
         if (!next.has(group.id)) continue
         const owns = group.items.some((item) => isGrowthShellNavItemActive(pathname, item))
         if (owns) {
@@ -75,7 +80,7 @@ export function GrowthSidebarNavContent({
       if (mutated) writeWorkspaceSidebarCollapsedSections(WORKSPACE_GROWTH_SIDEBAR_SECTIONS_STORAGE_KEY, next)
       return mutated ? next : prev
     })
-  }, [pathname])
+  }, [pathname, navGroups])
 
   function toggleGroup(id: string) {
     setCollapsedGroups((prev) =>
@@ -90,15 +95,18 @@ export function GrowthSidebarNavContent({
         collapsed ? "flex flex-col items-stretch px-0" : "px-3",
         className,
       )}
-      aria-label="AI OS navigation"
+      aria-label={ux1aNavActive ? GROWTH_WORKSPACE_FIRST_UX_1A_SIDEBAR_ARIA_LABEL : "AI OS navigation"}
+      data-growth-workspace-shell-nav-qa-marker={resolveGrowthWorkspaceShellNavQaMarker()}
+      data-growth-workspace-first-ux-1a={ux1aNavActive ? "true" : "false"}
     >
-      {GROWTH_SHELL_NAV_GROUPS.map((group, groupIndex) => {
+      {navGroups.map((group, groupIndex) => {
         const groupCollapsed = collapsedGroups.has(group.id)
         const groupHasActive = group.items.some((item) => isGrowthShellNavItemActive(pathname, item))
+        const showGroupHeader = Boolean(group.label.trim())
 
         return (
-          <div key={group.id} className={cn("w-full", groupIndex > 0 && "mt-3")}>
-            {!collapsed ? (
+          <div key={group.id} className={cn("w-full", groupIndex > 0 && showGroupHeader && "mt-3")}>
+            {!collapsed && showGroupHeader ? (
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
@@ -125,7 +133,7 @@ export function GrowthSidebarNavContent({
                   className={cn("shrink-0 transition-transform duration-150", groupCollapsed && "-rotate-90")}
                 />
               </button>
-            ) : groupIndex > 0 ? (
+            ) : collapsed && groupIndex > 0 && showGroupHeader ? (
               <div className="my-2 mx-auto w-5 border-t border-sidebar-border" />
             ) : null}
 

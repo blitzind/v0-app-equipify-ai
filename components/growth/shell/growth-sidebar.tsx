@@ -20,11 +20,15 @@ import {
   GrowthSidebarFooter,
   GrowthSidebarNavContent,
 } from "@/components/growth/shell/growth-sidebar-nav-content"
-import { GROWTH_SHELL_NAV_QA_MARKER } from "@/components/growth/shell/growth-shell-navigation"
-import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
+import {
+  isGrowthWorkspaceFirstUx1aShellNavActive,
+  resolveGrowthWorkspaceShellNavQaMarker,
+} from "@/lib/growth/navigation/growth-workspace-shell-navigation"
+import { GROWTH_WORKSPACE_FIRST_UX_1A_SIDEBAR_ARIA_LABEL } from "@/lib/growth/navigation/growth-workspace-first-ux-1a-labels"
 
 export function GrowthSidebar() {
   const [collapsed, setCollapsedState] = useState(false)
+  const ux1aNavActive = isGrowthWorkspaceFirstUx1aShellNavActive()
 
   // Restore desktop sidebar collapsed state — explicit toggle only (matches Core AppSidebar).
   useEffect(() => {
@@ -55,11 +59,15 @@ export function GrowthSidebar() {
         collapsed ? WORKSPACE_SIDEBAR_WIDTH_COLLAPSED : WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
       )}
       data-qa-marker={GROWTH_WORKSPACE_SHELL_QA_MARKER}
-      aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`}
+      data-growth-workspace-first-ux-1a={ux1aNavActive ? "true" : "false"}
+      aria-label={ux1aNavActive ? GROWTH_WORKSPACE_FIRST_UX_1A_SIDEBAR_ARIA_LABEL : "AI OS navigation"}
     >
       <WorkspaceShellBrand collapsed={collapsed} homeHref={GROWTH_WORKSPACE_BASE_PATH} />
       <WorkspaceSidebarOrganizationCard collapsed={collapsed} {...WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER}>
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        data-qa-marker={resolveGrowthWorkspaceShellNavQaMarker()}
+      >
         <GrowthSidebarNavContent collapsed={collapsed} />
         <GrowthSidebarFooter
           collapsed={collapsed}

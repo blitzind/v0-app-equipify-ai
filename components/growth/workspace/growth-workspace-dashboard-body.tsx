@@ -24,6 +24,10 @@ import { useGrowthWorkspaceDashboard } from "@/components/growth/workspace/use-g
 import { GrowthHomeDebugFooter } from "@/components/growth/workspace/growth-home-debug-footer"
 import { useGrowthWorkspaceQuickActionShortcuts } from "@/components/growth/workspace/use-growth-workspace-quick-action-shortcuts"
 import { GrowthHomeExecutiveBriefingDashboard } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard"
+import {
+  GrowthWorkspacePriorityFeedDashboard,
+  isGrowthWorkspacePriorityFeedActive,
+} from "@/components/growth/workspace/ux-1a/growth-workspace-priority-feed-dashboard"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -157,6 +161,15 @@ export function GrowthWorkspaceDashboardBody() {
   }
 
   if (!dashboard) return null
+
+  if (isGrowthWorkspacePriorityFeedActive()) {
+    return (
+      <div data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER} data-growth-workspace-first-ux-1a="true">
+        <GrowthWorkspacePriorityFeedDashboard dashboard={dashboard} workspaceSummary={workspaceSummary} />
+        <GrowthHomeDebugFooter />
+      </div>
+    )
+  }
 
   const everythingElse = (
     <>

@@ -59,8 +59,12 @@ function main(): void {
 
   const dashboardBody = readSource("components/growth/workspace/growth-workspace-dashboard-body.tsx")
   assert.match(dashboardBody, /GrowthOperatorSetupHealthPanel/)
-  assert.match(dashboardBody, /operator-action-cards/)
-  console.log("  ✓ Operator dashboard exposes setup health and action cards")
+  assert.match(dashboardBody, /GrowthWorkspacePriorityFeedDashboard/)
+  assert.match(
+    readSource("lib/growth/workspace/ux-1a/growth-workspace-priority-feed-synthesizer.ts"),
+    /operatorActionCards/,
+  )
+  console.log("  ✓ Operator dashboard exposes setup health and actionable priority feed")
 
   const launchComplete = readSource("components/growth/sendr/growth-sendr-launch-complete-step.tsx")
   assert.match(launchComplete, /Recommended next steps/)
