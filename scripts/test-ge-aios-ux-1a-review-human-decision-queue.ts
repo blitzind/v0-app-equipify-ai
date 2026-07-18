@@ -10,7 +10,10 @@ import type { GrowthAvaCompletedWorkItem } from "../lib/growth/aios/approvals/av
 import type { GrowthHumanApprovalItem } from "../lib/growth/aios/approvals/growth-human-approval-center-types"
 import {
   GROWTH_WORKSPACE_FIRST_UX_1A_FEATURE_FLAG,
+  GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_ENABLED,
+  GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG,
   isGrowthWorkspaceFirstUx1aEnabled,
+  isGrowthWorkspaceFirstUx1aEnabledClient,
 } from "../lib/growth/navigation/growth-workspace-first-ux-1a-feature"
 import type { GrowthSequenceExecutionJobView } from "../lib/growth/sequences/execution/sequence-execution-types"
 import {
@@ -158,6 +161,32 @@ function main(): void {
     resolveUx1aReviewHref({ [GROWTH_WORKSPACE_FIRST_UX_1A_FEATURE_FLAG]: "true" }),
     GROWTH_REVIEW_PAGE_HREF,
   )
+
+  const featureModule = readSource("lib/growth/navigation/growth-workspace-first-ux-1a-feature.ts")
+  assert.doesNotMatch(
+    featureModule,
+    /NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG(?!\s*=)/,
+    "accidental bare runtime identifier must not appear",
+  )
+  assert.match(featureModule, /process\.env\.NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_ENABLED/)
+  assert.equal(GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG, "NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_ENABLED")
+  assert.equal(isGrowthWorkspaceFirstUx1aEnabled({}), false)
+  assert.equal(isGrowthWorkspaceFirstUx1aEnabledClient(), false)
+  assert.equal(GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_ENABLED, false)
+  console.log("  ✓ hotfix 1A: absent flags resolve false without runtime ReferenceError")
+
+  const legacyApprovals = readSource("app/(growth)/growth/os/approvals/page.tsx")
+  const legacySequences = readSource("app/(growth)/growth/campaigns/sequences/page.tsx")
+  assert.doesNotMatch(legacyApprovals, /NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG/)
+  assert.doesNotMatch(legacySequences, /NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG/)
+  assert.match(legacyApprovals, /if \(ux1aActive\)/)
+  assert.match(legacySequences, /if \(ux1aActive\)/)
+  assert.match(legacyApprovals, /if \(!ux1aActive\) return/)
+  assert.match(legacySequences, /if \(!ux1aActive\) return/)
+  assert.match(legacyApprovals, /GrowthAvaCompletedWorkPanel/)
+  assert.match(legacySequences, /GrowthSequenceExecutionPanels/)
+  console.log("  ✓ hotfix 1A: legacy routes render normally and redirect only when flag enabled")
+
   console.log("  ✓ feature flag off preserves legacy review href resolution")
 
   assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/review/page.tsx")))
@@ -169,15 +198,15 @@ function main(): void {
   assert.doesNotMatch(reviewPage, /Human Approval Center|Completed Work|Sequence Execution|"Ava"/)
   console.log("  ✓ feature flag on exposes /growth/review presentation surface")
 
-  const legacyApprovals = readSource("app/(growth)/growth/os/approvals/page.tsx")
-  assert.match(legacyApprovals, /GrowthAvaCompletedWorkPanel/)
-  assert.match(legacyApprovals, /isGrowthWorkspaceFirstUx1aEnabledClient/)
-  assert.match(legacyApprovals, /GROWTH_REVIEW_PAGE_HREF/)
+  const legacyApprovalsPage = readSource("app/(growth)/growth/os/approvals/page.tsx")
+  assert.match(legacyApprovalsPage, /GrowthAvaCompletedWorkPanel/)
+  assert.match(legacyApprovalsPage, /isGrowthWorkspaceFirstUx1aEnabledClient/)
+  assert.match(legacyApprovalsPage, /GROWTH_REVIEW_PAGE_HREF/)
   console.log("  ✓ legacy approvals page preserved when flag off and redirects when flag on")
 
-  const legacySequences = readSource("app/(growth)/growth/campaigns/sequences/page.tsx")
-  assert.match(legacySequences, /GrowthSequenceExecutionPanels/)
-  assert.match(legacySequences, /buildGrowthReviewHref\(\{ tab: "sends" \}\)/)
+  const legacySequencesPage = readSource("app/(growth)/growth/campaigns/sequences/page.tsx")
+  assert.match(legacySequencesPage, /GrowthSequenceExecutionPanels/)
+  assert.match(legacySequencesPage, /buildGrowthReviewHref\(\{ tab: "sends" \}\)/)
   console.log("  ✓ legacy sequence execution preserved when flag off and redirects sends tab when flag on")
 
   const packages = projectReviewPackageDecisionItems([

@@ -24,7 +24,15 @@ export function isGrowthWorkspaceFirstUx1aEnabled(
   return isTruthyFlag(env[GROWTH_WORKSPACE_FIRST_UX_1A_FEATURE_FLAG])
 }
 
+/**
+ * Build-time inlined public flag — literal env access only (no bare identifier names).
+ * Absent/unset values resolve to false.
+ */
+export const GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_ENABLED = isTruthyFlag(
+  process.env.NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_ENABLED,
+)
+
 /** Client flag for workspace shell nav — mirrors server when set at build time. */
 export function isGrowthWorkspaceFirstUx1aEnabledClient(): boolean {
-  return isTruthyFlag(process.env[NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG])
+  return GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_ENABLED
 }

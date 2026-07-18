@@ -10,6 +10,7 @@ import {
   GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG,
   GROWTH_WORKSPACE_FIRST_UX_1A_QA_MARKER,
   isGrowthWorkspaceFirstUx1aEnabled,
+  isGrowthWorkspaceFirstUx1aEnabledClient,
 } from "../lib/growth/navigation/growth-workspace-first-ux-1a-feature"
 import {
   GROWTH_WORKSPACE_FIRST_UX_1A_FORBIDDEN_NAV_LABELS,
@@ -59,6 +60,11 @@ function main(): void {
   )
   assert.equal(isGrowthWorkspaceFirstUx1aEnabled({}), false)
   assert.equal(isGrowthWorkspaceFirstUx1aEnabled({ [GROWTH_WORKSPACE_FIRST_UX_1A_FEATURE_FLAG]: "true" }), true)
+  assert.equal(isGrowthWorkspaceFirstUx1aEnabledClient(), false)
+  assert.doesNotMatch(
+    readSource("lib/growth/navigation/growth-workspace-first-ux-1a-feature.ts"),
+    /NEXT_PUBLIC_GROWTH_WORKSPACE_FIRST_UX_1A_PUBLIC_FEATURE_FLAG(?!\s*=)/,
+  )
 
   const primaryLabels = GROWTH_WORKSPACE_FIRST_UX_1A_NAV_MANIFEST.flatMap((group) =>
     group.items.map((item) => item.label),
