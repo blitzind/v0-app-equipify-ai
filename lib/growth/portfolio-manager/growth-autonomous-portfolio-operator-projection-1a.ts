@@ -15,7 +15,7 @@ export const GROWTH_PORTFOLIO_MANAGER_MANUAL_FIND_OPTIONS = [10, 25, 50, 100] as
 const HEALTH_LABELS: Record<GrowthPortfolioHealthState, string> = {
   healthy: "Portfolio healthy. No action required.",
   needs_replenishment: "Portfolio needs more qualified companies.",
-  critically_low: "Portfolio is critically low — discovery is prioritized.",
+  critically_low: "The portfolio is below target, so I'm prioritizing discovery.",
   operator_intervention_required: "Complete your Company Profile so Ava can manage the portfolio.",
 }
 

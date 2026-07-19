@@ -170,7 +170,7 @@ function buildMissionCandidates(input: BuildDecisionContextInput): DecisionCandi
       {
         id: "mission:pipeline",
         kind: "continue_mission",
-        title: "Continue mission — build pipeline",
+        title: "Continuing to build the pipeline",
         detail: `${input.dailyWorkQueue.length} companies in today's queue`,
         href: null,
         source: "mission",

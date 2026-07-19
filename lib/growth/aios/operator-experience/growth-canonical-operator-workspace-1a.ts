@@ -31,6 +31,7 @@ import {
   type GrowthCanonicalOperatorTask,
   type GrowthCanonicalOperatorWorkspaceLeadContext,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
+import type { GrowthHomeWaitingOnYouItem } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
   formatCanonicalDraftCount,
   formatCanonicalPackageCount,
@@ -223,6 +224,41 @@ export function buildCanonicalOperatorTask(input: {
   }
 
   return null
+}
+
+export function mapCanonicalApprovalPackagesToWaitingOnYou(
+  approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot,
+): GrowthHomeWaitingOnYouItem[] {
+  return approvalSnapshot.packages.map((pkg) => ({
+    id: `approval:${pkg.itemId}`,
+    label: formatOperatorPriorityPackageTitle(pkg.companyName),
+    detail: formatOperatorPriorityPackageDetail({
+      channelLabel: pkg.channelLabel ?? "Email sequence",
+      emailDraftCount: pkg.draftCount,
+    }),
+    href: pkg.reviewHref,
+  }))
+}
+
+export function resolveCanonicalWaitingOnYouItems(input: {
+  approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined
+  canonicalOperatorTask: GrowthCanonicalOperatorTask | null
+  legacyItems: GrowthHomeWaitingOnYouItem[]
+}): GrowthHomeWaitingOnYouItem[] {
+  if (input.approvalSnapshot && input.approvalSnapshot.packages.length > 0) {
+    return mapCanonicalApprovalPackagesToWaitingOnYou(input.approvalSnapshot)
+  }
+  if (input.canonicalOperatorTask) {
+    return [
+      {
+        id: input.canonicalOperatorTask.id,
+        label: input.canonicalOperatorTask.title,
+        detail: input.canonicalOperatorTask.detail,
+        href: input.canonicalOperatorTask.href,
+      },
+    ]
+  }
+  return input.legacyItems
 }
 
 export function projectCanonicalLeadOpportunityNarrative(

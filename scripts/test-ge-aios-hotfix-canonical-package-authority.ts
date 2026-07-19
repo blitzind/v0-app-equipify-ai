@@ -12,7 +12,10 @@ import {
   buildCanonicalOperatorApprovalSnapshot,
   buildCanonicalOperatorTask,
   resolveCanonicalApprovalQueueCount,
+  resolveCanonicalWaitingOnYouItems,
 } from "../lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import { formatOperatorPriorityPackageTitle } from "../lib/growth/aios/operator-experience/growth-operator-home-language-2c"
+import { HOME_LIVING_WAITING_EMPTY_MESSAGE } from "../lib/growth/home/growth-home-living-experience-18e"
 import { buildPrimaryDecisionFromWorkManager } from "../lib/growth/work-manager/home/build-primary-decision-work"
 import { buildAvaPrimaryDecision } from "../lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
 import { buildAiOsUxViewModel } from "../lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
@@ -22,6 +25,17 @@ import {
   synthesizeGrowthReviewDecisionQueue,
 } from "../lib/growth/workspace/ux-1a/review/growth-review-decision-queue-synthesizer"
 import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
+
+function hasWaitingSectionItems(input: {
+  approveItemsCount: number
+  waitingOnYou: Array<{ label: string }>
+  canonicalPackageCount: number
+}): boolean {
+  const replyCount = input.waitingOnYou.filter((item) => /reply/i.test(item.label)).length
+  const hasCanonicalPackageWaiting =
+    input.canonicalPackageCount > 0 && input.waitingOnYou.length > 0
+  return input.approveItemsCount > 0 || replyCount > 0 || hasCanonicalPackageWaiting
+}
 
 function outreachItem(input: {
   id: string
@@ -132,10 +146,23 @@ const aiOsUxWithPackages = buildAiOsUxViewModel({
 })
 const heroDecision = buildAvaPrimaryDecision(aiOsUxWithPackages)
 assert.equal(aiOsUxWithPackages.approveItemsCount, 2)
-assert.equal(aiOsUxWithPackages.waitingOnYouOverflow, 1)
+assert.equal(aiOsUxWithPackages.waitingOnYou.length, 2)
+assert.equal(aiOsUxWithPackages.waitingOnYouOverflow, 0)
 assert.equal(heroDecision.additionalDecisionCount, 1)
 assert.ok(heroDecision.primaryDecision)
 console.log("  ✓ Ready For Review card shows top package plus N additional packages")
+
+assert.equal(aiOsUxWithPackages.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Block Imaging"))
+assert.equal(aiOsUxWithPackages.waitingOnYou[0]?.href, task!.href)
+assert.equal(aiOsUxWithPackages.waitingOnYou[1]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
+assert.ok(
+  hasWaitingSectionItems({
+    approveItemsCount: aiOsUxWithPackages.approveItemsCount,
+    waitingOnYou: aiOsUxWithPackages.waitingOnYou,
+    canonicalPackageCount: snapshot.packages.length,
+  }),
+)
+console.log("  ✓ canonical package snapshot populates What I need from you rows")
 
 const workManagerFallback = buildPrimaryDecisionFromWorkManager(
   {
@@ -214,5 +241,31 @@ const reviewRows = projectReviewPackageDecisionItems(projected)
 assert.equal(reviewRows.length, 2)
 assert.equal(reviewRows[0]?.companyName, "Block Imaging")
 console.log("  ✓ Review package rows materialize from canonical HAC item= routes")
+
+const taskOnlyRows = resolveCanonicalWaitingOnYouItems({
+  approvalSnapshot: null,
+  canonicalOperatorTask: task,
+  legacyItems: [],
+})
+assert.equal(taskOnlyRows.length, 1)
+assert.equal(taskOnlyRows[0]?.href, task!.href)
+console.log("  ✓ canonical operator task still yields one waiting row when package list unavailable")
+
+assert.equal(
+  hasWaitingSectionItems({
+    approveItemsCount: withoutCanonical.approveItemsCount,
+    waitingOnYou: withoutCanonical.waitingOnYou,
+    canonicalPackageCount: 0,
+  }),
+  false,
+)
+assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No packages are waiting for review/)
+console.log("  ✓ missing canonical package list keeps empty waiting section")
+
+assert.equal(
+  withoutCanonical.waitingOnYou.filter((row) => row.id.startsWith("approval:")).length,
+  0,
+)
+console.log("  ✓ no canonical package rows are synthesized from daily queue fallback")
 
 console.log("\nPASS ge-aios-hotfix-canonical-package-authority-v1")

@@ -30,6 +30,7 @@ import {
   buildCanonicalOperatorWaitingSummary,
   resolveCanonicalApprovalQueueCount,
   resolveCanonicalOutreachDraftCount,
+  resolveCanonicalWaitingOnYouItems,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
 import type {
   GrowthCanonicalOperatorApprovalSnapshot,
@@ -596,17 +597,14 @@ export function buildAiOsUxViewModel(input: {
         })
       : null)
 
-  const collapsedWaiting: GrowthHomeWaitingOnYouItem[] = canonicalOperatorTask
-    ? [
-        {
-          id: canonicalOperatorTask.id,
-          label: canonicalOperatorTask.title,
-          detail: canonicalOperatorTask.detail,
-          href: canonicalOperatorTask.href,
-          priority: "high",
-        },
-      ]
-    : waitingOnYouResult.items
+  const collapsedWaiting = resolveCanonicalWaitingOnYouItems({
+    approvalSnapshot: input.canonicalApprovalSnapshot,
+    canonicalOperatorTask,
+    legacyItems: waitingOnYouResult.items,
+  })
+
+  const hasCanonicalPackageList =
+    (input.canonicalApprovalSnapshot?.packages.length ?? 0) > 0
 
   const waitingSummary = input.canonicalApprovalSnapshot
     ? buildCanonicalOperatorWaitingSummary({
@@ -634,9 +632,13 @@ export function buildAiOsUxViewModel(input: {
         : heroBase.todayAtAGlance,
     },
     waitingOnYou: collapsedWaiting,
-    waitingOnYouOverflow: canonicalOperatorTask ? Math.max(0, approveItemsCount - 1) : waitingOnYouResult.overflowCount,
+    waitingOnYouOverflow: hasCanonicalPackageList
+      ? Math.max(0, approveItemsCount - collapsedWaiting.length)
+      : canonicalOperatorTask
+        ? Math.max(0, approveItemsCount - 1)
+        : waitingOnYouResult.overflowCount,
     approveItemsHref:
-      input.canonicalOperatorApprovalSnapshot?.topPackage?.reviewHref ??
+      input.canonicalApprovalSnapshot?.topPackage?.reviewHref ??
       input.canonicalOperatorTask?.href ??
       (approveItemsCount > 0
         ? buildGrowthReviewHref({ tab: "packages" })
