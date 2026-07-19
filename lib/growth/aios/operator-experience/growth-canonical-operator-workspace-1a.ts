@@ -5,6 +5,7 @@
 
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { GrowthHumanApprovalItem } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import { parsePackageIdFromApprovalRoute } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import {
   filterActiveCompletedWorkItems,
   resolveCompletedWorkOperatorBucket,
@@ -74,11 +75,9 @@ function packagePreviewFromItem(input: {
     titleCompany ||
     input.item.summary?.trim() ||
     "Account"
-  const packageIdFromRoute = input.item.route?.match(/packageId=([^&]+)/)?.[1]
+  const packageIdFromRoute = parsePackageIdFromApprovalRoute(input.item.route ?? undefined)
   const packageId =
-    input.pkg?.packageId ??
-    (packageIdFromRoute ? decodeURIComponent(packageIdFromRoute) : null) ??
-    input.item.id
+    input.pkg?.packageId ?? packageIdFromRoute ?? input.item.id
 
   const assetEvidence = input.item.evidence.find((row) => /asset/i.test(row.label))
   const resolvedDraftCount =
@@ -120,8 +119,7 @@ export function buildCanonicalOperatorApprovalSnapshot(input: {
   )
 
   const packages: GrowthCanonicalOperatorApprovalPackagePreview[] = outreachItems.map((item) => {
-    const packageIdFromRoute = item.route?.match(/packageId=([^&]+)/)?.[1]
-    const decodedPackageId = packageIdFromRoute ? decodeURIComponent(packageIdFromRoute) : null
+    const decodedPackageId = parsePackageIdFromApprovalRoute(item.route ?? undefined)
     const pkg =
       (decodedPackageId ? input.packagesById?.get(decodedPackageId) : null) ??
       [...(input.packagesById?.values() ?? [])].find(
@@ -137,8 +135,8 @@ export function buildCanonicalOperatorApprovalSnapshot(input: {
     qaMarker: GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER,
     outreachPackageCount: summary.outreachPackages,
     outreachDraftCount,
-    pendingApprovalCount: summary.totalActionable,
-    waitingForOperator: summary.totalActionable > 0,
+    pendingApprovalCount: summary.outreachPackages,
+    waitingForOperator: summary.outreachPackages > 0,
     packages,
     topPackage: packages[0] ?? null,
   }

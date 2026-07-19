@@ -585,21 +585,8 @@ export function buildAiOsUxViewModel(input: {
   canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
 }): GrowthHomeAiOsUxViewModel {
   const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
-  const queueEnabled = hasCanonicalDailyWorkQueue(input.dashboard)
-  const legacyApproveCount = queueEnabled
-    ? (input.dashboard.dailyRevenueWorkQueueDisplay?.blocked_count ?? 0) +
-      (input.dashboard.dailyRevenueWorkQueueDisplay?.waiting_count ?? 0) +
-      waitingOnYouResult.items.filter((item) => /approve/i.test(item.label)).length
-    : Math.max(
-        input.dashboard.briefing?.summary.pending_approvals ?? 0,
-        input.needsReview.totalCount,
-        waitingOnYouResult.items.length,
-      )
 
-  const approveItemsCount = resolveCanonicalApprovalQueueCount(
-    input.canonicalApprovalSnapshot,
-    legacyApproveCount,
-  )
+  const approveItemsCount = resolveCanonicalApprovalQueueCount(input.canonicalApprovalSnapshot, 0)
 
   const canonicalOperatorTask =
     input.canonicalOperatorTask ??

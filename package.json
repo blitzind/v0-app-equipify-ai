@@ -885,6 +885,7 @@
     "validate:sv1-5a-three-lead-production": "tsx scripts/validate-sv1-5a-three-lead-production.ts",
     "validate:ge-aios-contact-1c-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-contact-1c-production.ts",
     "test:ge-aios-hotfix-growth-route-access": "tsx scripts/test-ge-aios-hotfix-growth-route-access.ts",
+    "test:ge-aios-hotfix-canonical-package-authority": "tsx scripts/test-ge-aios-hotfix-canonical-package-authority.ts",
     "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",
     "test:ge-aios-ux-1b-home-queue-integration": "tsx scripts/test-ge-aios-ux-1b-home-queue-integration.ts",

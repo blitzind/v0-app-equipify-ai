@@ -107,20 +107,29 @@ export function categorizeAvaCompletedWorkItem(
   return "other"
 }
 
+function decodeRouteParam(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  try {
+    return decodeURIComponent(trimmed)
+  } catch {
+    return trimmed
+  }
+}
+
 export function parsePackageIdFromApprovalRoute(route: string | undefined): string | null {
   if (!route) return null
   try {
     const url = new URL(route, "https://equipify.local")
-    const packageId = url.searchParams.get("packageId")?.trim()
-    return packageId || null
+    const fromItem = decodeRouteParam(url.searchParams.get("item"))
+    if (fromItem) return fromItem
+    return decodeRouteParam(url.searchParams.get("packageId"))
   } catch {
-    const match = route.match(/[?&]packageId=([^&]+)/)
-    if (!match?.[1]) return null
-    try {
-      return decodeURIComponent(match[1])
-    } catch {
-      return match[1]
-    }
+    const itemMatch = route.match(/[?&]item=([^&]+)/)
+    if (itemMatch?.[1]) return decodeRouteParam(itemMatch[1])
+    const packageMatch = route.match(/[?&]packageId=([^&]+)/)
+    if (!packageMatch?.[1]) return null
+    return decodeRouteParam(packageMatch[1])
   }
 }
 

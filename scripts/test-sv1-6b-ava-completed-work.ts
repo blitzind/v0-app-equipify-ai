@@ -24,6 +24,7 @@ import type { GrowthHumanApprovalItem } from "../lib/growth/aios/approvals/growt
 import type { GrowthAutonomousOutreachApprovalPackage } from "../lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { growthCustomerApprovalsTitle } from "../lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
 import { buildAvaOperatorPackageActionApiPath } from "../lib/growth/mission-center/growth-ava-operator-workspace-contract"
+import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { resolveAiTeammatePresentation } from "../lib/workspace/ai-teammate-identity"
 
 function readSource(relativePath: string): string {
@@ -99,6 +100,12 @@ function main(): void {
   )
   assert.equal(packageId, "outreach-prep:lead-1:2026-07-12")
   console.log("  ✓ packageId recovered from existing HAC route")
+
+  assert.equal(
+    parsePackageIdFromApprovalRoute(buildGrowthReviewPackageHref("pkg-block-imaging")),
+    "pkg-block-imaging",
+  )
+  console.log("  ✓ packageId recovered from canonical Review item= route")
 
   const pkg = samplePackage()
   const item = sampleItem()
@@ -178,7 +185,7 @@ function main(): void {
   assert.match(cardUi, /Authorize/)
   assert.match(cardUi, /Needs revision/)
   assert.match(cardUi, /buildAvaOperatorPackageActionApiPath/)
-  assert.match(cardUi, /transportBlocked|sequence and transport/)
+  assert.match(cardUi, /GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE|GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER/)
   assert.match(cardUi, /GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF/)
   assert.doesNotMatch(cardUi, /executeTransportSend|sendSms|runSequenceExecutionJob/)
   console.log("  ✓ package card wires Approve/Reject/Needs Revision without send")
@@ -201,8 +208,8 @@ function main(): void {
   const homeSynth = readSource(
     "lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer.ts",
   )
-  assert.match(homeSynth, /os\/approvals/)
-  console.log("  ✓ Home routes into Ava Completed Work")
+  assert.match(homeSynth, /buildGrowthReviewHref/)
+  console.log("  ✓ Home routes into canonical Review package surface")
 
   const cognitive = readSource("components/growth/growth-lead-cognitive-workspace.tsx")
   assert.match(cognitive, /reviewCompletedWork/)
