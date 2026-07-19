@@ -69,7 +69,7 @@ export function GrowthHomeDailyWorkQueueSection({
                     <p className="text-xs text-muted-foreground">~{item.estimatedMinutes} min</p>
                   ) : null}
                   {item.requiresHumanApproval ? (
-                    <p className="text-xs font-medium text-amber-700">Human approval required</p>
+                    <p className="text-xs font-medium text-amber-700">Awaiting your review</p>
                   ) : null}
                 </div>
                 <GrowthHomeConfidenceBadge

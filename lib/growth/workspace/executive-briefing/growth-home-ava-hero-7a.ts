@@ -35,6 +35,11 @@ import type {
 import {
   buildPersonalizedHomeGreeting,
 } from "@/lib/growth/home/growth-home-living-experience-18e"
+import {
+  formatOperatorWaitingActivityLabel,
+  GROWTH_OPERATOR_REVIEW_CTA_LABEL,
+  GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { remapLegacyHrefToGrowthReview } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import {
   projectSupervisedSalesProgressNarrative,
@@ -157,12 +162,11 @@ export function buildAvaCurrentActivities(input: {
   if (employeeStatus.kind === "preparing_outreach" || readyForReview > 0) {
     activities.push({ id: "preparing", label: "Preparing opportunities" })
   }
-  if (employeeStatus.kind === "waiting_for_approval" || waitingCount > 0) {
-    const label =
-      waitingCount > 0
-        ? `Waiting for ${waitingCount} ${pluralize(waitingCount, "approval", "approvals")}`
-        : "Waiting for your approval"
-    activities.push({ id: "waiting", label })
+  if (employeeStatus.kind === "waiting_for_approval" || aiOsUx.approveItemsCount > 0) {
+    activities.push({
+      id: "waiting",
+      label: formatOperatorWaitingActivityLabel(aiOsUx.approveItemsCount),
+    })
   }
 
   if (activities.length === 0) {
@@ -256,7 +260,7 @@ export function buildAvaPrimaryDecision(aiOsUx: GrowthHomeAiOsUxViewModel): {
       }
     : {
         id: "approvals",
-        label: `${totalWaiting} ${pluralize(totalWaiting, "item", "items")} waiting for your approval`,
+        label: formatOperatorWaitingActivityLabel(aiOsUx.approveItemsCount),
         detail: null,
         href: normalizeOperatorReviewHref(aiOsUx.approveItemsHref),
       }

@@ -2,14 +2,19 @@
 
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import {
+  formatOperatorPackagesReadyHeadline,
+  formatOperatorReviewWorkspaceCaughtUpMessage,
+  formatOperatorReviewWorkspaceCaughtUpTitle,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
+import {
   extractGrowthInboxOperatorFirstName,
   formatGrowthInboxBriefingHeadline,
 } from "@/lib/growth/hubs/growth-inbox-hub-briefing-utils"
 
-export const GROWTH_WORKSPACE_PRIORITY_FEED_CAUGHT_UP_TITLE = "You're caught up." as const
+export const GROWTH_WORKSPACE_PRIORITY_FEED_CAUGHT_UP_TITLE = formatOperatorReviewWorkspaceCaughtUpTitle()
 
 export const GROWTH_WORKSPACE_PRIORITY_FEED_CAUGHT_UP_MESSAGE =
-  "There is nothing waiting for your attention right now." as const
+  formatOperatorReviewWorkspaceCaughtUpMessage()
 
 /** Labels that must not appear in UX-1A workspace operator copy. */
 export const GROWTH_WORKSPACE_PRIORITY_FEED_FORBIDDEN_TERMS = [
@@ -35,17 +40,16 @@ export function buildUx1aWorkspaceHeroSubline(input: {
   teammateIdentityAvailable: boolean
 }): { subline: string; teammateNamedInSubline: boolean } {
   const count = Math.max(0, input.readyCount)
-  const itemPhrase = count === 1 ? "1 item" : `${count} items`
 
   if (input.teammateIdentityAvailable && input.teammate.name.trim()) {
     return {
-      subline: `${input.teammate.name} has ${itemPhrase} ready for you.`,
+      subline: formatOperatorPackagesReadyHeadline(count).replace(/^I have/, `${input.teammate.name} has`),
       teammateNamedInSubline: true,
     }
   }
 
   return {
-    subline: `You have ${itemPhrase} ready for review.`,
+    subline: formatOperatorPackagesReadyHeadline(count),
     teammateNamedInSubline: false,
   }
 }

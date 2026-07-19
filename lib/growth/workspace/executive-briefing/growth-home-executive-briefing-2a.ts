@@ -35,7 +35,7 @@ function metricValue(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: st
 
 export function resolveAvaStatusBadgeLabel(statusLabel: string): string {
   const lower = statusLabel.toLowerCase()
-  if (lower.includes("waiting") || lower.includes("approval")) return "Waiting on You"
+  if (lower.includes("waiting") || lower.includes("approval") || lower.includes("review")) return "Ready for review"
   if (lower.includes("idle") || lower.includes("caught")) return "Idle"
   return "Working"
 }
@@ -58,12 +58,7 @@ export function buildExecutiveSnapshotKpis(input: {
     metricValue(dashboard, "my-queue", "Leads needing action"),
     metricValue(dashboard, "my-queue", "Call-ready leads"),
   )
-  const needsReview = Math.max(
-    aiOsUx.approveItemsCount,
-    aiOsUx.waitingOnYou.length,
-    briefing?.approval_queue.pending_drafts ?? 0,
-    metricValue(dashboard, "campaign-snapshot", "Approval queue"),
-  )
+  const needsReview = aiOsUx.approveItemsCount
   const repliesWaiting = Math.max(
     metricValue(dashboard, "my-queue", "Inbox requiring replies"),
     metricValue(dashboard, "activity", "Replies today"),

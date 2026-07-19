@@ -163,18 +163,18 @@ const groups = groupSupportingCompletedWork(active)
 assert.ok(groups.some((g) => g.bucket === "supporting_calibration" && g.count >= 2))
 console.log("  ✓ repetitive calibration items group into collapsed supporting summaries")
 
-assert.equal(resolveCompletedWorkContextualCta(sampleItem()), "Review Outreach")
+assert.equal(resolveCompletedWorkContextualCta(sampleItem()), "Review package")
 assert.equal(
   resolveCompletedWorkContextualCta(
     sampleItem({ source: "automation", actionType: "approve_automation" }),
   ),
-  "Review Follow-Up",
+  "Review follow-up",
 )
 assert.equal(
   resolveCompletedWorkContextualCta(
     sampleItem({ source: "adaptive_calibration", actionType: "review_recommendation" }),
   ),
-  "Review Recommendation",
+  "Review recommendation",
 )
 console.log("  ✓ generic CTA copy replaced with contextual actions")
 
@@ -191,8 +191,12 @@ console.log("  ✓ configurable teammate identity respected; no hardcoded Ava CT
 const card = readSource(
   "components/growth/ai-os/approvals/growth-ava-completed-outreach-package-card.tsx",
 )
+const progressiveLayout = readSource(
+  "components/growth/ai-os/approvals/growth-ava-package-progressive-review-layout.tsx",
+)
 assert.ok(card.includes("Drafts") || card.includes("Prepared drafts"))
-assert.ok(card.includes("Not prepared"))
+assert.ok(card.includes("GrowthAvaPackageProgressiveReviewLayout"))
+assert.ok(progressiveLayout.includes("Not prepared"))
 assert.ok(card.includes("Cancel work") || card.includes("Pause autonomy"))
 assert.ok(card.includes("Archive lead") || card.includes("Archive account"))
 assert.ok(card.includes("Authorize"))

@@ -15,8 +15,8 @@ import {
   remapLegacyHrefToGrowthReview,
   resolveOperatorPackageReviewHref,
 } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { formatOperatorPriorityRecommendedNextStep } from "../lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import {
-  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
   GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS,
   GROWTH_OPERATOR_PACKAGE_REVIEW_ENTRY_1A_QA_MARKER,
 } from "../lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
@@ -115,7 +115,7 @@ const snapshot = buildCanonicalOperatorApprovalSnapshot({
 })
 const task = buildCanonicalOperatorTask({ approvalSnapshot: snapshot })
 assert.equal(task?.href, canonicalHref)
-assert.equal(task?.whatHappensNext, GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK)
+assert.equal(task?.whatHappensNext, formatOperatorPriorityRecommendedNextStep())
 assert.doesNotMatch(task?.whatHappensNext ?? "", /send the sequence/i)
 console.log("  ✓ canonical operator task uses Review href and accurate authorize promise")
 

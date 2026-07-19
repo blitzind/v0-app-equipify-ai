@@ -132,7 +132,7 @@ const waitingSummary = buildCanonicalOperatorWaitingSummary({
     outreachPackageCount: 0,
   },
 })
-assert.match(waitingSummary, /Nothing needs your approval/i)
+assert.match(waitingSummary, /No packages are waiting for review/i)
 console.log("  ✓ draft-only orphan counts no longer emit waiting copy")
 
 const reviewQueue = synthesizeGrowthReviewDecisionQueue({
@@ -179,7 +179,7 @@ const narrative = buildAvaDailyActivityNarrative({
 })
 assert.ok(
   !narrative.waiting_on_you.some((line) =>
-    /outreach drafts.*approval|need your approval before I can continue/i.test(line),
+    /opportunity packages ready for your review|packages ready for your review/i.test(line),
   ),
 )
 console.log("  ✓ hero daily activity narrative suppresses stale approval blocking copy when canonical pending is zero")

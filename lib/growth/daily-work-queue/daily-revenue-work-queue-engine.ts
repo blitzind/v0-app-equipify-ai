@@ -4,6 +4,7 @@
  * Deterministic prioritization and capacity planning only. Never executes.
  */
 
+import { formatOperatorQueueWaitingReason } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import type { CommunicationStrategyRecommendedAction } from "@/lib/growth/contact-verification/communication-strategy-types"
 import {
   DEFAULT_DAILY_REVENUE_WORK_QUEUE_CAPACITY,
@@ -133,7 +134,7 @@ function resolvePriorityTier(input: DailyRevenueWorkQueueCandidate): {
       disposition: "high",
       sortScore: clampScore(800 + strategy.confidence * 0.08),
       dueAt: null,
-      reasoning: ["Human approval waiting", ...reasoning],
+      reasoning: [formatOperatorQueueWaitingReason(), ...reasoning],
     }
   }
 

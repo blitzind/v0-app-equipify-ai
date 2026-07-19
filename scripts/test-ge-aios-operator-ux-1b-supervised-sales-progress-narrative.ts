@@ -141,7 +141,7 @@ const qualified = projectSupervisedSalesProgressNarrative({
 })
 assert.equal(qualified.primaryStage, "qualified")
 assert.match(qualified.headline, /Block Imaging is qualified/)
-assert.match(qualified.supportingSentence ?? "", /ready for authorization/)
+assert.match(qualified.supportingSentence ?? "", /ready for review/)
 console.log("  ✓ qualified requires qualification evidence")
 
 const packageReady = projectSupervisedSalesProgressNarrative({
@@ -191,7 +191,7 @@ const waiting = projectSupervisedSalesProgressNarrative({
   }),
 })
 assert.equal(waiting.primaryStage, "waiting_for_authorization")
-assert.match(waiting.headline, /Block Imaging is waiting for your authorization/)
+assert.match(waiting.headline, /Block Imaging has an opportunity package ready for your review/)
 assert.equal(waiting.href, buildGrowthReviewPackageHref(PACKAGE_ID))
 assert.match(waiting.secondaryContext ?? "", /researching 3 additional companies/)
 assert.equal(waiting.headlineSuppressed, true)

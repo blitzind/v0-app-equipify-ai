@@ -247,7 +247,7 @@ function main(): void {
   })
   assert.match(opening ?? "", /preparing|oriented/i)
   const waitingSummary = formatLivingWaitingSummary({ approvalCount: 2 })
-  assert.match(waitingSummary, /I've prepared 2 outreach drafts/)
+  assert.match(waitingSummary, /2 opportunity packages ready for your review/)
   console.log("  ✓ living opening and waiting copy in Ava voice")
 
   const dashboard = readSource(

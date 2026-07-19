@@ -8,7 +8,10 @@ import {
   buildManualProspectSearchDiscoverHref,
   GROWTH_PORTFOLIO_MANAGER_MANUAL_FIND_OPTIONS,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a"
-import { GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+import {
+  GROWTH_OPERATOR_REVIEW_CTA_LABEL,
+  GROWTH_OPERATOR_PORTFOLIO_EXPLANATION,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
 
 type Props = {
@@ -44,6 +47,7 @@ export function GrowthHomePortfolioManagerSection({ portfolio }: Props) {
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">{portfolio.healthLabel}</p>
+          <p className="text-xs text-muted-foreground">{GROWTH_OPERATOR_PORTFOLIO_EXPLANATION}</p>
         </div>
       </div>
 

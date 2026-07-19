@@ -62,7 +62,7 @@ export function GrowthCanonicalDecisionCard({
             <GrowthBadge label="Needs your review" tone="attention" />
           ) : null}
           {projected.transportBlocked ? (
-            <GrowthBadge label="Waiting for your approval before outreach" tone="neutral" />
+            <GrowthBadge label="Ready for review" tone="neutral" />
           ) : null}
         </div>
       </div>

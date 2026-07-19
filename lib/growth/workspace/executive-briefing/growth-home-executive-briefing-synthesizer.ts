@@ -29,6 +29,12 @@ import {
   buildWaitingOnYou,
   buildWeeklyGoals,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-ownership-synthesizer"
+import {
+  formatOperatorEmployeeActivityLabel,
+  formatOperatorEmployeeStatusLabel,
+  formatOperatorWaitingActivityLabel,
+  GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { AI_PROACTIVE_FOUND_INTRO, proactiveCalmLine } from "@/lib/workspace/ai-proactive-initiative"
 import {
   teammateAttributeOutcomes,
@@ -574,9 +580,14 @@ function buildAiActivity(
   ]
 }
 
-function deriveEmployeeStatus(dashboard: GrowthWorkspaceDashboardViewModel): GrowthHomeAiEmployeeStatus {
+function deriveEmployeeStatus(
+  dashboard: GrowthWorkspaceDashboardViewModel,
+  pendingPackageCount?: number | null,
+): GrowthHomeAiEmployeeStatus {
   const briefing = dashboard.briefing
-  const pendingApprovals = briefing?.summary.pending_approvals ?? metricValue(dashboard, "campaign-snapshot", "Approval queue")
+  const legacyPending =
+    briefing?.summary.pending_approvals ?? metricValue(dashboard, "campaign-snapshot", "Approval queue")
+  const pendingApprovals = pendingPackageCount ?? legacyPending
   const repliesNeedingAttention = briefing?.summary.replies_needing_attention ?? 0
   const leads = metricValue(dashboard, "my-queue", "Leads needing action")
   const hot = metricValue(dashboard, "intelligence", "Hot companies")
@@ -586,8 +597,8 @@ function deriveEmployeeStatus(dashboard: GrowthWorkspaceDashboardViewModel): Gro
   if (pendingApprovals > 0) {
     return {
       kind: "waiting_for_approval",
-      label: "Waiting for approval",
-      activityLabel: "waiting for your approval on prepared outreach",
+      label: formatOperatorEmployeeStatusLabel(pendingApprovals),
+      activityLabel: formatOperatorEmployeeActivityLabel(pendingApprovals),
     }
   }
   if (repliesNeedingAttention > 0) {
@@ -1150,7 +1161,10 @@ export function synthesizeGrowthHomeExecutiveBriefing(
   )
   const approvalSummary = buildApprovalSummary(dashboard)
   const aiActivity = buildAiActivity(dashboard, teammate)
-  const employeeStatus = deriveEmployeeStatus(dashboard)
+  const employeeStatus = deriveEmployeeStatus(
+    dashboard,
+    input.canonicalOperatorApproval?.pendingApprovalCount,
+  )
   const completedToday = buildCompletedToday(dashboard)
   const workingOnNow = buildWorkingOnNow(dashboard, aiActivity)
   const needsReview = buildNeedsReview(dashboard, approvalSummary, exceptions)

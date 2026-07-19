@@ -7,6 +7,12 @@ import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-
 import type { GrowthCanonicalOperatorApprovalSnapshot } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
+import {
+  formatOperatorPackagesReadyHeadline,
+  GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON,
+  GROWTH_OPERATOR_REVIEW_CTA_LABEL,
+  formatOperatorPriorityRecommendedNextStep,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
@@ -144,14 +150,9 @@ export function projectSupervisedSalesProgressNarrative(input: {
     const count = pendingApprovalCount || packageCount
     const headline =
       companyName && count <= 1
-        ? `${companyName} is waiting for your authorization.`
-        : count === 1
-          ? "1 outreach package is ready for your review."
-          : `${count} outreach packages are waiting for your authorization.`
-    const supportingSentence =
-      count === 1
-        ? "Authorize the prepared outreach package. Sending remains separately gated."
-        : "Review and authorize the prepared outreach packages. Sending remains separately gated."
+        ? `${companyName} has an opportunity package ready for your review.`
+        : formatOperatorPackagesReadyHeadline(count)
+    const supportingSentence = formatOperatorPriorityRecommendedNextStep()
 
     return {
       qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
@@ -163,7 +164,7 @@ export function projectSupervisedSalesProgressNarrative(input: {
       companyName,
       count,
       href: packageReviewHref(approvalSnapshot),
-      ctaLabel: "Review",
+      ctaLabel: GROWTH_OPERATOR_REVIEW_CTA_LABEL,
       operatorAttentionRequired: true,
       headlineSuppressed: true,
       idleVariant: null,
@@ -175,21 +176,18 @@ export function projectSupervisedSalesProgressNarrative(input: {
     sourceStates.push("missionDiscovery.counters.draftsPrepared", "researchLoopSummary.readyForOutreachReview")
     const companyName = topPackage?.companyName ?? null
     const count = Math.max(packageCount, readyForOutreachReview)
-    const headline =
-      companyName && count <= 1
-        ? "1 outreach package is ready for your review."
-        : `${count} outreach ${pluralize(count, "package", "packages")} ${count === 1 ? "is" : "are"} ready for your review.`
+    const headline = formatOperatorPackagesReadyHeadline(count)
     return {
       qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
       primaryStage: "package_ready",
       headline,
-      supportingSentence: "I'll bring packages back here when they need your authorization.",
+      supportingSentence: GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON,
       secondaryContext: buildSecondaryResearchContext(researchingCount, teammate),
       completedSummary,
       companyName,
       count,
       href: packageReviewHref(approvalSnapshot),
-      ctaLabel: "Review",
+      ctaLabel: GROWTH_OPERATOR_REVIEW_CTA_LABEL,
       operatorAttentionRequired: false,
       headlineSuppressed: false,
       idleVariant: null,
@@ -210,7 +208,7 @@ export function projectSupervisedSalesProgressNarrative(input: {
       qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
       primaryStage: "qualified",
       headline,
-      supportingSentence: "I'll bring this back to you when it is ready for authorization.",
+      supportingSentence: "I'll bring this back to you when the opportunity package is ready for review.",
       secondaryContext: buildSecondaryResearchContext(researchingCount, teammate),
       completedSummary,
       companyName,

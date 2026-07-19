@@ -3,6 +3,9 @@
 import type { AvaDailyActivitySection, NarrativeIntelligenceFocus } from "@/lib/growth/ava-home/narrative/narrative-types"
 import { GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 import { HOME_LIVING_WAITING_EMPTY_MESSAGE } from "@/lib/growth/home/growth-home-living-experience-18e"
+import {
+  formatOperatorHomeOpeningWithPackages,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 
 export const GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER =
   "ge-aios-18f-narrative-intelligence-v1" as const
@@ -103,15 +106,16 @@ export function buildNarrativeIntelligenceOpeningLine(input: {
   hasPrimaryDecision?: boolean
   completedCount?: number
   waitingCount?: number
+  packageCount?: number
   setupIncomplete?: boolean
   discoveryTarget?: string | null
 }): string {
   if (input.setupIncomplete) {
     return "I'm ready to start — I just need a few things from you first."
   }
-  if (input.hasPrimaryDecision || input.focus === "approvals") {
-    return "I need your help before I can keep going."
-  }
+  const packages = Math.max(input.packageCount ?? input.waitingCount ?? 0, 0)
+  const packageOpening = formatOperatorHomeOpeningWithPackages(packages)
+  if (packageOpening) return packageOpening
   if (input.focus === "discovery") {
     if (input.discoveryTarget?.trim()) {
       return `I'm building your pipeline — finding ${input.discoveryTarget.trim()} that match your profile.`

@@ -3,6 +3,11 @@
 import type { AvaDailyActivityNarrative } from "@/lib/growth/ava-home/narrative/narrative-types"
 import { extractFirstNameFromGreeting } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
+import {
+  formatOperatorPackagesReadySummary,
+  GROWTH_OPERATOR_PACKAGES_EMPTY_DETAIL,
+  GROWTH_OPERATOR_PACKAGES_EMPTY_TITLE,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { GROWTH_INSTITUTIONAL_LEARNING_EMPTY_MESSAGE } from "@/lib/growth/memory/institutional-learning/growth-institutional-learning-truthfulness-1a"
 
 export const GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER =
@@ -17,7 +22,7 @@ export const HOME_LIVING_EMPTY_PROGRESS_MESSAGE =
   "I'm planning today's priorities as work comes in." as const
 
 export const HOME_LIVING_WAITING_EMPTY_MESSAGE =
-  "Nothing needs your approval right now — I'll keep working and add drafts to Approvals when they're ready." as const
+  `${GROWTH_OPERATOR_PACKAGES_EMPTY_TITLE} ${GROWTH_OPERATOR_PACKAGES_EMPTY_DETAIL}` as const
 
 export const HOME_LIVING_ALL_CLEAR_WITH_NARRATIVE =
   "I'm keeping an eye on everything else in the background." as const
@@ -71,7 +76,7 @@ export function buildLivingHomeOpeningLine(input: {
     return "I've been preparing for today's work."
   }
   if (input.hasPrimaryDecision) {
-    return "I need your help on one thing before I can keep going."
+    return null
   }
   return "I'm getting oriented for today's work."
 }
@@ -80,18 +85,10 @@ export function formatLivingWaitingSummary(input: {
   approvalCount: number
   replyCount?: number
 }): string {
-  const approvals = Math.max(input.approvalCount, 0)
-  const replies = Math.max(input.replyCount ?? 0, 0)
-  if (approvals > 0 && replies > 0) {
-    return `I've prepared ${approvals} outreach ${approvals === 1 ? "draft" : "drafts"} for your approval, and ${replies} ${replies === 1 ? "reply needs" : "replies need"} your review.`
-  }
-  if (approvals > 0) {
-    return `I've prepared ${approvals} outreach ${approvals === 1 ? "draft" : "drafts"} that need your approval.`
-  }
-  if (replies > 0) {
-    return `${replies} ${replies === 1 ? "reply needs" : "replies need"} your review before I can continue.`
-  }
-  return HOME_LIVING_WAITING_EMPTY_MESSAGE
+  return formatOperatorPackagesReadySummary({
+    packageCount: input.approvalCount,
+    replyCount: input.replyCount,
+  })
 }
 
 export function buildLivingSpecialistIdleLabel(input: {
@@ -108,7 +105,7 @@ export function buildLivingSpecialistIdleLabel(input: {
     return ""
   }
   if (input.hasApprovalWaiting) {
-    return "Waiting for your approval before I send outreach."
+    return "Ready for your review."
   }
   if (input.specialistId === "sales" && !input.hasResearchWork) {
     return "I'm still waiting for companies to research."

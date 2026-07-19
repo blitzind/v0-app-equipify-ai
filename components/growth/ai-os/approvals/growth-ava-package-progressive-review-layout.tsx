@@ -100,6 +100,8 @@ function EvidenceGroup({
     </div>
   )
 }
+
+function channelBadgeTone(row: OperatorPackageChannelReadinessRow): "healthy" | "attention" | "neutral" | "blocked" {
   if (row.content === "prepared" && row.contact !== "contact_missing") return "healthy"
   if (row.content === "prepared" && row.contact === "contact_missing") return "attention"
   if (row.content === "missing" || row.contact === "contact_missing") return "attention"
@@ -107,7 +109,7 @@ function EvidenceGroup({
   return "neutral"
 }
 
-function channelBadgeTone(row: OperatorPackageChannelReadinessRow): "healthy" | "attention" | "neutral" | "blocked" {
+function DraftEditorBlock({
   draft,
   draftEdits,
   onDraftChange,

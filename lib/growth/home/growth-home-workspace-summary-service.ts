@@ -670,7 +670,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
     avaConsole.waitingForApproval =
       canonicalApprovalCount > 0
-        ? `${canonicalApprovalCount} item(s) waiting for your approval`
+        ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
         : null
   }
 

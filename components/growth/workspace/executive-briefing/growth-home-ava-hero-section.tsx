@@ -25,6 +25,7 @@ import {
   buildNarrativeIntelligenceOpeningLine,
   GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER,
 } from "@/lib/growth/ava-home/narrative/engine/growth-home-narrative-intelligence-18f"
+import { GROWTH_OPERATOR_REVIEW_CTA_LABEL } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import {
   GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER,
   HOME_LIVING_ALL_CLEAR_WITH_NARRATIVE,
@@ -91,7 +92,8 @@ export function GrowthHomeAvaHeroSection({
     focus: dailyActivityNarrative?.focus ?? "idle",
     hasPrimaryDecision: Boolean(hero.primaryDecision),
     completedCount: dailyActivityNarrative?.completed_today.length ?? 0,
-    waitingCount: dailyActivityNarrative?.waiting_on_you.filter((line) => !/Nothing needs your approval/i.test(line)).length ?? 0,
+    waitingCount: dailyActivityNarrative?.waiting_on_you.filter((line) => !/No packages are waiting/i.test(line)).length ?? 0,
+    packageCount: pendingApprovals,
     setupIncomplete: dailyActivityNarrative?.focus === "setup",
     discoveryTarget: hero.discoveryNarrativeTarget ?? null,
   })
@@ -173,7 +175,7 @@ export function GrowthHomeAvaHeroSection({
           hero.supervisedSalesProgress.href &&
           hero.supervisedSalesProgress.ctaLabel ? (
             <Button asChild size="sm" variant="outline" className="mt-2">
-              <Link href={hero.supervisedSalesProgress.href}>{hero.supervisedSalesProgress.ctaLabel}</Link>
+                  <Link href={hero.supervisedSalesProgress.href}>{GROWTH_OPERATOR_REVIEW_CTA_LABEL}</Link>
             </Button>
           ) : null}
         </div>
@@ -280,7 +282,7 @@ export function GrowthHomeAvaHeroSection({
               {hero.primaryDecision.href ? (
                 <Button asChild size="sm">
                   <Link href={hero.primaryDecision.href}>
-                    Review
+                    {GROWTH_OPERATOR_REVIEW_CTA_LABEL}
                     <ArrowRight className="ml-1.5 size-4" />
                   </Link>
                 </Button>

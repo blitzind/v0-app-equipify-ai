@@ -7,6 +7,7 @@
 import type { GrowthHumanApprovalItem } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
 import type { GrowthAvaCompletedWorkCategoryId } from "@/lib/growth/aios/approvals/ava-completed-work-contract"
 import { categorizeAvaCompletedWorkItem } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
+import { formatOperatorCompletedWorkCta } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 
 export const GROWTH_AIOS_OPERATOR_UX_1A_QA_MARKER =
   "ge-aios-operator-ux-1a-completed-work-lifecycle-controls-v1" as const
@@ -183,15 +184,15 @@ export function sortCompletedWorkForOperatorPriority<T extends { item: GrowthHum
 
 export function resolveCompletedWorkContextualCta(item: GrowthHumanApprovalItem): string {
   const bucket = resolveCompletedWorkOperatorBucket(item)
-  if (bucket === "ready_outreach") return "Review Outreach"
-  if (bucket === "ready_meeting") return "Review Meeting Prep"
-  if (bucket === "ready_follow_up") return "Review Follow-Up"
-  if (bucket === "supporting_risk") return "View Risk Details"
+  if (bucket === "ready_outreach") return formatOperatorCompletedWorkCta(bucket)
+  if (bucket === "ready_meeting") return "Review meeting prep"
+  if (bucket === "ready_follow_up") return "Review follow-up"
+  if (bucket === "supporting_risk") return "View risk details"
   if (bucket === "supporting_calibration" || bucket === "supporting_objective") {
-    return "Review Recommendation"
+    return "Review recommendation"
   }
-  if (item.subjectType === "lead" && item.subjectId) return "Open Account"
-  return "Review Recommendation"
+  if (item.subjectType === "lead" && item.subjectId) return "Open account"
+  return "Review recommendation"
 }
 
 export function resolveCompletedWorkOverflowActions(input: {

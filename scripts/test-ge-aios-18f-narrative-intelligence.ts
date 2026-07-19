@@ -186,6 +186,7 @@ function main(): void {
   console.log("  ✓ runtime-driven current work")
 
   const approvalNarrative = buildAvaDailyActivityNarrative({
+    pendingApprovalCount: 2,
     memorySummary: {
       qaMarker: GROWTH_MEMORY_ENGINE_QA_MARKER,
       recent_events: [],
@@ -254,7 +255,7 @@ function main(): void {
   })
   assert.equal(approvalNarrative.focus, "approvals")
   assert.equal(approvalNarrative.section_order[0], "waiting_on_you")
-  assert.ok(approvalNarrative.waiting_on_you.some((line) => /2 outreach drafts/i.test(line)))
+  assert.ok(approvalNarrative.waiting_on_you.some((line) => /2 opportunity packages ready for your review/i.test(line)))
   console.log("  ✓ runtime-driven approvals with context-aware ordering")
 
   const knowledgeNarrative = buildAvaDailyActivityNarrative({

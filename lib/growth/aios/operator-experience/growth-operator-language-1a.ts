@@ -21,8 +21,8 @@ const ENGINE_TERM_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bresolver\b/gi, ""],
   [/\bprojection\b/gi, ""],
   [/\bsend\s*plane\b/gi, "outreach send"],
-  [/\boperator\s*review\s*required\b/gi, "Waiting for your approval"],
-  [/\btransport\s*blocked\b/gi, "Waiting for your approval before outreach"],
+  [/\boperator\s*review\s*required\b/gi, "Ready for review"],
+  [/\btransport\s*blocked\b/gi, "Ready for review"],
   [/\bexpand_committee\b/gi, "Expand stakeholders on this account"],
   [/\bprepare_meeting\b/gi, "Prepare for the upcoming meeting"],
   [/\bfollow_up\b/gi, "Follow up after the last touch"],
@@ -34,7 +34,7 @@ const POSITIVE_CONCLUSION_PATTERNS: Array<[RegExp, string]> = [
   [/decision\s*maker\s*verified|champion\s*identified/i, "Decision maker verified"],
   [/company\s*matches?\s*(your\s*)?business\s*profile|icp\s*match/i, "Company matches your business profile"],
   [/contact\s*verification\s*still\s*required|email\s*unverified/i, "Contact verification still required"],
-  [/waiting\s*for\s*your\s*approval|pending\s*approval|awaiting\s*operator/i, "Waiting for your approval before outreach"],
+  [/waiting\s*for\s*your\s*approval|pending\s*approval|awaiting\s*operator/i, "Ready for review"],
   [/service\s*director|expand\s*committee|multi.?thread/i, "Expand stakeholders on this account"],
   [/meeting\s*booked|upcoming\s*meeting/i, "Prepare for the upcoming meeting"],
 ]
@@ -85,7 +85,7 @@ export function humanizeOperatorDecisionTitle(
     case "wait":
       return "Wait until the agreed follow-up date"
     case "approve_package":
-      return "Review outreach before I send"
+      return "Review opportunity package"
     default:
       return humanizeOperatorFacingLine(title) || title
   }
@@ -93,28 +93,28 @@ export function humanizeOperatorDecisionTitle(
 
 export function humanizeOperatorBadgeLabel(label: string): string {
   const normalized = label.trim().toLowerCase()
-  if (normalized.includes("operator review")) return "Needs your review"
-  if (normalized.includes("send plane")) return "Waiting for approval"
-  if (normalized.includes("transport blocked")) return "Waiting for approval"
+  if (normalized.includes("operator review")) return "Ready for review"
+  if (normalized.includes("send plane")) return "Ready for review"
+  if (normalized.includes("transport blocked")) return "Ready for review"
   if (normalized.includes("freshness")) return "Recently updated"
   return stripInternalEngineTerms(label)
 }
 
 export function formatCanonicalDraftCount(count: number): string {
   const safe = Math.max(0, count)
-  if (safe === 0) return "No outreach drafts waiting"
-  if (safe === 1) return "1 outreach draft prepared"
-  return `${safe} outreach drafts prepared`
+  if (safe === 0) return "No editable drafts in this package"
+  if (safe === 1) return "1 email draft prepared"
+  return `${safe} email drafts prepared`
+}
+
+export function formatCanonicalPackageCount(count: number): string {
+  const safe = Math.max(0, count)
+  if (safe === 0) return "No opportunity packages waiting"
+  if (safe === 1) return "1 opportunity package ready for review"
+  return `${safe} opportunity packages ready for review`
 }
 
 import { formatTerminalReasonOperatorMessage } from "@/lib/growth/aios/execution/growth-terminal-reason-taxonomy-1a"
 import { formatDegradedEnforcementOperatorMessage } from "@/lib/growth/aios/execution/growth-degraded-enforcement-policy-1a"
 
 export { formatTerminalReasonOperatorMessage, formatDegradedEnforcementOperatorMessage }
-
-export function formatCanonicalPackageCount(count: number): string {
-  const safe = Math.max(0, count)
-  if (safe === 0) return "No outreach packages waiting"
-  if (safe === 1) return "1 outreach package ready for review"
-  return `${safe} outreach packages ready for review`
-}

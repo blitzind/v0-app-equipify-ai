@@ -28,9 +28,7 @@ import {
 } from "../lib/growth/aios/operator-experience/growth-operator-language-1a"
 import { buildAiOsUxViewModel } from "../lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
 import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
-import {
-  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
-} from "../lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
+import { formatOperatorPriorityRecommendedNextStep } from "../lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { buildGrowthHomeExecutiveBriefingCertDashboard } from "../lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 
 const ROOT = process.cwd()
@@ -154,8 +152,8 @@ const narrative = projectCanonicalLeadOpportunityNarrative({
 assert.equal(narrative.packageCount, 1)
 assert.equal(narrative.draftCount, 2)
 assert.equal(narrative.approvalRequired, true)
-assert.equal(narrative.currentFocus, "Review outreach for Block Imaging")
-assert.equal(narrative.blockedBy, "Waiting for your approval before outreach")
+assert.equal(narrative.currentFocus, "Review opportunity package for Block Imaging")
+assert.equal(narrative.blockedBy, "Ready for review")
 console.log("  ✓ lead opportunity narrative matches approval + decision state")
 
 const task = buildCanonicalOperatorTask({
@@ -168,12 +166,12 @@ assert.match(task!.title, /Block Imaging/)
 assert.equal(task!.draftCount, 2)
 assert.equal(task!.packageCount, 1)
 assert.equal(task!.href, buildGrowthReviewPackageHref(pkg.packageId))
-assert.equal(task!.whatHappensNext, GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK)
+assert.equal(task!.whatHappensNext, formatOperatorPriorityRecommendedNextStep())
 console.log("  ✓ canonical operator task collapses duplicate home priorities")
 
 const waitingSummary = buildCanonicalOperatorWaitingSummary({ approvalSnapshot: snapshot })
-assert.match(waitingSummary, /1 outreach package/)
-assert.match(waitingSummary, /2 drafts/)
+assert.match(waitingSummary, /1 opportunity package ready for your review/)
+assert.match(waitingSummary, /Once you've reviewed them/)
 console.log("  ✓ waiting summary uses one canonical draft count")
 
 const dashboard = buildGrowthHomeExecutiveBriefingCertDashboard()
@@ -216,7 +214,7 @@ const completedWorkSource = readSource("components/growth/ai-os/approvals/growth
 assert.ok(completedWorkSource.includes("buildCanonicalOperatorApprovalSnapshot"))
 const decisionCardSource = readSource("components/growth/growth-canonical-decision-card.tsx")
 assert.ok(!decisionCardSource.includes("Send Plane blocked"))
-assert.ok(decisionCardSource.includes("Waiting for your approval before outreach"))
+assert.ok(decisionCardSource.includes("Ready for review"))
 console.log("  ✓ wiring present across Home, Lead Workspace, Completed Work, decision card")
 
 console.log(`\n[GE-AIOS-OPERATOR-EXPERIENCE-1A] PASS ${GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER}`)

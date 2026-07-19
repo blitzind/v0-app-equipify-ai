@@ -20,8 +20,11 @@ import { buildKnowledgeNarrativeLines } from "@/lib/growth/memory/knowledge/buil
 import { SALES_SPECIALIST_MEMORY_SOURCE } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
 import type { SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import type { AvaSpecialistOrchestratorResult } from "@/lib/growth/specialists/types"
+import {
+  formatOperatorDailyActivityWaitingFollowOn,
+  formatOperatorDailyActivityWaitingLine,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { buildPhaseAwareNarrativeLine } from "@/lib/growth/operating-rhythm/bridges/narrative-bridge"
-import type { AvaOperatingRhythm } from "@/lib/growth/operating-rhythm/types"
 import type { AvaWorkItem, AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import {
   buildLeadDiscoveryCompletedLine,
@@ -168,30 +171,29 @@ export function buildDailyActivityLearnedLines(
   return buildKnowledgeNarrativeLines(memorySummary?.organizational_knowledge ?? []).slice(0, 2)
 }
 
-/** Waiting on operator — canonical pending approval count first, then Work Manager queue. */
+/** Waiting on operator — canonical pending approval count only (package vocabulary). */
 export function buildDailyActivityWaitingLines(input: {
   workResult: AvaWorkManagerResult
   salesDailySummary?: SalesOutcomeDailySummary | null
   pendingApprovalCount?: number
 }): string[] {
   const lines: string[] = []
-  const approvalItems = input.workResult.operator_queue.filter((row) => row.type === "approval")
   const approvalCount =
     input.pendingApprovalCount ??
     input.salesDailySummary?.approvals_pending ??
-    approvalItems.length
+    0
 
-  if (approvalCount > 0) {
-    lines.push(
-      `I have ${approvalCount} outreach ${pluralize(approvalCount, "draft", "drafts")} ready for your approval.`,
-    )
-    lines.push("I need your approval before I can continue.")
+  const waitingLine = formatOperatorDailyActivityWaitingLine(approvalCount)
+  if (waitingLine) {
+    lines.push(waitingLine)
+    const followOn = formatOperatorDailyActivityWaitingFollowOn(approvalCount)
+    if (followOn) lines.push(followOn)
   }
 
   const replyItems = input.workResult.operator_queue.filter((row) => row.type === "reply")
   if (replyItems.length > 0) {
     lines.push(
-      `${replyItems.length} ${pluralize(replyItems.length, "reply needs", "replies need")} your review before I can continue.`,
+      `${replyItems.length} ${pluralize(replyItems.length, "reply needs", "replies need")} your response before I can continue.`,
     )
   }
 

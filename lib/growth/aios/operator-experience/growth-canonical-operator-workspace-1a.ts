@@ -13,11 +13,15 @@ import {
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type { GrowthCanonicalOperatorDecisionProjection } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
 import {
-  formatCanonicalDraftCount,
-  formatCanonicalPackageCount,
-  humanizeOperatorDecisionTitle,
-  humanizeOperatorFacingLine,
-} from "@/lib/growth/aios/operator-experience/growth-operator-language-1a"
+  formatOperatorPackagesReadySummary,
+  formatOperatorPriorityPackageDetail,
+  formatOperatorPriorityPackageTitle,
+  formatOperatorPriorityRecommendedNextStep,
+  GROWTH_OPERATOR_PACKAGES_EMPTY_DETAIL,
+  GROWTH_OPERATOR_PACKAGES_EMPTY_TITLE,
+  GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON,
+  GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import {
   GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER,
   type GrowthCanonicalLeadOpportunityNarrative,
@@ -26,6 +30,12 @@ import {
   type GrowthCanonicalOperatorTask,
   type GrowthCanonicalOperatorWorkspaceLeadContext,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
+import {
+  formatCanonicalDraftCount,
+  formatCanonicalPackageCount,
+  humanizeOperatorDecisionTitle,
+  humanizeOperatorFacingLine,
+} from "@/lib/growth/aios/operator-experience/growth-operator-language-1a"
 import {
   buildGrowthReviewHref,
   resolveOperatorPackageReviewHref,
@@ -146,17 +156,16 @@ export function buildCanonicalOperatorTask(input: {
   const top = input.approvalSnapshot.topPackage
 
   if (top) {
-    const draftLabel =
-      top.draftCount > 0
-        ? `${top.draftCount} draft${top.draftCount === 1 ? "" : "s"}`
-        : "outreach package"
     return {
       id: `approval:${top.itemId}`,
       kind: "approval",
-      title: `Review ${top.companyName}`,
-      detail: `${top.channelLabel ?? "Email sequence"} prepared · ${draftLabel}`,
-      why: `${teammate} finished research and prepared outreach for your review.`,
-      whatHappensNext: GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
+      title: formatOperatorPriorityPackageTitle(top.companyName),
+      detail: formatOperatorPriorityPackageDetail({
+        channelLabel: top.channelLabel ?? "Email sequence",
+        emailDraftCount: top.draftCount,
+      }),
+      why: `${teammate} finished research and prepared this opportunity package for your review.`,
+      whatHappensNext: formatOperatorPriorityRecommendedNextStep(),
       confidenceLabel: null,
       href: top.reviewHref,
       companyName: top.companyName,
@@ -233,19 +242,19 @@ export function projectCanonicalLeadOpportunityNarrative(
     Boolean(hac?.status === "pending")
 
   const currentFocus = packageForLead
-    ? `Review outreach for ${input.companyName}`
+    ? `Review opportunity package for ${input.companyName}`
     : decision
       ? humanizeOperatorDecisionTitle(decision.whatToDo, decision.primaryAction)
       : `Research and qualify ${input.companyName}`
 
   const blockedBy = approvalRequired
-    ? "Waiting for your approval before outreach"
+    ? GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW
     : decision?.transportBlocked
-      ? "Waiting for your approval before outreach"
+      ? GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW
       : null
 
   const nextStep = packageForLead
-    ? "Review the prepared sequence and approve send"
+    ? formatOperatorPriorityRecommendedNextStep()
     : decision
       ? humanizeOperatorDecisionTitle(decision.whatToDo, decision.primaryAction)
       : "Continue qualification research"
@@ -292,20 +301,13 @@ export function buildCanonicalOperatorWaitingSummary(input: {
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot
   replyCount?: number
 }): string {
-  const packages = input.approvalSnapshot.outreachPackageCount
-  const drafts = input.approvalSnapshot.outreachDraftCount
+  const packages = input.approvalSnapshot.pendingApprovalCount
   const replies = Math.max(input.replyCount ?? 0, 0)
-
-  if (packages > 0 && replies > 0) {
-    return `I've prepared ${packages} outreach ${packages === 1 ? "package" : "packages"} with ${drafts} ${drafts === 1 ? "draft" : "drafts"}, and ${replies} ${replies === 1 ? "reply needs" : "replies need"} your review.`
-  }
+  const summary = formatOperatorPackagesReadySummary({ packageCount: packages, replyCount: replies })
   if (packages > 0) {
-    return `I've prepared ${packages} outreach ${packages === 1 ? "package" : "packages"} with ${drafts} ${drafts === 1 ? "draft" : "drafts"} that need your approval.`
+    return `${summary} ${GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON}`
   }
-  if (replies > 0) {
-    return `${replies} ${replies === 1 ? "reply needs" : "replies need"} your review before I can continue.`
-  }
-  return "Nothing needs your approval right now — I'll add prepared work here when it's ready."
+  return summary
 }
 
 export function resolveCanonicalApprovalQueueCount(
