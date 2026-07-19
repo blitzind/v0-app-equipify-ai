@@ -33,6 +33,7 @@ import { GrowthAvaPackageProgressiveReviewLayout } from "@/components/growth/ai-
 import {
   projectOperatorPackageDecisionSummary,
 } from "@/lib/growth/workspace/ux-2a/review/growth-operator-package-progressive-review-2a"
+import { projectOperatorPackageRecommendation2D } from "@/lib/growth/workspace/ux-2d/review/growth-operator-package-recommendation-2d"
 import {
   GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER,
@@ -383,6 +384,17 @@ export function GrowthAvaCompletedOutreachPackageCard({
     [view, transportExecutionReady],
   )
 
+  const packageRecommendation = useMemo(
+    () =>
+      view && decisionSummary
+        ? projectOperatorPackageRecommendation2D({
+            packet: view,
+            summary: decisionSummary,
+          })
+        : null,
+    [view, decisionSummary],
+  )
+
   return (
     <li
       className="rounded-xl border-2 border-emerald-200/80 bg-card p-5 shadow-sm dark:border-emerald-900/50"
@@ -460,10 +472,11 @@ export function GrowthAvaCompletedOutreachPackageCard({
         </div>
       </div>
 
-      {view && decisionSummary ? (
+      {view && decisionSummary && packageRecommendation ? (
         <GrowthAvaPackageProgressiveReviewLayout
           view={view}
           summary={decisionSummary}
+          recommendation={packageRecommendation}
           teammateName={teammate.name}
           packageId={card.packageId}
           leadId={card.leadId}

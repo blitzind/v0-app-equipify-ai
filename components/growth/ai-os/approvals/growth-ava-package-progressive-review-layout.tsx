@@ -14,6 +14,10 @@ import {
   type OperatorPackageChannelReadinessRow,
   type OperatorPackageDecisionSummary,
 } from "@/lib/growth/workspace/ux-2a/review/growth-operator-package-progressive-review-2a"
+import {
+  GROWTH_OPERATOR_PACKAGE_RECOMMENDATION_2D_QA_MARKER,
+  type OperatorPackageRecommendation,
+} from "@/lib/growth/workspace/ux-2d/review/growth-operator-package-recommendation-2d"
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -69,7 +73,33 @@ function SummaryBlock({ title, children }: { title: string; children: ReactNode 
   )
 }
 
-function channelBadgeTone(row: OperatorPackageChannelReadinessRow): "healthy" | "attention" | "neutral" | "blocked" {
+function qualityBadgeTone(state: OperatorPackageRecommendation["qualityState"]): "healthy" | "attention" | "neutral" {
+  if (state === "ready") return "healthy"
+  if (state === "needs_attention") return "attention"
+  return "neutral"
+}
+
+function qualityBadgeLabel(state: OperatorPackageRecommendation["qualityState"]): string {
+  if (state === "ready") return "Recommendation ready"
+  if (state === "needs_attention") return "Needs attention"
+  return "Limited evidence"
+}
+
+function EvidenceGroup({
+  label,
+  lines,
+}: {
+  label: string
+  lines: string[]
+}) {
+  if (!lines.length) return null
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <BulletList lines={lines} />
+    </div>
+  )
+}
   if (row.content === "prepared" && row.contact !== "contact_missing") return "healthy"
   if (row.content === "prepared" && row.contact === "contact_missing") return "attention"
   if (row.content === "missing" || row.contact === "contact_missing") return "attention"
@@ -77,7 +107,7 @@ function channelBadgeTone(row: OperatorPackageChannelReadinessRow): "healthy" | 
   return "neutral"
 }
 
-function DraftEditorBlock({
+function channelBadgeTone(row: OperatorPackageChannelReadinessRow): "healthy" | "attention" | "neutral" | "blocked" {
   draft,
   draftEdits,
   onDraftChange,
@@ -127,6 +157,7 @@ function DraftEditorBlock({
 type Props = {
   view: Approvals2AOperatorReviewPacket
   summary: OperatorPackageDecisionSummary
+  recommendation: OperatorPackageRecommendation
   teammateName: string
   packageId: string
   leadId: string
@@ -142,6 +173,7 @@ type Props = {
 export function GrowthAvaPackageProgressiveReviewLayout({
   view,
   summary,
+  recommendation,
   teammateName,
   packageId,
   leadId,
@@ -165,34 +197,132 @@ export function GrowthAvaPackageProgressiveReviewLayout({
     <div
       className="mt-5 space-y-4"
       data-qa-marker={GROWTH_OPERATOR_PACKAGE_PROGRESSIVE_REVIEW_2A_QA_MARKER}
+      data-qa-marker-recommendation-2d={GROWTH_OPERATOR_PACKAGE_RECOMMENDATION_2D_QA_MARKER}
       data-qa-section="package-review-level-1"
     >
       <SummaryBlock title="60-second decision summary">
         <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <GrowthBadge
+              label={qualityBadgeLabel(recommendation.qualityState)}
+              tone={qualityBadgeTone(recommendation.qualityState)}
+            />
+            <span className="text-xs text-muted-foreground">{summary.confidenceLabel}</span>
+          </div>
+
+          {recommendation.weakEvidenceIntro ? (
+            <div className="rounded-md border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+              {recommendation.weakEvidenceIntro}
+            </div>
+          ) : null}
+
           <div>
             <p className="text-lg font-semibold text-foreground">{summary.companyName}</p>
             {summary.companyContext ? (
               <p className="mt-1 text-sm text-muted-foreground">{summary.companyContext}</p>
             ) : null}
-            <p className="mt-2 text-sm leading-relaxed text-foreground">{summary.recommendedAngle}</p>
-            <p className="mt-2 text-xs font-medium text-muted-foreground">{summary.confidenceLabel}</p>
+            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Executive recommendation
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-foreground">
+              {recommendation.executiveRecommendation}
+            </p>
           </div>
 
-          {summary.fitReasons.length ? (
+          {recommendation.whyThisAccount.length ? (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Why this opportunity
+                Why this account
               </p>
-              <BulletList lines={summary.fitReasons} />
+              <BulletList lines={recommendation.whyThisAccount} />
             </div>
           ) : null}
 
-          {summary.buyingSignals.length ? (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Buying signals and pain points
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Why now
+            </p>
+            <p className="mt-1 text-sm text-foreground">{recommendation.whyNow}</p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Recommended buyer
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {recommendation.recommendedBuyer.name
+                ? `${recommendation.recommendedBuyer.name}${recommendation.recommendedBuyer.title ? ` · ${recommendation.recommendedBuyer.title}` : ""}`
+                : "No verified contact on file yet."}
+            </p>
+            {recommendation.recommendedBuyer.confidenceLabel ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {recommendation.recommendedBuyer.confidenceLabel}
               </p>
-              <BulletList lines={summary.buyingSignals} />
+            ) : null}
+            <p className="mt-1 text-sm text-foreground">{recommendation.recommendedBuyer.roleRationale}</p>
+            {recommendation.recommendedBuyer.weakContact ? (
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                Contact confidence is limited — verify the buyer before authorizing outreach.
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Recommended angle
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">{recommendation.primaryAngle.label}</p>
+            <p className="mt-1 text-sm text-foreground">{recommendation.primaryAngle.rationale}</p>
+            {recommendation.primaryAngle.equipifyValue ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Equipify fit: {recommendation.primaryAngle.equipifyValue}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              First-conversation strategy
+            </p>
+            <div className="mt-1 space-y-1 text-sm text-foreground">
+              <p>
+                <span className="font-medium">Opening premise:</span>{" "}
+                {recommendation.firstConversation.openingPremise}
+              </p>
+              <p>
+                <span className="font-medium">Discovery question:</span>{" "}
+                {recommendation.firstConversation.discoveryQuestion}
+              </p>
+              {recommendation.firstConversation.proofPoint ? (
+                <p>
+                  <span className="font-medium">Proof point:</span>{" "}
+                  {recommendation.firstConversation.proofPoint}
+                </p>
+              ) : null}
+              <p>
+                <span className="font-medium">Desired next step:</span>{" "}
+                {recommendation.firstConversation.desiredNextStep}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Evidence and uncertainty
+            </p>
+            <EvidenceGroup label="Verified" lines={recommendation.evidenceAndUncertainty.verified} />
+            <EvidenceGroup label="Inferred" lines={recommendation.evidenceAndUncertainty.inferred} />
+            <EvidenceGroup label="Unknown" lines={recommendation.evidenceAndUncertainty.unknown} />
+          </div>
+
+          {!recommendation.draftAlignment.aligned ? (
+            <div className="rounded-md border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+              <p className="font-medium">Draft alignment</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                {recommendation.draftAlignment.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
 
@@ -206,17 +336,11 @@ export function GrowthAvaPackageProgressiveReviewLayout({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Contact strategy
             </p>
-            <p className="mt-1 text-sm text-foreground">
-              {summary.contactName
-                ? `${summary.contactName}${summary.contactRole ? ` · ${summary.contactRole}` : ""}`
-                : "No verified contact on file yet."}
-            </p>
-            {summary.contactConfidenceLabel ? (
-              <p className="mt-1 text-xs text-muted-foreground">{summary.contactConfidenceLabel}</p>
-            ) : null}
             {summary.contactWarning ? (
               <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">{summary.contactWarning}</p>
-            ) : null}
+            ) : (
+              <p className="mt-1 text-sm text-foreground">{summary.contactReadySummary}</p>
+            )}
           </div>
 
           <div className="space-y-2">
