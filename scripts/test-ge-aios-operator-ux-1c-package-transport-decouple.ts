@@ -51,6 +51,7 @@ assert.equal(incompletePackage.ready, false)
 console.log("  ✓ incomplete package remains authorization-blocked")
 
 const card = readSource("components/growth/ai-os/approvals/growth-ava-completed-outreach-package-card.tsx")
+const layout = readSource("components/growth/ai-os/approvals/growth-ava-package-progressive-review-layout.tsx")
 assert.match(card, /resolvePackageAuthorizationReadiness/)
 assert.match(card, /transportExecutionReady/)
 assert.doesNotMatch(card, /Authorize is blocked until sequence enrollment readiness/)
@@ -78,7 +79,8 @@ assert.match(actionRoute, /package_incomplete/)
 console.log("  ✓ action route messaging distinguishes authorization from execution setup")
 
 assert.doesNotMatch(card, /executeTransportSend|autonomy_outbound_enabled\s*=\s*true/)
-assert.match(card, /Transport blocked/)
+assert.match(card, /Transport setup incomplete|Outbound transport is currently blocked|transportSummary/)
+assert.match(layout, /Transport readiness/)
 console.log("  ✓ presentation preserves transport block without implying send on authorize")
 
 assert.match(

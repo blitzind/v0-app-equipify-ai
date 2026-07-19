@@ -1,11 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Check, Loader2, MoreHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +19,6 @@ import {
   buildAvaOperatorExecutionRequestRetryApiPath,
   GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS,
 } from "@/lib/growth/mission-center/growth-ava-operator-workspace-contract"
-import { GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 import {
   GROWTH_AVA_COMPLETED_WORK_QA_MARKER,
   GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF,
@@ -31,8 +29,10 @@ import {
 } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { AvaOutreachPackageReadiness } from "@/lib/growth/mission-center/growth-ava-outreach-sequence-handoff-1f"
-import { GrowthAvaMemoryReviewSection } from "@/components/growth/ai-os/approvals/growth-ava-memory-review-section"
-import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthAvaPackageProgressiveReviewLayout } from "@/components/growth/ai-os/approvals/growth-ava-package-progressive-review-layout"
+import {
+  projectOperatorPackageDecisionSummary,
+} from "@/lib/growth/workspace/ux-2a/review/growth-operator-package-progressive-review-2a"
 import {
   GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER,
@@ -54,66 +54,13 @@ import {
   resolvePackageAuthorizationReadiness,
 } from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
-import { needsApproval, recommends } from "@/lib/workspace/ai-teammate-voice"
+import { recommends } from "@/lib/workspace/ai-teammate-voice"
 
 type Props = {
   card: GrowthAvaCompletedOutreachPackageCard
   packageBody?: GrowthAutonomousOutreachApprovalPackage | null
   onDecided: () => void
   onDismiss?: () => void
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm text-foreground whitespace-pre-wrap">{value}</p>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-function BulletList({ lines }: { lines: string[] }) {
-  if (!lines.length) return <p className="text-sm text-muted-foreground">Not prepared</p>
-  return (
-    <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-      {lines.map((line) => (
-        <li key={line}>{line}</li>
-      ))}
-    </ul>
-  )
-}
-
-function EditableBlock({
-  label,
-  value,
-  onChange,
-  rows = 4,
-}: {
-  label: string
-  value: string
-  onChange: (next: string) => void
-  rows?: number
-}) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <Textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={rows}
-        className="min-h-[88px] resize-y text-sm"
-      />
-    </div>
-  )
 }
 
 export function GrowthAvaCompletedOutreachPackageCard({
@@ -425,6 +372,17 @@ export function GrowthAvaCompletedOutreachPackageCard({
   const authorizedWithoutExecutionRequest =
     approved && !executionRequest && packageBody?.packageApprovalDecision === "approved"
 
+  const decisionSummary = useMemo(
+    () =>
+      view
+        ? projectOperatorPackageDecisionSummary({
+            packet: view,
+            transportExecutionReady: transportExecutionReady,
+          })
+        : null,
+    [view, transportExecutionReady],
+  )
+
   return (
     <li
       className="rounded-xl border-2 border-emerald-200/80 bg-card p-5 shadow-sm dark:border-emerald-900/50"
@@ -448,10 +406,10 @@ export function GrowthAvaCompletedOutreachPackageCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">
-            {Math.round((view?.risk.overallConfidence ?? card.confidence) * 100)}% confidence
+            {decisionSummary?.confidenceLabel ??
+              `${Math.round((view?.risk.overallConfidence ?? card.confidence) * 100)}% confidence`}
           </Badge>
-          <Badge variant="outline">Risk {card.risk}</Badge>
-          <Badge variant="outline">Transport blocked</Badge>
+          {approved ? <Badge variant="outline">Authorized</Badge> : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" size="icon" variant="ghost" className="size-8" disabled={busy !== null}>
@@ -502,354 +460,25 @@ export function GrowthAvaCompletedOutreachPackageCard({
         </div>
       </div>
 
-      {view ? (
-        <div className="mt-5 space-y-4">
-          <Section title="Company summary">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Company" value={view.company.name} />
-              <Field label="Website" value={view.company.website ?? "Not on record"} />
-              <Field label="Industry" value={view.company.industry ?? "Not prepared"} />
-              <Field label="Location" value={view.company.location ?? "Not on record"} />
-              <Field
-                label="Equipment serviced"
-                value={
-                  view.company.equipmentServiced.length
-                    ? view.company.equipmentServiced.join(" · ")
-                    : "Not prepared"
-                }
-              />
-            </div>
-          </Section>
-
-          <Section title="Decision maker">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Name" value={view.decisionMaker.name ?? "Not prepared"} />
-              <Field label="Title" value={view.decisionMaker.title ?? "Not prepared"} />
-              <Field label="Email" value={view.decisionMaker.email ?? "Not prepared"} />
-              <Field label="Phone" value={view.decisionMaker.phone ?? "Not prepared"} />
-              <Field label="LinkedIn" value={view.decisionMaker.linkedIn ?? "Not prepared"} />
-              <Field
-                label="Verification status"
-                value={view.decisionMaker.verificationStatus ?? "Not prepared"}
-              />
-            </div>
-          </Section>
-
-          <Section title={`Why ${teammate.name} chose this account`}>
-            <BulletList lines={view.whySelected} />
-          </Section>
-
-          {view.memoryReview.length ? (
-            <GrowthAvaMemoryReviewSection
-              leadId={card.leadId}
-              packageId={card.packageId}
-              rows={view.memoryReview}
-              onUpdated={(rows) =>
-                setPacket((current) => (current ? { ...current, memoryReview: rows } : current))
-              }
-            />
-          ) : null}
-
-          {view.operatorReviewLayout.canonicalDecisionEssentials.length ? (
-            <Section title="Why this package exists">
-              <BulletList lines={view.operatorReviewLayout.canonicalDecisionEssentials} />
-            </Section>
-          ) : null}
-
-          {view.operatorReviewLayout.canonicalDecisionEnforcementEssentials.length ? (
-            <Section title="Enforcement status">
-              <BulletList lines={view.operatorReviewLayout.canonicalDecisionEnforcementEssentials} />
-            </Section>
-          ) : null}
-
-          {view.operatorReviewLayout.relationshipStrategyEssentials.length ? (
-            <Section title="Relationship strategy">
-              <BulletList lines={view.operatorReviewLayout.relationshipStrategyEssentials} />
-            </Section>
-          ) : null}
-
-          {view.operatorReviewLayout.revenueStrategyEssentials.length ? (
-            <Section title="Sales recommendation">
-              <BulletList lines={view.operatorReviewLayout.revenueStrategyEssentials} />
-            </Section>
-          ) : null}
-
-          {view.operatorReviewLayout.consultantDiscoveryEssentials.length ? (
-            <Section title="Consultant discovery">
-              <BulletList lines={view.operatorReviewLayout.consultantDiscoveryEssentials} />
-            </Section>
-          ) : null}
-
-          <Section title="Conversation strategy">
-            <BulletList lines={view.operatorReviewLayout.conversationStrategyEssentials} />
-            {view.operatorReviewLayout.sellerTruthEssentials.length ? (
-              <div className="mt-3 space-y-1">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Seller guidance
-                </p>
-                <BulletList lines={view.operatorReviewLayout.sellerTruthEssentials.slice(0, 5)} />
-              </div>
-            ) : null}
-          </Section>
-
-          <Section title="Drafts">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={busy !== null || !card.leadId}
-                onClick={() => void saveDrafts()}
-              >
-                {busy === "save" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
-                Save draft edits
-              </Button>
-              <span className="text-xs text-muted-foreground" data-qa={GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER}>
-                Persist edits before authorize — transport sends the saved version.
-              </span>
-            </div>
-            <div className="grid gap-3">
-              {view.drafts.map((draft) => (
-                <div key={draft.channel} className="rounded-md border bg-background/80 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{draft.label}</span>
-                    {!draft.prepared ? <Badge variant="outline">Not prepared</Badge> : null}
-                    {draft.versionStatus === "approved" ? (
-                      <Badge variant="default">Approved</Badge>
-                    ) : draft.versionStatus === "edited" ? (
-                      <Badge variant="secondary">Edited</Badge>
-                    ) : draft.prepared ? (
-                      <Badge variant="outline">Generated</Badge>
-                    ) : null}
-                    {draft.editedByOperator ? (
-                      <Badge variant="outline">Edited by operator</Badge>
-                    ) : null}
-                    {draft.wordCount != null ? (
-                      <Badge variant="outline">{draft.wordCount} words</Badge>
-                    ) : null}
-                    {draft.readTimeSeconds != null ? (
-                      <Badge variant="outline">~{draft.readTimeSeconds}s read</Badge>
-                    ) : null}
-                    {draft.characterCount != null ? (
-                      <Badge variant="outline">{draft.characterCount} chars</Badge>
-                    ) : null}
-                  </div>
-                  {draft.prepared ? (
-                    <div className="mt-2">
-                      <EditableBlock
-                        label={`${draft.label} (editable)`}
-                        value={draftEdits[draft.channel] ?? draft.preview ?? ""}
-                        onChange={(next) =>
-                          setDraftEdits((prev) => ({ ...prev, [draft.channel]: next }))
-                        }
-                        rows={draft.channel === "sms" || draft.channel === "linkedin" ? 3 : 6}
-                      />
-                      {draft.constitutionWarnings?.length ? (
-                        <div className="mt-2 rounded-md border border-amber-300/70 bg-amber-50/50 p-2 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
-                          <p className="font-medium">Constitution warnings (you decide)</p>
-                          <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                            {draft.constitutionWarnings.slice(0, 4).map((warning) => (
-                              <li key={warning}>{warning}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-muted-foreground">Not prepared</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Risk panel">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Field
-                label="Overall confidence"
-                value={`${Math.round(view.risk.overallConfidence * 100)}%`}
-              />
-              <Field label="Spam risk" value={view.risk.spamRisk} />
-              <Field label="Bounce risk" value={view.risk.bounceRisk} />
-              <Field
-                label="Relationship strength"
-                value={view.risk.relationshipStrength ?? "Not prepared"}
-              />
-              <Field label="Research completeness" value={view.risk.researchCompleteness} />
-              <Field label="Contact verification" value={view.risk.contactVerification} />
-              <Field
-                label="Unknown fields"
-                value={
-                  view.risk.unknownFields.length
-                    ? view.risk.unknownFields.join(", ")
-                    : "None listed"
-                }
-              />
-              <Field
-                label="Blocking autonomous send"
-                value={view.risk.autonomousSendBlockedReasons.join(" · ")}
-              />
-            </div>
-          </Section>
-
-          <GrowthCollapsibleEngineCard
-            title="Research summary"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-research-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.researchSummary} />
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {view.evidenceCards.map((evidence) => (
-                <div
-                  key={evidence.id}
-                  className="rounded-md border bg-background/80 px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span aria-hidden>{evidence.present ? "✓" : "○"}</span>
-                    <span className="font-medium">{evidence.label}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {evidence.present
-                      ? evidence.detail ?? "Evidence present"
-                      : "Not prepared"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Seller truth detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-seller-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.sellerTruthDetail} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Prospect truth detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-prospect-${card.packageId}`}
-          >
-            <BulletList lines={view.knowledgeLayers.prospectTruth} />
-            {view.operatorReviewLayout.expandable.prospectTruthDetail.length ? (
-              <div className="mt-3">
-                <BulletList lines={view.operatorReviewLayout.expandable.prospectTruthDetail} />
-              </div>
-            ) : null}
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Relationship strategy detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-relationship-strategy-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.relationshipStrategyDetail} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Sales strategy detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-revenue-strategy-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.revenueStrategyDetail} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Consultant reasoning detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-consultant-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.consultantDiscoveryDetail} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Observation intelligence"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-observations-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.observationIntelligence} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Explainability"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-explain-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.explainabilityDetail} />
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Strategy detail"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-strategy-${card.packageId}`}
-          >
-            {view.salesStrategy ? (
-              <div className="space-y-3">
-                <BulletList lines={view.operatorReviewLayout.expandable.strategyDetail} />
-                <EditableBlock
-                  label="Strategy (editable)"
-                  value={strategyEdit}
-                  onChange={setStrategyEdit}
-                  rows={8}
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Strategy brief was not attached to this package.
-              </p>
-            )}
-          </GrowthCollapsibleEngineCard>
-
-          <GrowthCollapsibleEngineCard
-            title="Transparency & metadata"
-            defaultOpen={false}
-            compact
-            persistKey={`ava-outreach-transparency-${card.packageId}`}
-          >
-            <BulletList lines={view.operatorReviewLayout.expandable.transparencyDetail} />
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Employees" value={view.company.employees ?? "Not on record"} />
-              <Field
-                label="Revenue estimate"
-                value={view.company.revenueEstimate ?? "Not on record"}
-              />
-              <Field
-                label="Research confidence"
-                value={
-                  view.company.researchConfidence != null
-                    ? `${Math.round(view.company.researchConfidence * 100)}%`
-                    : "Not prepared"
-                }
-              />
-              <Field
-                label="Contact confidence"
-                value={
-                  view.decisionMaker.contactConfidence != null
-                    ? `${Math.round(view.decisionMaker.contactConfidence * 100)}%`
-                    : "Not prepared"
-                }
-              />
-            </div>
-            {view.operatorReviewLayout.expandable.personalizationDetail.length ? (
-              <div className="mt-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Personalization signals
-                </p>
-                <BulletList lines={view.operatorReviewLayout.expandable.personalizationDetail} />
-              </div>
-            ) : null}
-          </GrowthCollapsibleEngineCard>
-        </div>
+      {view && decisionSummary ? (
+        <GrowthAvaPackageProgressiveReviewLayout
+          view={view}
+          summary={decisionSummary}
+          teammateName={teammate.name}
+          packageId={card.packageId}
+          leadId={card.leadId}
+          draftEdits={draftEdits}
+          onDraftChange={(channel, next) =>
+            setDraftEdits((prev) => ({ ...prev, [channel]: next }))
+          }
+          strategyEdit={strategyEdit}
+          onStrategyEdit={setStrategyEdit}
+          busy={busy !== null}
+          onSaveDrafts={() => void saveDrafts()}
+          onMemoryUpdated={(rows) =>
+            setPacket((current) => (current ? { ...current, memoryReview: rows } : current))
+          }
+        />
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">Loading complete review packet…</p>
       )}
@@ -993,29 +622,6 @@ export function GrowthAvaCompletedOutreachPackageCard({
           >
             Reject
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy !== null || !card.leadId}
-            onClick={() => void runLifecycle("archive_account")}
-          >
-            Archive lead
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy !== null || !card.leadId}
-            onClick={() => void runLifecycle("pause_autonomy")}
-          >
-            Pause autonomy
-          </Button>
-          {view ? (
-            <Button asChild size="sm" variant="ghost">
-              <Link href={view.links.leadHref}>View lead</Link>
-            </Button>
-          ) : null}
         </div>
       )}
 
