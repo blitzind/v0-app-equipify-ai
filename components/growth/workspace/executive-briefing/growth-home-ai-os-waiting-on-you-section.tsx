@@ -37,12 +37,9 @@ export function GrowthHomeAiOsWaitingOnYouSection({
     relationshipSnapshotsById,
     waitingCompanyByLeadId,
   )
-  const { waitingOnYouOverflow, approveItemsHref, approveItemsCount, canonicalApprovalSnapshot } =
-    aiOsUx
+  const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
   const replyCount = waitingOnYou.filter((item) => /reply/i.test(item.label)).length
-  const hasCanonicalPackageWaiting =
-    (canonicalApprovalSnapshot?.packages.length ?? 0) > 0 && waitingOnYou.length > 0
-  const hasItems = approveItemsCount > 0 || replyCount > 0 || hasCanonicalPackageWaiting
+  const hasItems = approveItemsCount > 0 || replyCount > 0
   const waitingSummary = formatLivingWaitingSummary({
     approvalCount: approveItemsCount,
     replyCount,

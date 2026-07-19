@@ -102,6 +102,18 @@ function packagePreviewFromItem(input: {
   }
 }
 
+export function emptyCanonicalOperatorApprovalSnapshot(): GrowthCanonicalOperatorApprovalSnapshot {
+  return {
+    qaMarker: GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER,
+    outreachPackageCount: 0,
+    outreachDraftCount: 0,
+    pendingApprovalCount: 0,
+    waitingForOperator: false,
+    packages: [],
+    topPackage: null,
+  }
+}
+
 export function buildCanonicalOperatorApprovalSnapshot(input: {
   hacItems: GrowthHumanApprovalItem[]
   packagesById?: Map<string, GrowthAutonomousOutreachApprovalPackage>
@@ -242,22 +254,18 @@ export function mapCanonicalApprovalPackagesToWaitingOnYou(
 
 export function resolveCanonicalWaitingOnYouItems(input: {
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined
-  canonicalOperatorTask: GrowthCanonicalOperatorTask | null
   legacyItems: GrowthHomeWaitingOnYouItem[]
 }): GrowthHomeWaitingOnYouItem[] {
-  if (input.approvalSnapshot && input.approvalSnapshot.packages.length > 0) {
-    return mapCanonicalApprovalPackagesToWaitingOnYou(input.approvalSnapshot)
+  const packageRows =
+    input.approvalSnapshot && input.approvalSnapshot.packages.length > 0
+      ? mapCanonicalApprovalPackagesToWaitingOnYou(input.approvalSnapshot)
+      : []
+
+  if (input.approvalSnapshot) {
+    const replyRows = input.legacyItems.filter((item) => /reply/i.test(item.label))
+    return [...packageRows, ...replyRows]
   }
-  if (input.canonicalOperatorTask) {
-    return [
-      {
-        id: input.canonicalOperatorTask.id,
-        label: input.canonicalOperatorTask.title,
-        detail: input.canonicalOperatorTask.detail,
-        href: input.canonicalOperatorTask.href,
-      },
-    ]
-  }
+
   return input.legacyItems
 }
 

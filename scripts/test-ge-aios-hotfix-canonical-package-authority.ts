@@ -11,6 +11,7 @@ import {
 import {
   buildCanonicalOperatorApprovalSnapshot,
   buildCanonicalOperatorTask,
+  emptyCanonicalOperatorApprovalSnapshot,
   resolveCanonicalApprovalQueueCount,
   resolveCanonicalWaitingOnYouItems,
 } from "../lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
@@ -28,13 +29,58 @@ import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/revi
 
 function hasWaitingSectionItems(input: {
   approveItemsCount: number
-  waitingOnYou: Array<{ label: string }>
-  canonicalPackageCount: number
+  replyCount?: number
 }): boolean {
-  const replyCount = input.waitingOnYou.filter((item) => /reply/i.test(item.label)).length
-  const hasCanonicalPackageWaiting =
-    input.canonicalPackageCount > 0 && input.waitingOnYou.length > 0
-  return input.approveItemsCount > 0 || replyCount > 0 || hasCanonicalPackageWaiting
+  return input.approveItemsCount > 0 || (input.replyCount ?? 0) > 0
+}
+
+function assertHomeApprovalAuthoritySync(input: {
+  label: string
+  snapshot: ReturnType<typeof buildCanonicalOperatorApprovalSnapshot>
+  aiOsUx: ReturnType<typeof buildAiOsUxViewModel>
+  operatorTasksPendingApprovals: number
+  reviewPackageCount: number
+}) {
+  const heroDecision = buildAvaPrimaryDecision(input.aiOsUx)
+  assert.equal(
+    input.operatorTasksPendingApprovals,
+    input.snapshot.pendingApprovalCount,
+    `${input.label}: operatorTasks must mirror snapshot count`,
+  )
+  assert.equal(
+    input.aiOsUx.approveItemsCount,
+    input.snapshot.pendingApprovalCount,
+    `${input.label}: approveItemsCount must mirror snapshot count`,
+  )
+  assert.equal(
+    input.aiOsUx.waitingOnYou.filter((row) => row.id.startsWith("approval:")).length,
+    input.snapshot.packages.length,
+    `${input.label}: package waiting rows must mirror snapshot packages`,
+  )
+  assert.equal(
+    input.reviewPackageCount,
+    input.snapshot.pendingApprovalCount,
+    `${input.label}: review count must mirror snapshot count`,
+  )
+  assert.equal(
+    hasWaitingSectionItems({ approveItemsCount: input.aiOsUx.approveItemsCount }),
+    input.snapshot.pendingApprovalCount > 0,
+    `${input.label}: waiting section visibility must mirror package count`,
+  )
+  if (input.snapshot.pendingApprovalCount > 0) {
+    assert.ok(heroDecision.primaryDecision, `${input.label}: hero card required when packages exist`)
+    assert.equal(
+      heroDecision.additionalDecisionCount,
+      Math.max(0, input.snapshot.pendingApprovalCount - 1),
+      `${input.label}: hero overflow must mirror package count`,
+    )
+  } else {
+    assert.equal(
+      input.aiOsUx.canonicalOperatorTask,
+      null,
+      `${input.label}: package operator task must be absent when snapshot empty`,
+    )
+  }
 }
 
 function outreachItem(input: {
@@ -68,7 +114,31 @@ function outreachItem(input: {
   }
 }
 
-console.log("[ge-aios-hotfix-canonical-package-authority-v1] certification")
+function buildAiOsUxForSnapshot(input: {
+  snapshot: ReturnType<typeof buildCanonicalOperatorApprovalSnapshot>
+  dashboard?: ReturnType<typeof buildGrowthHomeExecutiveBriefingCertDashboard>
+}) {
+  const task = buildCanonicalOperatorTask({ approvalSnapshot: input.snapshot })
+  return buildAiOsUxViewModel({
+    dashboard: input.dashboard ?? buildGrowthHomeExecutiveBriefingCertDashboard(),
+    executiveBrief: {
+      greeting: "Good morning",
+      todaysPriority: "Review outreach",
+      primaryCta: { label: "Review", href: "/growth/review?tab=packages" },
+      secondaryCta: { label: "Queue", href: "/growth/leads" },
+      biggestWin: null,
+      biggestRisk: null,
+      completedOutcomes: [],
+    },
+    waitingOnYou: [],
+    waitingOnYouOverflow: 0,
+    needsReview: { totalCount: 0, reviewHref: "/growth/review?tab=packages", items: [] },
+    canonicalApprovalSnapshot: input.snapshot,
+    canonicalOperatorTask: task,
+  })
+}
+
+console.log("[ge-aios-hotfix-canonical-package-authority-v2] certification")
 
 const canonicalRoute = buildGrowthReviewPackageHref("pkg-block-imaging")
 assert.equal(parsePackageIdFromApprovalRoute(canonicalRoute), "pkg-block-imaging")
@@ -106,12 +176,11 @@ const followUp = outreachItem({
 followUp.source = "meta_recommender"
 followUp.actionType = "review_recommendation"
 
-const snapshot = buildCanonicalOperatorApprovalSnapshot({
+const multiSnapshot = buildCanonicalOperatorApprovalSnapshot({
   hacItems: [block, blitz, followUp],
 })
-assert.equal(snapshot.outreachPackageCount, 2)
-assert.equal(snapshot.pendingApprovalCount, 2)
-assert.notEqual(snapshot.pendingApprovalCount, 3)
+assert.equal(multiSnapshot.outreachPackageCount, 2)
+assert.equal(multiSnapshot.pendingApprovalCount, 2)
 console.log("  ✓ Fix B — package-facing pendingApprovalCount uses outreach packages only")
 
 const projected = projectAvaCompletedWork({ items: [block, blitz] }).items
@@ -119,65 +188,47 @@ const reviewQueue = synthesizeGrowthReviewDecisionQueue({
   packageItems: projected,
   sendJobs: [],
 })
-const homePending = resolveCanonicalApprovalQueueCount(snapshot, 0)
-assert.equal(homePending, reviewQueue.packageCount)
-assert.equal(reviewQueue.packageCount, 2)
-assert.equal(reviewQueue.totalActionable, 2)
-console.log("  ✓ Home package count matches Review package count on canonical HAC data")
 
-const task = buildCanonicalOperatorTask({ approvalSnapshot: snapshot })
-assert.ok(task)
-const aiOsUxWithPackages = buildAiOsUxViewModel({
-  dashboard: buildGrowthHomeExecutiveBriefingCertDashboard(),
-  executiveBrief: {
-    greeting: "Good morning",
-    todaysPriority: "Review outreach",
-    primaryCta: { label: "Review", href: "/growth/review?tab=packages" },
-    secondaryCta: { label: "Queue", href: "/growth/leads" },
-    biggestWin: null,
-    biggestRisk: null,
-    completedOutcomes: [],
-  },
-  waitingOnYou: [],
-  waitingOnYouOverflow: 0,
-  needsReview: { totalCount: 0, reviewHref: "/growth/review?tab=packages", items: [] },
-  canonicalApprovalSnapshot: snapshot,
-  canonicalOperatorTask: task,
+const multiAiOsUx = buildAiOsUxForSnapshot({ snapshot: multiSnapshot })
+assertHomeApprovalAuthoritySync({
+  label: "multi-package",
+  snapshot: multiSnapshot,
+  aiOsUx: multiAiOsUx,
+  operatorTasksPendingApprovals: multiSnapshot.pendingApprovalCount,
+  reviewPackageCount: reviewQueue.packageCount,
 })
-const heroDecision = buildAvaPrimaryDecision(aiOsUxWithPackages)
-assert.equal(aiOsUxWithPackages.approveItemsCount, 2)
-assert.equal(aiOsUxWithPackages.waitingOnYou.length, 2)
-assert.equal(aiOsUxWithPackages.waitingOnYouOverflow, 0)
-assert.equal(heroDecision.additionalDecisionCount, 1)
-assert.ok(heroDecision.primaryDecision)
-console.log("  ✓ Ready For Review card shows top package plus N additional packages")
+assert.equal(multiAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Block Imaging"))
+assert.equal(multiAiOsUx.waitingOnYou[1]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
+console.log("  ✓ Test D — multi-package snapshot stays synchronized across Home and Review")
 
-assert.equal(aiOsUxWithPackages.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Block Imaging"))
-assert.equal(aiOsUxWithPackages.waitingOnYou[0]?.href, task!.href)
-assert.equal(aiOsUxWithPackages.waitingOnYou[1]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
-assert.ok(
-  hasWaitingSectionItems({
-    approveItemsCount: aiOsUxWithPackages.approveItemsCount,
-    waitingOnYou: aiOsUxWithPackages.waitingOnYou,
-    canonicalPackageCount: snapshot.packages.length,
-  }),
-)
-console.log("  ✓ canonical package snapshot populates What I need from you rows")
+const singleSnapshot = buildCanonicalOperatorApprovalSnapshot({ hacItems: [blitz] })
+const singleProjected = projectAvaCompletedWork({ items: [blitz] }).items
+const singleReviewQueue = synthesizeGrowthReviewDecisionQueue({
+  packageItems: singleProjected,
+  sendJobs: [],
+})
+const singleAiOsUx = buildAiOsUxForSnapshot({ snapshot: singleSnapshot })
+assertHomeApprovalAuthoritySync({
+  label: "single-package",
+  snapshot: singleSnapshot,
+  aiOsUx: singleAiOsUx,
+  operatorTasksPendingApprovals: singleSnapshot.pendingApprovalCount,
+  reviewPackageCount: singleReviewQueue.packageCount,
+})
+assert.equal(singleAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
+console.log("  ✓ Test A — single package synchronizes hero, waiting, and review")
 
-const workManagerFallback = buildPrimaryDecisionFromWorkManager(
-  {
-    qaMarker: "ge-aios-11a-work-manager-v1",
-    operator_queue: [],
-    active_work: null,
-    work_plan: [],
-    all_work_items: [],
-    completed_today: [],
-    specialist_orchestrator_result: null,
-  },
-  aiOsUxWithPackages,
-)
-assert.equal(workManagerFallback.additionalDecisionCount, 0)
-console.log("  ✓ Work Manager fallback remains unchanged when operator queue is empty")
+const emptySnapshot = emptyCanonicalOperatorApprovalSnapshot()
+const emptyAiOsUx = buildAiOsUxForSnapshot({ snapshot: emptySnapshot })
+assertHomeApprovalAuthoritySync({
+  label: "zero-package",
+  snapshot: emptySnapshot,
+  aiOsUx: emptyAiOsUx,
+  operatorTasksPendingApprovals: 0,
+  reviewPackageCount: 0,
+})
+assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No packages are waiting for review/)
+console.log("  ✓ Test B — zero packages keeps all Home surfaces empty")
 
 const dashboard = buildGrowthHomeExecutiveBriefingCertDashboard()
 dashboard.dailyRevenueWorkQueueEnabled = true
@@ -196,17 +247,6 @@ dashboard.dailyRevenueWorkQueueDisplay = {
       estimated_minutes: 5,
       requires_human_approval: true,
     },
-    {
-      lead_id: "lead-blitz",
-      company_name: "Blitz Industries",
-      action_label: "Review package",
-      channel_label: "Email",
-      reasoning: "Waiting",
-      priority: "high",
-      confidence: 88,
-      estimated_minutes: 5,
-      requires_human_approval: true,
-    },
   ],
 } as never
 dashboard.dailyRevenueWorkQueue = {
@@ -218,7 +258,7 @@ dashboard.dailyRevenueWorkQueue = {
   low: [],
 } as never
 
-const withoutCanonical = buildAiOsUxViewModel({
+const degradedAiOsUx = buildAiOsUxViewModel({
   dashboard,
   executiveBrief: {
     greeting: "Good morning",
@@ -232,40 +272,51 @@ const withoutCanonical = buildAiOsUxViewModel({
   waitingOnYou: [],
   waitingOnYouOverflow: 0,
   needsReview: { totalCount: 99, reviewHref: "/growth/review", items: [] },
-  canonicalApprovalSnapshot: null,
+  canonicalApprovalSnapshot: emptySnapshot,
 })
-assert.equal(withoutCanonical.approveItemsCount, 0)
-console.log("  ✓ Fix C — missing canonical snapshot does not inflate package counts from daily queue")
+const staleDashboardPendingApprovals = 1
+assert.equal(degradedAiOsUx.approveItemsCount, 0)
+assert.equal(
+  resolveCanonicalApprovalQueueCount(emptySnapshot, staleDashboardPendingApprovals),
+  0,
+)
+assert.equal(degradedAiOsUx.waitingOnYou.length, 0)
+assert.equal(degradedAiOsUx.canonicalOperatorTask, null)
+assert.equal(
+  hasWaitingSectionItems({ approveItemsCount: degradedAiOsUx.approveItemsCount }),
+  false,
+)
+assert.equal(
+  degradedAiOsUx.waitingOnYou.filter((row) => row.id.startsWith("approval:")).length,
+  0,
+)
+console.log("  ✓ Test C — unavailable canonical approval degrades to zero across Home surfaces")
+
+const taskOnlyRows = resolveCanonicalWaitingOnYouItems({
+  approvalSnapshot: null,
+  legacyItems: [],
+})
+assert.equal(taskOnlyRows.length, 0)
+console.log("  ✓ unavailable snapshot does not synthesize package rows from operator task fallback")
+
+const workManagerFallback = buildPrimaryDecisionFromWorkManager(
+  {
+    qaMarker: "ge-aios-11a-work-manager-v1",
+    operator_queue: [],
+    active_work: null,
+    work_plan: [],
+    all_work_items: [],
+    completed_today: [],
+    specialist_orchestrator_result: null,
+  },
+  multiAiOsUx,
+)
+assert.equal(workManagerFallback.additionalDecisionCount, 0)
+console.log("  ✓ Work Manager fallback remains unchanged when operator queue is empty")
 
 const reviewRows = projectReviewPackageDecisionItems(projected)
 assert.equal(reviewRows.length, 2)
 assert.equal(reviewRows[0]?.companyName, "Block Imaging")
 console.log("  ✓ Review package rows materialize from canonical HAC item= routes")
 
-const taskOnlyRows = resolveCanonicalWaitingOnYouItems({
-  approvalSnapshot: null,
-  canonicalOperatorTask: task,
-  legacyItems: [],
-})
-assert.equal(taskOnlyRows.length, 1)
-assert.equal(taskOnlyRows[0]?.href, task!.href)
-console.log("  ✓ canonical operator task still yields one waiting row when package list unavailable")
-
-assert.equal(
-  hasWaitingSectionItems({
-    approveItemsCount: withoutCanonical.approveItemsCount,
-    waitingOnYou: withoutCanonical.waitingOnYou,
-    canonicalPackageCount: 0,
-  }),
-  false,
-)
-assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No packages are waiting for review/)
-console.log("  ✓ missing canonical package list keeps empty waiting section")
-
-assert.equal(
-  withoutCanonical.waitingOnYou.filter((row) => row.id.startsWith("approval:")).length,
-  0,
-)
-console.log("  ✓ no canonical package rows are synthesized from daily queue fallback")
-
-console.log("\nPASS ge-aios-hotfix-canonical-package-authority-v1")
+console.log("\nPASS ge-aios-hotfix-canonical-package-authority-v2")

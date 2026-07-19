@@ -18,6 +18,8 @@ export type BuildAvaNarrativeContextInput = {
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
   timeline: GrowthHomeTimelinePeriod[]
+  /** Canonical package approval count — same authority as Home Review queue. */
+  pendingApprovalCount?: number
 }
 
 function fact(
@@ -143,12 +145,13 @@ export function buildAvaNarrativeContext(input: BuildAvaNarrativeContextInput): 
       }),
     )
 
-  if (approvalsWaiting.length === 0 && operatorTasks.pendingApprovals > 0) {
+  const canonicalPendingApprovals = Math.max(input.pendingApprovalCount ?? 0, 0)
+  if (approvalsWaiting.length === 0 && canonicalPendingApprovals > 0) {
     approvalsWaiting.push(
       fact({
         kind: "approval",
         label: "pending_approvals",
-        count: operatorTasks.pendingApprovals,
+        count: canonicalPendingApprovals,
       }),
     )
   }
@@ -284,7 +287,7 @@ export function buildAvaNarrativeContext(input: BuildAvaNarrativeContextInput): 
       readyForReview,
       repliesToday: kpis.repliesToday,
       meetingsToday: meetings.today,
-      approvalsWaiting: Math.max(kpis.approvalQueueCount, operatorTasks.pendingApprovals, waitingOnYou.length),
+      approvalsWaiting: canonicalPendingApprovals,
       hotCompanies: kpis.hotCompanies,
     },
   }

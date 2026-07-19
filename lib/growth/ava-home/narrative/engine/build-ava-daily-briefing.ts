@@ -117,6 +117,7 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     waitingOnYou: input.waitingOnYou,
     dailyWorkQueue: input.dailyWorkQueue,
     timeline: input.timeline,
+    pendingApprovalCount: input.pendingApprovalCount,
   }
   const context = buildAvaNarrativeContext(contextInput)
   const generatedAt = input.generatedAt ?? new Date().toISOString()

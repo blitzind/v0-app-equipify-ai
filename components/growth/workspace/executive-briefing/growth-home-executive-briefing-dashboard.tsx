@@ -175,6 +175,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
   const lastUpdateLabel = formatRelativeTime(briefing.generatedAt)
   const aiOsUx = useMemo(() => normalizeGrowthHomeAiOsUxViewModel(briefing.aiOsUx), [briefing.aiOsUx])
+  const canonicalPendingApprovals = aiOsUx.approveItemsCount ?? 0
 
   const previousSnapshot = useMemo(() => readAvaNarrativeMetricsSnapshot(), [dashboard.generatedAt])
   const persistedMemoryStore = useMemo(
@@ -310,7 +311,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           lastUpdateLabel={lastUpdateLabel}
           leadPool={workspaceSummary?.leadPool ?? null}
           leadsNeedingAction={workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0}
-          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+          pendingApprovals={canonicalPendingApprovals}
           relationshipSnapshotCount={relationshipSnapshotCount}
         />
 
@@ -319,14 +320,14 @@ export function GrowthHomeExecutiveBriefingDashboard({
         <GrowthHomeLaunchCompleteBanner setupIncomplete={setupIncomplete} />
 
         <GrowthHomeBriefingCrossLinks
-          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+          pendingApprovals={canonicalPendingApprovals}
         />
 
         <GrowthHomeFirstWeekGuide
           setupIncomplete={setupIncomplete}
           waitingOnYou={aiOsUx.waitingOnYou}
           workManager={avaHero.workManager ?? null}
-          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+          pendingApprovals={canonicalPendingApprovals}
           emailsSentToday={workspaceSummary?.kpis.emailsSentToday ?? 0}
           outreachPreparedToday={workspaceSummary?.salesOutcomes?.outreach_prepared ?? 0}
           organizationalKnowledgeCount={

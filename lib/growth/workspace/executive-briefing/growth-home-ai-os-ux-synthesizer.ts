@@ -590,16 +590,15 @@ export function buildAiOsUxViewModel(input: {
   const approveItemsCount = resolveCanonicalApprovalQueueCount(input.canonicalApprovalSnapshot, 0)
 
   const canonicalOperatorTask =
-    input.canonicalOperatorTask ??
-    (input.canonicalApprovalSnapshot
-      ? buildCanonicalOperatorTask({
+    input.canonicalApprovalSnapshot?.topPackage
+      ? (input.canonicalOperatorTask ??
+        buildCanonicalOperatorTask({
           approvalSnapshot: input.canonicalApprovalSnapshot,
-        })
-      : null)
+        }))
+      : null
 
   const collapsedWaiting = resolveCanonicalWaitingOnYouItems({
     approvalSnapshot: input.canonicalApprovalSnapshot,
-    canonicalOperatorTask,
     legacyItems: waitingOnYouResult.items,
   })
 
@@ -634,12 +633,9 @@ export function buildAiOsUxViewModel(input: {
     waitingOnYou: collapsedWaiting,
     waitingOnYouOverflow: hasCanonicalPackageList
       ? Math.max(0, approveItemsCount - collapsedWaiting.length)
-      : canonicalOperatorTask
-        ? Math.max(0, approveItemsCount - 1)
-        : waitingOnYouResult.overflowCount,
+      : waitingOnYouResult.overflowCount,
     approveItemsHref:
       input.canonicalApprovalSnapshot?.topPackage?.reviewHref ??
-      input.canonicalOperatorTask?.href ??
       (approveItemsCount > 0
         ? buildGrowthReviewHref({ tab: "packages" })
         : waitingOnYouResult.items[0]?.href ??

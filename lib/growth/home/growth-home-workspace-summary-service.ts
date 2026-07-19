@@ -72,6 +72,7 @@ import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth
 import { loadCanonicalOperatorApprovalSnapshotForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-loader"
 import {
   buildCanonicalOperatorTask,
+  emptyCanonicalOperatorApprovalSnapshot,
   resolveCanonicalApprovalQueueCount,
   resolveCanonicalOutreachDraftCount,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
@@ -638,41 +639,41 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const durationMs = Date.now() - startedAt
   logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })
 
-  const canonicalOperatorApproval = organizationId
-    ? await withGrowthHomeLoaderBudget({
-        label: "canonical_operator_approval",
-        budgetMs: loaderBudgetMs,
-        fn: () =>
-          loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
-            organizationId,
-            generatedAt,
-          }),
-        fallback: null,
-      }).then((step) => {
-        stageTimings.push(step.timing)
-        return step.value
+  let canonicalOperatorApprovalLoaded: Awaited<
+    ReturnType<typeof loadCanonicalOperatorApprovalSnapshotForHome>
+  > | null = null
+  if (organizationId) {
+    const approvalStart = Date.now()
+    try {
+      canonicalOperatorApprovalLoaded = await loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
+        organizationId,
+        generatedAt,
       })
+    } catch {
+      canonicalOperatorApprovalLoaded = null
+    }
+    stageTimings.push({
+      label: "canonical_operator_approval",
+      durationMs: Date.now() - approvalStart,
+      timedOut: false,
+    })
+  }
+
+  const canonicalOperatorApproval = organizationId
+    ? (canonicalOperatorApprovalLoaded ?? emptyCanonicalOperatorApprovalSnapshot())
     : null
 
-  const canonicalApprovalCount = resolveCanonicalApprovalQueueCount(
-    canonicalOperatorApproval,
-    kpis.approvalQueueCount,
-  )
-  const canonicalDraftCount = resolveCanonicalOutreachDraftCount(
-    canonicalOperatorApproval,
-    salesOutcomes.dailySummary.approvals_pending,
-  )
+  const canonicalApprovalCount = resolveCanonicalApprovalQueueCount(canonicalOperatorApproval, 0)
+  const canonicalDraftCount = resolveCanonicalOutreachDraftCount(canonicalOperatorApproval, 0)
 
-  if (canonicalOperatorApproval) {
-    kpis.approvalQueueCount = canonicalApprovalCount
-    operatorTasks.pendingApprovals = canonicalApprovalCount
-    salesOutcomes.dailySummary.approvals_pending = canonicalApprovalCount
-    salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
-    avaConsole.waitingForApproval =
-      canonicalApprovalCount > 0
-        ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
-        : null
-  }
+  kpis.approvalQueueCount = canonicalApprovalCount
+  operatorTasks.pendingApprovals = canonicalApprovalCount
+  salesOutcomes.dailySummary.approvals_pending = canonicalApprovalCount
+  salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
+  avaConsole.waitingForApproval =
+    canonicalApprovalCount > 0
+      ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
+      : null
 
   const revenueQueueLeadId =
     dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
@@ -731,27 +732,21 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     leads: leads.map((row) => ({ id: row.id, companyName: row.companyName })),
   }) ?? preliminaryFocus
 
-  const canonicalOperatorTask = buildCanonicalOperatorTask({
-    approvalSnapshot:
-      canonicalOperatorApproval ?? {
-        qaMarker: "ge-aios-operator-experience-1a-v1",
-        outreachPackageCount: 0,
-        outreachDraftCount: 0,
-        pendingApprovalCount: 0,
-        waitingForOperator: false,
-        packages: [],
-        topPackage: null,
-      },
-    decision: canonicalHeroDecision
-      ? projectGrowthCanonicalOperatorDecision({
-          decision: canonicalHeroDecision.decision,
-          freshness: canonicalHeroDecision.freshness,
+  const canonicalOperatorTask =
+    canonicalOperatorApproval?.topPackage
+      ? buildCanonicalOperatorTask({
+          approvalSnapshot: canonicalOperatorApproval,
+          decision: canonicalHeroDecision
+            ? projectGrowthCanonicalOperatorDecision({
+                decision: canonicalHeroDecision.decision,
+                freshness: canonicalHeroDecision.freshness,
+              })
+            : null,
+          focusLeadId: canonicalOperatorFocus?.leadId ?? heroLeadId,
+          focusCompanyName: canonicalOperatorFocus?.companyName ?? null,
+          focusHref: canonicalOperatorFocus?.href ?? null,
         })
-      : null,
-    focusLeadId: canonicalOperatorFocus?.leadId ?? heroLeadId,
-    focusCompanyName: canonicalOperatorFocus?.companyName ?? null,
-    focusHref: canonicalOperatorFocus?.href ?? null,
-  })
+      : null
 
   const heroLeadCompanyName =
     leads.find((row) => row.id === heroLeadId)?.companyName ?? null
