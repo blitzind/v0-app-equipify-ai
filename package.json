@@ -963,6 +963,8 @@
     "probe:ge-aios-first-customer-pipeline-scaling-1c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-first-customer-pipeline-scaling-1c.ts",
     "test:ge-aios-first-customer-portfolio-intake-1d": "tsx scripts/test-ge-aios-first-customer-portfolio-intake-1d.ts",
     "probe:ge-aios-first-customer-portfolio-intake-1d": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-first-customer-portfolio-intake-1d.ts",
+    "test:ge-aios-multi-lead-intake-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-multi-lead-intake-1a.ts",
+    "probe:ge-aios-multi-lead-intake-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-multi-lead-intake-1a.ts",
     "test:ge-aios-portfolio-intake-orphan-root-cause-1e": "tsx scripts/test-ge-aios-portfolio-intake-orphan-root-cause-1e.ts",
     "probe:ge-aios-portfolio-intake-orphan-root-cause-1e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ge-aios-portfolio-intake-orphan-root-cause-1e.ts",
     "test:ge-aios-portfolio-intake-pending-state-1f": "tsx scripts/test-ge-aios-portfolio-intake-pending-state-1f.ts",
