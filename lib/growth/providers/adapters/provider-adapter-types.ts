@@ -120,6 +120,7 @@ export type GrowthDeliveryAttempt = {
   failure_reason: string | null
   retry_count: number
   metadata: Record<string, unknown>
+  transport_snapshot_id?: string | null
   created_at: string
 }
 

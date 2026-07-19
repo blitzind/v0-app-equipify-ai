@@ -72,6 +72,13 @@ export type GrowthSequenceExecutionJob = {
   requiresHumanApproval: boolean
   humanApprovedAt: string | null
   humanApprovedBy: string | null
+  /** GE-AIOS-END-TO-END-1C — supervised package-backed transport binding */
+  outreachPackageId?: string | null
+  approvedSenderAccountId?: string | null
+  transportSnapshotId?: string | null
+  transportSnapshot?: Record<string, unknown> | null
+  transportContentHash?: string | null
+  packageFingerprint?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -174,6 +181,10 @@ export type GrowthSequenceSendPayload = {
   contentTemplateId?: string | null
   personalizationGenerationId?: string | null
   sequenceVideoAttachment?: import("@/lib/growth/sequences/growth-sequence-video-attachment-types").GrowthSequenceVideoSendAttribution | null
+  transportAuthoritySource?: import("@/lib/growth/sequences/execution/growth-transport-authority-1c-types").GrowthTransportAuthoritySource | null
+  transportContentHash?: string | null
+  transportSnapshotId?: string | null
+  outreachPackageId?: string | null
 }
 
 export type GrowthSequenceSmsSendPayload = {

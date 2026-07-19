@@ -40,6 +40,12 @@ type JobRow = {
   requires_human_approval: boolean
   human_approved_at: string | null
   human_approved_by: string | null
+  outreach_package_id?: string | null
+  approved_sender_account_id?: string | null
+  transport_snapshot_id?: string | null
+  transport_snapshot?: Record<string, unknown> | null
+  transport_content_hash?: string | null
+  package_fingerprint?: string | null
   created_at: string
   updated_at: string
 }
@@ -98,6 +104,12 @@ function mapJob(row: JobRow): GrowthSequenceExecutionJob {
     requiresHumanApproval: row.requires_human_approval,
     humanApprovedAt: row.human_approved_at,
     humanApprovedBy: row.human_approved_by,
+    outreachPackageId: row.outreach_package_id ?? null,
+    approvedSenderAccountId: row.approved_sender_account_id ?? null,
+    transportSnapshotId: row.transport_snapshot_id ?? null,
+    transportSnapshot: row.transport_snapshot ?? null,
+    transportContentHash: row.transport_content_hash ?? null,
+    packageFingerprint: row.package_fingerprint ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -196,6 +208,14 @@ export async function updateSequenceExecutionJob(
     voiceDropDeliveryAttemptId: string | null
     humanApprovedAt: string | null
     humanApprovedBy: string | null
+    outreachPackageId?: string | null
+    approvedSenderAccountId?: string | null
+    transportSnapshotId?: string | null
+    transportSnapshot?: Record<string, unknown> | null
+    transportContentHash?: string | null
+    packageFingerprint?: string | null
+    manualSenderAccountId?: string | null
+    allowAutoRotation?: boolean
   }>,
 ): Promise<GrowthSequenceExecutionJob> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -218,6 +238,17 @@ export async function updateSequenceExecutionJob(
   }
   if (patch.humanApprovedAt !== undefined) row.human_approved_at = patch.humanApprovedAt
   if (patch.humanApprovedBy !== undefined) row.human_approved_by = patch.humanApprovedBy
+  if (patch.outreachPackageId !== undefined) row.outreach_package_id = patch.outreachPackageId
+  if (patch.approvedSenderAccountId !== undefined) {
+    row.approved_sender_account_id = patch.approvedSenderAccountId
+  }
+  if (patch.transportSnapshotId !== undefined) row.transport_snapshot_id = patch.transportSnapshotId
+  if (patch.transportSnapshot !== undefined) row.transport_snapshot = patch.transportSnapshot
+  if (patch.transportContentHash !== undefined) row.transport_content_hash = patch.transportContentHash
+  if (patch.packageFingerprint !== undefined) row.package_fingerprint = patch.packageFingerprint
+  if (patch.manualSenderAccountId !== undefined) row.manual_sender_account_id = patch.manualSenderAccountId
+  if (patch.allowAutoRotation !== undefined) row.allow_auto_rotation = patch.allowAutoRotation
+  if (patch.senderAccountId !== undefined) row.sender_account_id = patch.senderAccountId
 
   const { data, error } = await jobsTable(admin).update(row).eq("id", jobId).select("*").single()
   if (error) throw new Error(error.message)

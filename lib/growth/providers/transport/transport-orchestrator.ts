@@ -18,6 +18,7 @@ import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enf
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
 import { resolveTransportFallbackRoute, simulateTransportDelivery } from "@/lib/growth/providers/transport/transport-fallback"
 import { recordTransportAuditEvent } from "@/lib/growth/providers/transport/transport-events"
+import { buildTransportLineageMetadataFromAttempt } from "@/lib/growth/sequences/execution/growth-transport-snapshot-audit-1c"
 import {
   createDeliveryAttempt,
   ensureProviderRateLimit,
@@ -688,9 +689,11 @@ export async function retryScheduledDeliveryAttempt(
     },
     lead_id: attempt.lead_id,
     sequence_enrollment_id: attempt.sequence_enrollment_id,
+    sequence_execution_job_id: asString(attempt.metadata.sequence_execution_job_id) || undefined,
     actorUserId: actor.actorUserId,
     actorEmail: actor.actorEmail,
     retry_count: attempt.retry_count,
+    extra_metadata: buildTransportLineageMetadataFromAttempt(attempt),
   })
 }
 

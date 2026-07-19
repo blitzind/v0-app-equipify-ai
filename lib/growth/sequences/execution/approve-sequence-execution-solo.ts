@@ -16,6 +16,8 @@ import {
   type SequenceExecutionRunInput,
 } from "@/lib/growth/sequences/execution/sequence-job-runner"
 import { getSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
+import { verifySupervisedJobTransportApprovalFidelity } from "@/lib/growth/sequences/execution/growth-transport-authority-job-bind-1c"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 
 export type GrowthSequenceSoloApprovalResult = GrowthSequenceExecutionRunResult & {
   generationApproved?: boolean
@@ -54,10 +56,28 @@ export async function approveSequenceExecutionJobSolo(
   }
 
   const jobAlreadyApproved = job.status === "approved" && Boolean(job.humanApprovedAt)
+  const supervisedTransportBound = Boolean(job.outreachPackageId && job.transportSnapshot)
   let generationApproved = false
   let generationId: string | null = null
 
-  if (job.sequenceStepId) {
+  if (supervisedTransportBound) {
+    const organizationId = getGrowthEngineAiOrgId()
+    if (organizationId) {
+      const fidelity = await verifySupervisedJobTransportApprovalFidelity(admin, {
+        jobId: job.id,
+        organizationId,
+      })
+      if (!fidelity.ok) {
+        return {
+          ok: false,
+          jobId: job.id,
+          status: job.status,
+          message: fidelity.code,
+        }
+      }
+    }
+    generationApproved = true
+  } else if (job.sequenceStepId) {
     const step = await fetchGrowthSequenceEnrollmentStepById(admin, job.sequenceStepId)
     generationId = step?.generationId ?? null
   }

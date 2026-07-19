@@ -24,6 +24,8 @@ import {
   GE_AIOS_SUPERVISED_ENROLLMENT_REUSE_1I_QA_MARKER,
   validateSupervisedExecutionEnrollmentReuse,
 } from "@/lib/growth/mission-center/growth-ava-outreach-enrollment-reuse-1i"
+import { refreshSupervisedTransportSnapshotForJob } from "@/lib/growth/sequences/execution/growth-transport-authority-job-bind-1c"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 
 const TRANSPORT_CHANNELS = new Set<GrowthAvaOutreachExecutionRequestChannel>(["email", "sms"])
 
@@ -108,6 +110,18 @@ async function queueSupervisedTransportJob(
     sequenceStepId: input.step.id,
   })
   if (existingJob) {
+    const organizationId = getGrowthEngineAiOrgId()
+    if (organizationId) {
+      await refreshSupervisedTransportSnapshotForJob(admin, {
+        jobId: existingJob.id,
+        organizationId,
+        packageId: input.request.packageId,
+        leadId: input.request.leadId,
+        sequencePatternStepId: input.step.id,
+        sequencePatternId: input.sequencePatternId,
+      }).catch(() => undefined)
+    }
+
     logGrowthEngine("ava_outreach_execution_request_fulfilled", {
       qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
       handoff_qa_marker: GE_AIOS_SUPERVISED_ENROLLMENT_REUSE_1I_QA_MARKER,

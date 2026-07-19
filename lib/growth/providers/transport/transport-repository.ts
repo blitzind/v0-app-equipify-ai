@@ -62,6 +62,7 @@ function mapAttempt(row: Row): GrowthDeliveryAttempt {
     failure_reason: asString(row.failure_reason) || null,
     retry_count: asNumber(row.retry_count, 0),
     metadata: row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : {},
+    transport_snapshot_id: asString(row.transport_snapshot_id) || null,
     created_at: asString(row.created_at),
   }
 }
@@ -136,6 +137,13 @@ export async function createDeliveryAttempt(
   if (input.metadata?.outreach_queue_id) {
     row.outreach_queue_id = input.metadata.outreach_queue_id
   }
+  const snapshotId =
+    typeof input.metadata?.transport_snapshot_id === "string"
+      ? input.metadata.transport_snapshot_id
+      : typeof input.metadata?.transportSnapshotId === "string"
+        ? input.metadata.transportSnapshotId
+        : null
+  if (snapshotId) row.transport_snapshot_id = snapshotId
 
   const { data, error } = await attemptsTable(admin).insert(row).select("*").single()
 

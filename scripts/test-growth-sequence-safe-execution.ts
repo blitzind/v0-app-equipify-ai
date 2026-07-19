@@ -105,7 +105,22 @@ async function main(): Promise<void> {
   assert.match(sendBuilderSource, /applyOutboundEmailTracking/)
   assert.match(sendBuilderSource, /applyExperimentVariantToSendPayload/)
   assert.match(sendBuilderSource, new RegExp(UNSUBSCRIBE_PLACEHOLDER.replace(/[{}]/g, "\\$&")))
-  assert.match(sendBuilderSource, /generation\.status !== "approved"/)
+  assert.match(sendBuilderSource, /resolveTransportAuthority/)
+  assert.match(sendBuilderSource, /authority\.source === "frozen_snapshot"/)
+  assert.match(sendBuilderSource, /authority\.source === "legacy_generation"/)
+  assert.match(sendBuilderSource, /approved_sender_substitution_blocked/)
+  assert.doesNotMatch(sendBuilderSource, /fetchGrowthAiCopilotGenerationById/)
+
+  const transportAuthoritySource = readSource(
+    "lib/growth/sequences/execution/growth-transport-authority-1c.ts",
+  )
+  assert.match(transportAuthoritySource, /source: "frozen_snapshot"/)
+  assert.match(transportAuthoritySource, /resolveLegacyGenerationTransportAuthority/)
+  assert.match(transportAuthoritySource, /generation\.status !== "approved"/)
+
+  const approveSoloSource = readSource("lib/growth/sequences/execution/approve-sequence-execution-solo.ts")
+  assert.match(approveSoloSource, /verifySupervisedJobTransportApprovalFidelity/)
+  assert.match(approveSoloSource, /supervisedTransportBound/)
 
   const repositorySource = readSource("lib/growth/sequences/execution/sequence-job-repository.ts")
   assert.match(repositorySource, /findActiveSequenceExecutionJob/)

@@ -3,7 +3,6 @@
  * Run: pnpm test:ge-aios-end-to-end-hotfix-1b-sequence-run-override-forwarding
  */
 import assert from "node:assert/strict"
-import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -12,6 +11,8 @@ export const GE_AIOS_END_TO_END_HOTFIX_1B_QA_MARKER =
 
 const RUN_ROUTE = "app/api/platform/growth/sequences/execution/jobs/[jobId]/run/route.ts"
 const JOB_RUNNER = "lib/growth/sequences/execution/sequence-job-runner.ts"
+const SEND_BUILDER = "lib/growth/sequences/execution/sequence-send-builder.ts"
+const TRANSPORT_AUTHORITY = "lib/growth/sequences/execution/growth-transport-authority-1c.ts"
 const SAFE_EXECUTE_CRON = "app/api/cron/growth-sequence-safe-execute/route.ts"
 const SCHEDULER_ROUTE = "app/api/platform/growth/sequences/scheduler/run/route.ts"
 const AUTONOMOUS_ORCHESTRATOR =
@@ -19,10 +20,6 @@ const AUTONOMOUS_ORCHESTRATOR =
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
-}
-
-function readCommittedSource(relativePath: string): string {
-  return execSync(`git show HEAD:${relativePath}`, { encoding: "utf8" })
 }
 
 function extractRunRouteCallBlock(source: string): string {
@@ -60,32 +57,36 @@ function main(): void {
   assert.equal(GE_AIOS_END_TO_END_HOTFIX_1B_QA_MARKER, GE_AIOS_END_TO_END_HOTFIX_1B_QA_MARKER)
 
   const runRoute = readSource(RUN_ROUTE)
-  const committedRunRoute = readCommittedSource(RUN_ROUTE)
   const jobRunner = readSource(JOB_RUNNER)
+  const sendBuilder = readSource(SEND_BUILDER)
+  const transportAuthority = readSource(TRANSPORT_AUTHORITY)
   const safeExecuteCron = readSource(SAFE_EXECUTE_CRON)
   const schedulerRoute = readSource(SCHEDULER_ROUTE)
   const autonomousOrchestrator = readSource(AUTONOMOUS_ORCHESTRATOR)
 
-  // 1. Deployed baseline (HEAD) does not forward override.
-  assert.match(committedRunRoute, /humanApproved: z\.boolean\(\)\.optional\(\)/)
-  assert.match(committedRunRoute, /humanApprovalConfirmed: z\.boolean\(\)\.optional\(\)/)
-  assert.doesNotMatch(committedRunRoute, /canonicalDecisionOverrideReason/)
-  const committedCall = extractRunRouteCallBlock(committedRunRoute)
-  assert.doesNotMatch(committedCall, /canonicalDecisionOverrideReason/)
+  // 1. Human `/run` route accepts and forwards operator override.
+  assert.match(runRoute, /humanApproved: z\.boolean\(\)\.optional\(\)/)
+  assert.match(runRoute, /humanApprovalConfirmed: z\.boolean\(\)\.optional\(\)/)
+  assert.match(runRoute, /canonicalDecisionOverrideReason: z\.string\(\)\.trim\(\)\.min\(1\)\.optional\(\)/)
+  const runRouteCall = extractRunRouteCallBlock(runRoute)
+  assert.match(
+    runRouteCall,
+    /canonicalDecisionOverrideReason: parsed\.data\.canonicalDecisionOverrideReason \?\? null/,
+  )
 
-  // 2. Runner already supports override input and forwards it to enforcement.
+  // 2. Runner supports override input and forwards it to canonical enforcement.
   const runnerInput = extractRunnerInputType(jobRunner)
   assert.match(runnerInput, /canonicalDecisionOverrideReason\?: string \| null/)
   const canonicalGateCall = extractCanonicalGateCall(jobRunner)
   assert.match(canonicalGateCall, /operatorOverrideReason: input\.canonicalDecisionOverrideReason/)
 
-  // 3. Patched route accepts and forwards override (smallest repair).
-  assert.match(runRoute, /canonicalDecisionOverrideReason: z\.string\(\)\.trim\(\)\.min\(1\)\.optional\(\)/)
-  const patchedCall = extractRunRouteCallBlock(runRoute)
-  assert.match(
-    patchedCall,
-    /canonicalDecisionOverrideReason: parsed\.data\.canonicalDecisionOverrideReason \?\? null/,
-  )
+  // 3. Supervised transport uses frozen authority; legacy generation remains for autonomous jobs.
+  assert.match(sendBuilder, /resolveTransportAuthority/)
+  assert.match(transportAuthority, /source: "frozen_snapshot"/)
+  assert.match(transportAuthority, /resolveLegacyGenerationTransportAuthority/)
+  assert.match(sendBuilder, /authority\.source === "frozen_snapshot"/)
+  assert.match(sendBuilder, /authority\.source === "legacy_generation"/)
+  assert.match(sendBuilder, /approved_sender_substitution_blocked/)
 
   // 4. Scheduler / cron / autonomous paths cannot supply override.
   assert.match(safeExecuteCron, /runApprovedDueSequenceExecutionJobs/)

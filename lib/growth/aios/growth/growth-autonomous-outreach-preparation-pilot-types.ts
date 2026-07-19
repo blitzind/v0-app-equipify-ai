@@ -111,6 +111,8 @@ export type GrowthAutonomousOutreachApprovalPackage = {
   /** GE-AVA-AUTONOMY-EXECUTION-REQUEST-1 — set after operator package approval */
   packageApprovalDecision?: "approved" | "rejected" | null
   executionRequestId?: string | null
+  /** GE-AIOS-END-TO-END-1C — operator-approved outbound sender account for supervised transport */
+  approvedSenderAccountId?: string | null
 }
 
 export type GrowthAutonomousOutreachPreparationRunRecord = {

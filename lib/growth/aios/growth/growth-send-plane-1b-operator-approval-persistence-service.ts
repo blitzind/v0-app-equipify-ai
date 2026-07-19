@@ -13,6 +13,7 @@ import {
   GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER,
   type SendPlane1BEditablePackageChannel,
 } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
+import { resolveSupervisedApprovedSenderAccountId } from "@/lib/growth/sequences/execution/growth-supervised-sender-resolution-1c"
 
 export async function persistOperatorPackageDraftEdits(
   admin: SupabaseClient,
@@ -97,15 +98,26 @@ export async function freezeOperatorApprovedPackageAssets(
     approvedAt: input.approvedAt,
   })
 
+  const approvedSenderAccountId = await resolveSupervisedApprovedSenderAccountId(admin, {
+    organizationId: input.organizationId,
+    package: approvalPackage,
+    explicitSenderAccountId: approvalPackage.approvedSenderAccountId ?? null,
+  })
+
+  const frozenPackage: GrowthAutonomousOutreachApprovalPackage = {
+    ...approvalPackage,
+    approvedSenderAccountId: approvedSenderAccountId ?? approvalPackage.approvedSenderAccountId ?? null,
+  }
+
   if (existing) {
     await updateOutreachPreparationPilotRunApprovalPackage(admin, {
       organizationId: input.organizationId,
       runId: existing.runId,
-      approvalPackage,
-      confidence: approvalPackage.confidence,
+      approvalPackage: frozenPackage,
+      confidence: frozenPackage.confidence,
       now: input.approvedAt,
     })
   }
 
-  return approvalPackage
+  return frozenPackage
 }

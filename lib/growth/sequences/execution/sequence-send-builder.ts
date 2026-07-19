@@ -1,7 +1,6 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { applyExperimentVariantToSendPayload } from "@/lib/growth/experiments/experiment-repository"
@@ -9,9 +8,7 @@ import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enr
 import { resolveSenderRotationForPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
-import { resolveApprovedTemplateContent } from "@/lib/growth/content/dashboard"
 import { isApolloEmailPlaceholderContent } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
-import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import {
   applySendrPageUrlMergeFields,
@@ -24,6 +21,9 @@ import {
   wireApprovedSequenceVideoAttachment,
 } from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
 import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
+import { resolveTransportAuthority } from "@/lib/growth/sequences/execution/growth-transport-authority-1c"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { getSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -102,109 +102,93 @@ export async function buildSequenceExecutionSendPayload(
     sequenceExecutionJobId?: string | null
     contentTemplateVersionId?: string | null
     personalizationGenerationId?: string | null
+    organizationId?: string | null
   },
 ): Promise<GrowthSequenceSendPayload | { error: string }> {
-  const [step, lead] = await Promise.all([
+  const [step, lead, job] = await Promise.all([
     fetchGrowthSequenceEnrollmentStepById(admin, input.sequenceStepId),
     fetchGrowthLeadById(admin, input.leadId),
+    input.sequenceExecutionJobId
+      ? getSequenceExecutionJob(admin, input.sequenceExecutionJobId)
+      : Promise.resolve(null),
   ])
   if (!step) return { error: "step_not_found" }
   if (!lead?.contactEmail) return { error: "missing_recipient_email" }
   if (step.channel !== "email") return { error: "unsupported_channel" }
 
-  const sender = await resolveSequenceExecutionSender(admin, {
-    senderPoolId: input.senderPoolId,
-    allowAutoRotation: input.allowAutoRotation,
-    manualSenderAccountId: input.manualSenderAccountId,
-    sequenceExecutionJobId: input.sequenceExecutionJobId,
+  const organizationId =
+    input.organizationId?.trim() ||
+    lead.promotedOrganizationId?.trim() ||
+    getGrowthEngineAiOrgId() ||
+    null
+
+  const authority = await resolveTransportAuthority(admin, {
+    sequenceStepId: input.sequenceStepId,
+    leadId: input.leadId,
+    sequenceExecutionJobId: input.sequenceExecutionJobId ?? null,
+    organizationId,
+    contentTemplateVersionId: input.contentTemplateVersionId ?? null,
+    personalizationGenerationId: input.personalizationGenerationId ?? null,
   })
-  if (!sender) return { error: "no_sender_route" }
+  if ("error" in authority) return { error: authority.error }
 
-  let preferredSenderAccountId: string | null = null
-  if (lead.promotedOrganizationId) {
-    let sequencePatternId: string | null = null
-    if (input.sequenceEnrollmentId) {
-      const enrollment = await fetchGrowthSequenceEnrollmentById(admin, input.sequenceEnrollmentId)
-      sequencePatternId = enrollment?.sequencePatternId ?? null
-    }
-    preferredSenderAccountId = await resolvePreferredSenderAccountFromSendrLink(admin, {
-      organizationId: lead.promotedOrganizationId,
-      sequencePatternStepId: step.sequencePatternStepId,
-      sequencePatternId,
-    })
-  }
-
-  const manualSenderAccountId =
-    input.manualSenderAccountId ?? preferredSenderAccountId ?? sender.manualSenderAccountId ?? null
-  let resolvedSender =
-    manualSenderAccountId && manualSenderAccountId !== sender.senderAccountId
-      ? await resolveSequenceExecutionSender(admin, {
-          senderPoolId: input.senderPoolId,
-          allowAutoRotation: false,
-          manualSenderAccountId,
-          sequenceExecutionJobId: input.sequenceExecutionJobId,
-        })
-      : sender
-  if (!resolvedSender) return { error: "no_sender_route" }
-
-  let subject = "Follow up"
-  let body = step.instructions?.trim() || "Following up on our conversation."
-  let contentTemplateVersionId: string | null = input.contentTemplateVersionId ?? null
-  let contentTemplateId: string | null = null
-
-  if (input.contentTemplateVersionId) {
-    const resolved = await resolveApprovedTemplateContent(admin, {
-      templateVersionId: input.contentTemplateVersionId,
-      templateType: "sequence_email",
-      mergeValues: {
-        "lead.contact_name": lead.contactName ?? "[contact]",
-        "lead.company_name": lead.companyName ?? "[company]",
-        "lead.industry": "[industry]",
-      },
-    })
-    if (!resolved) return { error: "content_template_not_approved" }
-    subject = resolved.subject || subject
-    body = resolved.body || body
-    contentTemplateVersionId = resolved.templateVersionId
-    contentTemplateId = resolved.templateId
-  }
-
-  if (step.generationId) {
-    const generation = await fetchGrowthAiCopilotGenerationById(admin, step.generationId)
-    if (!generation) return { error: "missing_generation" }
-    if (generation.status !== "approved") return { error: "generation_not_approved" }
-    subject = generation.generatedSubject?.trim() || subject
-    body = generation.generatedContent?.trim() || body
-  }
+  let subject = authority.subject
+  let body = authority.bodyText
 
   if (step.channel === "email" && isApolloEmailPlaceholderContent({ subject, body })) {
-    return { error: step.generationId ? "apollo_email_placeholder_blocked" : "missing_generation" }
+    return {
+      error:
+        authority.source === "frozen_snapshot"
+          ? "approved_transport_asset_invalid"
+          : step.generationId
+            ? "apollo_email_placeholder_blocked"
+            : "missing_generation",
+    }
   }
 
-  const personalizationGenerationId = input.personalizationGenerationId ?? null
-  if (personalizationGenerationId) {
-    const personalization = await getApprovedPersonalizationForJob(admin, personalizationGenerationId)
-    if (!personalization) return { error: "personalization_not_approved" }
-    subject = personalization.subject || subject
-    body = personalization.body || body
+  let resolvedSender = await resolveSequenceExecutionSender(admin, {
+    senderPoolId: input.senderPoolId ?? job?.senderPoolId ?? null,
+    allowAutoRotation: authority.allowAutoRotation,
+    manualSenderAccountId: authority.manualSenderAccountId ?? input.manualSenderAccountId ?? null,
+    sequenceExecutionJobId: input.sequenceExecutionJobId,
+  })
+  if (!resolvedSender) return { error: "no_sender_route" }
+
+  if (
+    authority.source === "frozen_snapshot" &&
+    resolvedSender.senderAccountId !== authority.senderAccountId
+  ) {
+    return { error: "approved_sender_substitution_blocked" }
   }
 
-  const experimentOverlay = await applyExperimentVariantToSendPayload(admin, {
-    leadId: input.leadId,
-    sequenceEnrollmentId: input.sequenceEnrollmentId,
-    sequenceStepId: input.sequenceStepId,
+  let experimentOverlay = {
     subject,
     body,
     senderAccountId: resolvedSender.senderAccountId,
     providerId: resolvedSender.providerId,
-  })
+    experimentId: null as string | null,
+    variantId: null as string | null,
+    variantLabel: null as string | null,
+  }
+
+  if (authority.source === "legacy_generation") {
+    experimentOverlay = await applyExperimentVariantToSendPayload(admin, {
+      leadId: input.leadId,
+      sequenceEnrollmentId: input.sequenceEnrollmentId,
+      sequenceStepId: input.sequenceStepId,
+      subject,
+      body,
+      senderAccountId: resolvedSender.senderAccountId,
+      providerId: resolvedSender.providerId,
+    })
+  }
 
   subject = experimentOverlay.subject
   body = experimentOverlay.body
   resolvedSender.senderAccountId = experimentOverlay.senderAccountId
   resolvedSender.providerId = experimentOverlay.providerId
 
-  if (lead.promotedOrganizationId) {
+  if (lead.promotedOrganizationId && authority.source === "legacy_generation") {
     const sendrPageUrl = await resolveSendrPageUrlForSequenceStep(admin, {
       organizationId: lead.promotedOrganizationId,
       sequencePatternStepId: step.sequencePatternStepId,
@@ -256,17 +240,24 @@ export async function buildSequenceExecutionSendPayload(
     senderAccountId: resolvedSender.senderAccountId,
     providerId: resolvedSender.providerId,
     senderPoolId: resolvedSender.senderPoolId ?? input.senderPoolId ?? null,
-    allowAutoRotation: resolvedSender.allowAutoRotation ?? input.allowAutoRotation ?? true,
+    allowAutoRotation: resolvedSender.allowAutoRotation ?? authority.allowAutoRotation,
     manualSenderAccountId:
-      resolvedSender.manualSenderAccountId ?? manualSenderAccountId ?? input.manualSenderAccountId ?? null,
+      resolvedSender.manualSenderAccountId ??
+      authority.manualSenderAccountId ??
+      input.manualSenderAccountId ??
+      null,
     rotationReason: resolvedSender.rotationReason ?? null,
     rotationRiskLevel: resolvedSender.rotationRiskLevel ?? null,
     experimentId: experimentOverlay.experimentId,
     experimentVariantId: experimentOverlay.variantId,
     experimentVariantLabel: experimentOverlay.variantLabel,
-    contentTemplateVersionId,
-    contentTemplateId,
-    personalizationGenerationId,
+    contentTemplateVersionId: input.contentTemplateVersionId ?? null,
+    contentTemplateId: null,
+    personalizationGenerationId: input.personalizationGenerationId ?? null,
     sequenceVideoAttachment: videoWire?.attribution ?? null,
+    transportAuthoritySource: authority.source,
+    transportContentHash: authority.contentHash || null,
+    transportSnapshotId: authority.transportSnapshotId,
+    outreachPackageId: authority.outreachPackageId,
   }
 }

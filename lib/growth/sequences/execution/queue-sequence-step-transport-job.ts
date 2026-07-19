@@ -39,8 +39,12 @@ import {
 import {
   createSequenceExecutionJob,
   findActiveSequenceExecutionJob,
+  updateSequenceExecutionJob,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
+import { bindSupervisedTransportSnapshotToJob } from "@/lib/growth/sequences/execution/growth-transport-authority-job-bind-1c"
+import { resolveSupervisedApprovedSenderAccountId } from "@/lib/growth/sequences/execution/growth-supervised-sender-resolution-1c"
+import { GE_AIOS_TRANSPORT_AUTHORITY_1C_QA_MARKER } from "@/lib/growth/sequences/execution/growth-transport-authority-1c-types"
 import { emitGrowthLeadSequenceStepQueuedTimeline } from "@/lib/growth/timeline-emitter"
 import {
   evaluateGrowthQaDeliverabilityBypass,
@@ -523,7 +527,29 @@ export async function queueSequenceStepTransportJob(
     }
   }
 
-  const sender = await resolveSequenceExecutionSender(admin)
+  const organizationId = getGrowthEngineAiOrgId()
+  const supervisedPackageId =
+    input.supervisedExecutionRequestFulfillment && input.executionRequestPackageId
+      ? input.executionRequestPackageId
+      : null
+
+  let senderAccountIdForBypass: string | null = null
+  if (supervisedPackageId && organizationId) {
+    senderAccountIdForBypass = await resolveSupervisedApprovedSenderAccountId(admin, {
+      organizationId,
+      explicitSenderAccountId: null,
+      sequencePatternStepId: input.step.sequencePatternStepId,
+      sequencePatternId: (await fetchGrowthSequenceEnrollmentById(admin, input.enrollmentId))
+        ?.sequencePatternId,
+    })
+  }
+
+  const sender = senderAccountIdForBypass
+    ? {
+        senderAccountId: senderAccountIdForBypass,
+        providerId: null as string | null,
+      }
+    : await resolveSequenceExecutionSender(admin)
   if (!sender) {
     logGrowthEngine("sequence_scheduler_transport_job_skipped", {
       stepId: input.step.id,
@@ -543,6 +569,25 @@ export async function queueSequenceStepTransportJob(
     status: "pending_approval",
     channel: "email",
   })
+
+  if (supervisedPackageId && organizationId) {
+    const bindResult = await bindSupervisedTransportSnapshotToJob(admin, {
+      jobId: job.id,
+      organizationId,
+      packageId: supervisedPackageId,
+      leadId: input.step.leadId,
+      sequencePatternStepId: input.step.sequencePatternStepId,
+      sequencePatternId: (await fetchGrowthSequenceEnrollmentById(admin, input.enrollmentId))
+        ?.sequencePatternId,
+    })
+    if (!bindResult.ok) {
+      await updateSequenceExecutionJob(admin, job.id, {
+        status: "blocked",
+        lastError: bindResult.error,
+      })
+      return { queued: false, reason: bindResult.error }
+    }
+  }
 
   const qaDeliverabilityBypass = await evaluateGrowthQaDeliverabilityBypass(admin, {
     actingUserEmail: input.actingUserEmail,
@@ -566,6 +611,8 @@ export async function queueSequenceStepTransportJob(
       provider_id: sender.providerId,
       generation_id: generationId ?? null,
       acting_user_id: input.actingUserId,
+      outreach_package_id: supervisedPackageId,
+      transport_authority_qa_marker: supervisedPackageId ? GE_AIOS_TRANSPORT_AUTHORITY_1C_QA_MARKER : null,
       ...serializeGrowthQaDeliverabilityBypassSnapshot(qaDeliverabilityBypass),
     },
   })

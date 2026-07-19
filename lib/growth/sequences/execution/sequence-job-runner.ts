@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
@@ -28,6 +29,7 @@ import {
   updateSequenceExecutionJob,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
+import { verifySupervisedJobTransportApprovalFidelity } from "@/lib/growth/sequences/execution/growth-transport-authority-job-bind-1c"
 import { runSequenceSmsExecutionJob } from "@/lib/growth/sequences/execution/sequence-sms-runner"
 import { runSequenceVoiceDropExecutionJob } from "@/lib/growth/sequences/execution/sequence-voice-drop-runner"
 import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
@@ -91,6 +93,24 @@ export async function approveSequenceExecutionJob(
   }
   if (!["draft", "pending_approval", "blocked", "failed"].includes(job.status)) {
     return { ok: false, jobId: job.id, status: job.status, message: "invalid_status_for_approval" }
+  }
+
+  if (job.outreachPackageId && job.transportSnapshot) {
+    const organizationId = getGrowthEngineAiOrgId()
+    if (organizationId) {
+      const fidelity = await verifySupervisedJobTransportApprovalFidelity(admin, {
+        jobId: job.id,
+        organizationId,
+      })
+      if (!fidelity.ok) {
+        return {
+          ok: false,
+          jobId: job.id,
+          status: job.status,
+          message: fidelity.code,
+        }
+      }
+    }
   }
 
   const apolloDraftGate = await evaluateApolloSequenceExecutionJobApprovalGateForJob(admin, {
@@ -458,6 +478,7 @@ export async function runSequenceExecutionJob(
     allowAutoRotation: locked.allowAutoRotation,
     manualSenderAccountId: locked.manualSenderAccountId,
     sequenceExecutionJobId: locked.id,
+    organizationId: getGrowthEngineAiOrgId(),
   })
 
   if ("error" in payload) {
@@ -584,6 +605,15 @@ export async function runSequenceExecutionJob(
         : {}),
       ...(payload.personalizationGenerationId
         ? { personalization_generation_id: payload.personalizationGenerationId }
+        : {}),
+      ...(payload.transportAuthoritySource
+        ? {
+            transport_authority_source: payload.transportAuthoritySource,
+            transport_content_hash: payload.transportContentHash ?? null,
+            transport_snapshot_id: payload.transportSnapshotId ?? null,
+            outreach_package_id: payload.outreachPackageId ?? null,
+            package_fingerprint: locked.packageFingerprint ?? null,
+          }
         : {}),
       governance_audit_recorded: true,
     },
