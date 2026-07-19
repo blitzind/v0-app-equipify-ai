@@ -35,7 +35,6 @@ export function GrowthHomePortfolioManagerSection({ portfolio }: Props) {
   return (
     <section
       data-qa-section="home-portfolio-manager"
-      data-qa-marker={GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card/70 p-5 shadow-sm"
     >
       <div className="mb-4 flex items-start justify-between gap-3 border-b border-border/50 pb-3">
