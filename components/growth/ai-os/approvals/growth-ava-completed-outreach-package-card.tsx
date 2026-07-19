@@ -42,9 +42,16 @@ import {
 import { GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
 import {
   GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PRE_ACTION,
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_DETAIL,
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_HEADLINE,
   GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS,
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS_PENDING_EXECUTION,
+  GROWTH_OPERATOR_PACKAGE_INCOMPLETE_BLOCK_PREFIX,
+  GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_DETAIL,
+  GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_TITLE,
   GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS,
   GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_TITLE,
+  resolvePackageAuthorizationReadiness,
 } from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { needsApproval, recommends } from "@/lib/workspace/ai-teammate-voice"
@@ -406,8 +413,17 @@ export function GrowthAvaCompletedOutreachPackageCard({
   const approved = Boolean(
     executionRequest || packageBody?.packageApprovalDecision === "approved",
   )
-  const authorizeBlocked =
-    executionReadiness != null && !executionReadiness.executionReady && !approved
+  const packageAuthorization = resolvePackageAuthorizationReadiness({
+    packageId: card.packageId,
+    leadId: card.leadId,
+    generatedAssetCount:
+      packageBody?.generatedAssets?.length ?? card.draftAssets?.length ?? 0,
+    packageApprovalDecision: packageBody?.packageApprovalDecision ?? null,
+  })
+  const authorizeBlocked = !packageAuthorization.ready && !approved
+  const transportExecutionReady = executionReadiness?.executionReady === true
+  const authorizedWithoutExecutionRequest =
+    approved && !executionRequest && packageBody?.packageApprovalDecision === "approved"
 
   return (
     <li
@@ -861,18 +877,31 @@ export function GrowthAvaCompletedOutreachPackageCard({
       </div>
 
       {executionReadiness ? (
-        <div className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
-          <p className="font-medium text-foreground">
-            {executionReadiness.executionReady ? "Execution-ready" : "Review-ready only"}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {executionReadiness.executionReady
-              ? executionReadiness.confidenceSource === "lead_sequence_intelligence"
-                ? "Canonical lead sequence recommendation is ready for enrollment."
-                : `Approved package cadence (${executionReadiness.recommendedCadence ?? card.recommendedSequence}) maps to sequence pattern ${executionReadiness.resolvedPatternKey ?? "catalog"}.`
-              : (executionReadiness.blockReason ??
-                "Sequence enrollment is not ready — Authorize would fail fulfillment preflight.")}
-          </p>
+        <div className="mt-3 space-y-3">
+          <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/30 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <p className="font-medium text-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_HEADLINE}</p>
+            <p className="mt-1 text-muted-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_DETAIL}</p>
+          </div>
+          {transportExecutionReady ? (
+            <div className="rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
+              <p className="font-medium text-foreground">Transport execution ready</p>
+              <p className="mt-1 text-muted-foreground">
+                {executionReadiness.confidenceSource === "lead_sequence_intelligence"
+                  ? "Canonical lead sequence recommendation is ready for enrollment."
+                  : `Approved package cadence (${executionReadiness.recommendedCadence ?? card.recommendedSequence}) maps to sequence pattern ${executionReadiness.resolvedPatternKey ?? "catalog"}.`}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200/70 bg-amber-50/30 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+              <p className="font-medium text-foreground">
+                {GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_TITLE}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {executionReadiness.blockReason ??
+                  GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_DETAIL}
+              </p>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -904,10 +933,20 @@ export function GrowthAvaCompletedOutreachPackageCard({
             </div>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS}</p>
-              <Button asChild size="sm">
-                <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review transport approval</Link>
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                {authorizedWithoutExecutionRequest
+                  ? GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS_PENDING_EXECUTION
+                  : GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS}
+              </p>
+              {executionRequest ? (
+                <Button asChild size="sm">
+                  <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review transport approval</Link>
+                </Button>
+              ) : authorizedWithoutExecutionRequest && !transportExecutionReady ? (
+                <p className="text-xs text-muted-foreground">
+                  {GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_DETAIL}
+                </p>
+              ) : null}
             </>
           )}
           <ol className="space-y-1 border-t border-emerald-200/60 pt-2 text-xs text-muted-foreground dark:border-emerald-900/40">
@@ -932,7 +971,8 @@ export function GrowthAvaCompletedOutreachPackageCard({
           </Button>
           {authorizeBlocked ? (
             <p className="w-full text-xs text-amber-700 dark:text-amber-300">
-              Authorize is blocked until sequence enrollment readiness is satisfied.
+              {GROWTH_OPERATOR_PACKAGE_INCOMPLETE_BLOCK_PREFIX}{" "}
+              {packageAuthorization.blockReason ?? "required package information is missing"}.
             </p>
           ) : null}
           <Button

@@ -164,7 +164,7 @@ export function evaluateAvaOutreachPackageReadiness(input: {
       blockCode: "no_sequence_pattern",
       blockReason: input.patterns.length
         ? "No active sequence pattern matches the approved package cadence."
-        : "Sequence pattern catalog unavailable — server validation required before Authorize.",
+        : "Sequence pattern catalog unavailable — transport setup remains pending after authorization.",
       resolvedPatternKey: null,
       resolvedPatternId: null,
       sequenceConfidence: null,

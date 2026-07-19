@@ -28,12 +28,12 @@ async function main(): Promise<void> {
     "/api/platform/growth/ai-os/autonomous-outreach-preparation-pilot/packages/pkg-1/action",
   )
   assert.deepEqual(GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS, [
-    "Package Approved",
-    "Execution Request Created",
-    "Sequence Job Waiting",
-    "Transport Approval Required",
-    "Reply Monitoring Automatic",
-    "Follow-up Automatic",
+    "Package authorized",
+    "Execution request created",
+    "Sequence prepared",
+    "Transport approval required",
+    "Reply monitoring automatic",
+    "Follow-up automatic",
   ])
 
   const workspace = readSource("components/growth/ai-os/growth-ava-operator-approval-workspace.tsx")
@@ -43,11 +43,12 @@ async function main(): Promise<void> {
   assert.match(workspace, /Buying Committee/)
   assert.match(workspace, /Communication Strategy/)
   assert.match(workspace, /Draft Preview/)
-  assert.match(workspace, /Approve Package/)
-  assert.match(workspace, /Approve Sequence Job/)
+  assert.match(workspace, /Authorize/)
+  assert.match(workspace, /Review transport approval/)
   assert.match(workspace, /GROWTH_AVA_OPERATOR_SEQUENCE_APPROVAL_HREF/)
   assert.match(workspace, /GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS/)
   assert.doesNotMatch(workspace, /executeTransportSend|sendSms|runSequenceExecutionJob/)
+  assert.doesNotMatch(workspace, /Approve Package/)
 
   const panel = readSource("components/growth/ai-os/growth-ai-os-lead-research-pilot-panel.tsx")
   assert.match(panel, /GrowthAvaOperatorApprovalWorkspace/)
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
   assert.match(page, /packageId/)
 
   const hac = readSource("lib/growth/aios/approvals/growth-human-approval-center-engine.ts")
-  assert.match(hac, /\?packageId=/)
+  assert.match(hac, /buildGrowthReviewPackageHref/)
 
   console.log(`[${PHASE}] passed`)
 }

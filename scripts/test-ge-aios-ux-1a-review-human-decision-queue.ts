@@ -201,7 +201,8 @@ function main(): void {
   const legacyApprovalsPage = readSource("app/(growth)/growth/os/approvals/page.tsx")
   assert.match(legacyApprovalsPage, /GrowthAvaCompletedWorkPanel/)
   assert.match(legacyApprovalsPage, /isGrowthWorkspaceFirstUx1aEnabledClient/)
-  assert.match(legacyApprovalsPage, /GROWTH_REVIEW_PAGE_HREF/)
+  assert.match(legacyApprovalsPage, /remapLegacyHrefToGrowthReview/)
+  assert.match(legacyApprovalsPage, /searchParams\.toString\(\)/)
   console.log("  ✓ legacy approvals page preserved when flag off and redirects when flag on")
 
   const legacySequencesPage = readSource("app/(growth)/growth/campaigns/sequences/page.tsx")
@@ -267,6 +268,12 @@ function main(): void {
   assert.equal(
     remapUx1aOperatorHref("/growth/os/approvals?packageId=pkg-1"),
     buildGrowthReviewPackageHref("pkg-1"),
+  )
+  assert.equal(
+    remapLegacyHrefToGrowthReview(
+      "/growth/os/pilot/lead-research/lead-1?packageId=outreach-prep%3Alead-1%3A2026",
+    ),
+    buildGrowthReviewPackageHref("outreach-prep:lead-1:2026"),
   )
   assert.equal(remapLegacyHrefToGrowthReview(GROWTH_REVIEW_LEGACY_SEQUENCE_HREF), buildGrowthReviewHref({ tab: "sends" }))
   console.log("  ✓ workspace and legacy hrefs deep-link into Review tabs/items")

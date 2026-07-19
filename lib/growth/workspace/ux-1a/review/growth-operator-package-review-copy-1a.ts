@@ -34,3 +34,40 @@ export const GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS = [
     detail: "When sending is enabled, approve outbound transport separately before anything sends.",
   },
 ] as const
+
+/** GE-AIOS-OPERATOR-UX-1C — Package authorization vs transport execution readiness. */
+export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_HEADLINE =
+  "Package ready for authorization" as const
+
+export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_DETAIL =
+  "Ava's strategy and drafts are ready for your decision." as const
+
+export const GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_TITLE =
+  "Transport setup incomplete" as const
+
+export const GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_DETAIL =
+  "This package can be authorized, but it cannot be sent until a sequence pattern and transport approval are available." as const
+
+export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS_PENDING_EXECUTION =
+  "Package authorized. Transport remains blocked until execution setup is complete and sending is separately approved." as const
+
+export const GROWTH_OPERATOR_PACKAGE_INCOMPLETE_BLOCK_PREFIX =
+  "Authorize is unavailable until the package is complete:" as const
+
+export function resolvePackageAuthorizationReadiness(input: {
+  packageId?: string | null
+  leadId?: string | null
+  generatedAssetCount?: number | null
+  packageApprovalDecision?: string | null
+}): { ready: boolean; blockReason: string | null } {
+  if (!input.packageId?.trim() || !input.leadId?.trim()) {
+    return { ready: false, blockReason: "package identity is incomplete" }
+  }
+  if ((input.generatedAssetCount ?? 0) <= 0) {
+    return { ready: false, blockReason: "draft content is missing" }
+  }
+  if (input.packageApprovalDecision === "rejected") {
+    return { ready: false, blockReason: "this package was rejected" }
+  }
+  return { ready: true, blockReason: null }
+}

@@ -47,7 +47,8 @@ function actionErrorStatus(error: string): number {
     error === "no_sequence_pattern" ||
     error === "fatigue_blocked" ||
     error === "low_confidence" ||
-    error === "preflight_blocked"
+    error === "preflight_blocked" ||
+    error === "package_incomplete"
   ) {
     return 422
   }
@@ -134,7 +135,9 @@ export async function POST(request: Request, context: RouteContext) {
       transportBlocked: true,
       message:
         body.decision === "approve"
-          ? "Package approved — execution request created. Sequence transport remains gated by existing job approval."
+          ? result.executionRequest
+            ? "Package approved — execution request created. Sequence transport remains gated by existing job approval."
+            : "Package authorized. Transport setup remains pending — nothing was sent."
           : "Package rejected — no execution request created.",
     })
   } catch (error) {

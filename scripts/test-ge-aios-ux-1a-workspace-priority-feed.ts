@@ -143,6 +143,12 @@ function main(): void {
     "/growth/review?tab=packages&item=pkg-123",
   )
   assert.equal(
+    remapUx1aOperatorHref(
+      `/growth/os/pilot/lead-research/lead-1?packageId=${encodeURIComponent("outreach-prep:lead-1:2026")}`,
+    ),
+    "/growth/review?tab=packages&item=outreach-prep%3Alead-1%3A2026",
+  )
+  assert.equal(
     remapUx1aOperatorHref("/growth/campaigns/sequences?job=job-456"),
     "/growth/review?tab=sends&item=job-456",
   )

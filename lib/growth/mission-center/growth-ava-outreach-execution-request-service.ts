@@ -272,11 +272,10 @@ export async function submitAvaOutreachPackageApprovalAction(
     recommendedSequence: pkg.recommendedSequence,
     recommendedChannel: pkg.recommendedChannel,
   })
-  if (!readiness.executionReady) {
-    throw new Error(readiness.blockCode ?? "execution_not_ready")
-  }
 
-  const requestId = randomUUID()
+  if (!pkg.generatedAssets?.length) {
+    throw new Error("package_incomplete")
+  }
 
   await freezeOperatorApprovedPackageAssets(admin, {
     organizationId: input.organizationId,
@@ -285,6 +284,38 @@ export async function submitAvaOutreachPackageApprovalAction(
     draftEdits: input.draftEdits,
     operatorUserId: input.operatorUserId,
   })
+
+  if (!readiness.executionReady) {
+    await markAutonomousOutreachPackageApprovalDecision({
+      admin,
+      organizationId: input.organizationId,
+      packageId: input.packageId,
+      decision: "approved",
+      executionRequestId: null,
+      now,
+    })
+
+    logGrowthEngine("ava_outreach_package_approved", {
+      qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
+      handoff_qa_marker: GE_AIOS_SUPERVISED_SEQUENCE_HANDOFF_1F_QA_MARKER,
+      package_id: input.packageId,
+      lead_id: leadId,
+      request_id: null,
+      execution_status: "pending_execution_setup",
+      sequence_job_id: null,
+      sequence_pattern_id: null,
+    })
+
+    return {
+      qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
+      decision: input.decision,
+      packageId: input.packageId,
+      leadId,
+      executionRequest: null,
+    }
+  }
+
+  const requestId = randomUUID()
 
   let executionRequest: GrowthAvaOutreachExecutionRequest = {
     qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
