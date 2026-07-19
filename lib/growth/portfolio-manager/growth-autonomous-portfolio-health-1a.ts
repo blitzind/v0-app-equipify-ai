@@ -62,7 +62,6 @@ export function buildPortfolioHealthCountsFromLeads(input: {
     const admission = resolveLeadAdmissionStateFromMetadata(lead.metadata)
     if (admission === "review") {
       counts.awaitingReview += 1
-      counts.awaitingAdmission += 1
       continue
     }
     if (admission === "rejected") {
