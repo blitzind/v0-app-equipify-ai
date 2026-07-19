@@ -26,6 +26,13 @@ import {
   type GrowthCanonicalOperatorTask,
   type GrowthCanonicalOperatorWorkspaceLeadContext,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
+import {
+  buildGrowthReviewHref,
+  resolveOperatorPackageReviewHref,
+} from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+import {
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
+} from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
 
 function relativePreparedLabel(preparedAt: string | null): string | null {
   if (!preparedAt) return null
@@ -81,7 +88,7 @@ function packagePreviewFromItem(input: {
       input.pkg?.generatedAssets?.[0]?.channel ??
       (input.item.channel && input.item.channel !== "none" ? input.item.channel : "Email sequence"),
     statusLabel: "Waiting for approval",
-    reviewHref: input.item.route ?? `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`,
+    reviewHref: resolveOperatorPackageReviewHref(packageId),
   }
 }
 
@@ -149,7 +156,7 @@ export function buildCanonicalOperatorTask(input: {
       title: `Review ${top.companyName}`,
       detail: `${top.channelLabel ?? "Email sequence"} prepared · ${draftLabel}`,
       why: `${teammate} finished research and prepared outreach for your review.`,
-      whatHappensNext: "After you approve, I'll send the sequence and keep following up.",
+      whatHappensNext: GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
       confidenceLabel: null,
       href: top.reviewHref,
       companyName: top.companyName,
@@ -179,7 +186,7 @@ export function buildCanonicalOperatorTask(input: {
         input.decision.thenActions[0] ??
         "Once you confirm, I'll take the next step on this account.",
       confidenceLabel: input.decision.confidenceLabel,
-      href: `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`,
+      href: buildGrowthReviewHref({ tab: "packages" }),
       companyName: focusCompanyName,
       leadId: focusLeadId,
       draftCount: input.approvalSnapshot.outreachDraftCount,

@@ -17,7 +17,9 @@ import {
 } from "@/lib/growth/mission-center/growth-ava-operator-workspace-contract"
 import { GrowthHomeOpportunityIntelligencePanel } from "@/components/growth/workspace/executive-briefing/growth-home-opportunity-intelligence-panel"
 import type { GrowthHomeOpportunityIntelligenceApiResponse } from "@/lib/growth/opportunity-intelligence/growth-home-opportunity-intelligence-api-contract"
-import type { OpportunityIntelligenceViewModel } from "@/lib/growth/opportunity-intelligence/opportunity-intelligence-view-model-types"
+import {
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS,
+} from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
 
 type CommunicationStrategyResponse = {
   ok?: boolean
@@ -326,23 +328,11 @@ export function GrowthAvaOperatorApprovalWorkspace({
           <div className="space-y-4 rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
             <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
               <Check className="size-5" aria-hidden />
-              <p className="font-semibold">Package Approved</p>
+              <p className="font-semibold">Package authorized</p>
             </div>
-            <p className="text-sm">
-              Execution Request {executionRequest?.executionStatus === "queued" ? "queued" : "recorded"}.
-              {executionRequest?.sequenceJobId ? (
-                <>
-                  {" "}
-                  Sequence job <span className="font-mono text-xs">{executionRequest.sequenceJobId.slice(0, 8)}…</span>{" "}
-                  created.
-                </>
-              ) : null}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Transport still requires approval in the existing Sequence Execution dashboard — no send from this screen.
-            </p>
+            <p className="text-sm text-muted-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS}</p>
             <Button type="button" asChild>
-              <Link href={GROWTH_AVA_OPERATOR_SEQUENCE_APPROVAL_HREF}>Approve Sequence Job</Link>
+              <Link href={GROWTH_AVA_OPERATOR_SEQUENCE_APPROVAL_HREF}>Review transport approval</Link>
             </Button>
             <ol className="space-y-2 border-t border-emerald-200/60 pt-3 text-sm dark:border-emerald-900/40">
               {GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS.map((step) => (
@@ -361,7 +351,7 @@ export function GrowthAvaOperatorApprovalWorkspace({
               onClick={() => void submitDecision("approve")}
             >
               {busy === "approve" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Approve Package
+              Authorize
             </Button>
             <Button
               type="button"
@@ -374,7 +364,7 @@ export function GrowthAvaOperatorApprovalWorkspace({
             </Button>
             {observation.workflowStatus !== "assessed" ? (
               <p className="w-full text-xs text-muted-foreground">
-                Approve is enabled when research workflow reaches assessed.
+                Authorize is enabled when research workflow reaches assessed.
               </p>
             ) : null}
           </div>

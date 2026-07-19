@@ -35,6 +35,16 @@ import type {
 import {
   buildPersonalizedHomeGreeting,
 } from "@/lib/growth/home/growth-home-living-experience-18e"
+import { remapLegacyHrefToGrowthReview } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+import {
+  projectSupervisedSalesProgressNarrative,
+  type GrowthSupervisedSalesProgressNarrative,
+} from "@/lib/growth/aios/operator-experience/growth-supervised-sales-progress-narrative-1b"
+
+function normalizeOperatorReviewHref(href: string | null | undefined): string | null {
+  if (!href) return null
+  return remapLegacyHrefToGrowthReview(href)
+}
 
 export const GROWTH_HOME_AVA_HERO_7A_QA_MARKER = "growth-ge-aios-7a-ava-home-experience-v1" as const
 
@@ -77,6 +87,8 @@ export type GrowthHomeAvaHeroViewModel = {
   specialistOrchestrator?: AvaSpecialistOrchestratorResult | null
   /** GE-AIOS-18G — Active discovery target for opening line */
   discoveryNarrativeTarget?: string | null
+  /** GE-AIOS-OPERATOR-UX-1B — Supervised sales journey narrative */
+  supervisedSalesProgress?: GrowthSupervisedSalesProgressNarrative | null
 }
 
 export type BuildAvaHomeHeroInput = {
@@ -221,10 +233,10 @@ export function buildAvaPrimaryDecision(aiOsUx: GrowthHomeAiOsUxViewModel): {
         id: canonical.id,
         label: canonical.title,
         detail: [canonical.detail, canonical.why].filter(Boolean).join(" · ") || null,
-        href: canonical.href ?? aiOsUx.approveItemsHref,
+        href: normalizeOperatorReviewHref(canonical.href ?? aiOsUx.approveItemsHref),
       },
       additionalDecisionCount: Math.max(0, aiOsUx.approveItemsCount - 1),
-      reviewAllHref: aiOsUx.approveItemsHref,
+      reviewAllHref: normalizeOperatorReviewHref(aiOsUx.approveItemsHref),
     }
   }
 
@@ -236,17 +248,22 @@ export function buildAvaPrimaryDecision(aiOsUx: GrowthHomeAiOsUxViewModel): {
   }
 
   const primaryDecision: GrowthHomeAvaHeroDecision | null = top
-    ? { id: top.id, label: top.label, detail: top.detail ?? null, href: top.href ?? aiOsUx.approveItemsHref }
+    ? {
+        id: top.id,
+        label: top.label,
+        detail: top.detail ?? null,
+        href: normalizeOperatorReviewHref(top.href ?? aiOsUx.approveItemsHref),
+      }
     : {
         id: "approvals",
         label: `${totalWaiting} ${pluralize(totalWaiting, "item", "items")} waiting for your approval`,
         detail: null,
-        href: aiOsUx.approveItemsHref,
+        href: normalizeOperatorReviewHref(aiOsUx.approveItemsHref),
       }
 
   const additionalDecisionCount = Math.max(0, totalWaiting - 1)
 
-  return { primaryDecision, additionalDecisionCount, reviewAllHref: aiOsUx.approveItemsHref }
+  return { primaryDecision, additionalDecisionCount, reviewAllHref: normalizeOperatorReviewHref(aiOsUx.approveItemsHref) }
 }
 
 function mapPrimaryDecision(result: {
@@ -329,7 +346,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
           id: canonicalTask.id,
           label: canonicalTask.title,
           detail: [canonicalTask.detail, canonicalTask.why].filter(Boolean).join(" · ") || null,
-          href: canonicalTask.href ?? input.aiOsUx.approveItemsHref,
+          href: normalizeOperatorReviewHref(canonicalTask.href ?? input.aiOsUx.approveItemsHref),
           canonicalProjection: canonicalHero
             ? projectCanonicalDecisionToHomePrimary({
                 decision: canonicalHero.decision,
@@ -338,7 +355,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
             : null,
         },
         additionalDecisionCount: Math.max(0, input.aiOsUx.approveItemsCount - 1),
-        reviewAllHref: input.aiOsUx.approveItemsHref,
+        reviewAllHref: normalizeOperatorReviewHref(input.aiOsUx.approveItemsHref),
       }
     : canonicalHero
     ? (() => {
@@ -387,6 +404,12 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     input.workspaceSummary.missionDiscovery?.searchSummary?.trim() ||
     null
 
+  const supervisedSalesProgress = projectSupervisedSalesProgressNarrative({
+    approvalSnapshot: input.aiOsUx.canonicalApprovalSnapshot,
+    missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+    researchLoopSummary: input.researchLoopSummary,
+  })
+
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
     greeting,
@@ -407,6 +430,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     memorySummary: dailyBriefing.memory_result,
     specialistOrchestrator: dailyBriefing.specialist_orchestrator_result ?? null,
     discoveryNarrativeTarget,
+    supervisedSalesProgress,
   }
 }
 

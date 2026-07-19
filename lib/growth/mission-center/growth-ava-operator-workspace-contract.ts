@@ -24,10 +24,10 @@ export function buildAvaOperatorPackageMemoryActionsApiPath(packageId: string): 
 }
 
 export const GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS = [
-  "Package Approved",
-  "Execution Request Created",
-  "Sequence Job Waiting",
-  "Transport Approval Required",
-  "Reply Monitoring Automatic",
-  "Follow-up Automatic",
+  "Package authorized",
+  "Execution request created",
+  "Sequence prepared",
+  "Transport approval required",
+  "Reply monitoring automatic",
+  "Follow-up automatic",
 ] as const

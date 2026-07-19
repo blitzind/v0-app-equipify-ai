@@ -28,6 +28,10 @@ import {
   type GrowthHumanApprovalSource,
   type GrowthHumanApprovalStatus,
 } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import {
+  buildGrowthReviewHref,
+  buildGrowthReviewPackageHref,
+} from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 
 export type GeV15ApprovalInboxSnapshotItem = {
   leadId: string
@@ -69,7 +73,7 @@ export type GrowthHumanApprovalCenterInput = {
   totalLimit?: number
 }
 
-const APPROVAL_CENTER_HREF = "/growth/os/approvals"
+const APPROVAL_CENTER_HREF = buildGrowthReviewHref({ tab: "packages" })
 
 function stableApprovalId(parts: Array<string | number | null | undefined>): string {
   const fingerprint = parts.map((part) => String(part ?? "")).join("|")
@@ -400,7 +404,7 @@ export function collectOutreachPackageApprovalItems(input: GrowthHumanApprovalCe
         enforcementSource: "autonomous_outreach_preparation_pilot",
         blockedReason: "Transport blocked — draft only until human approval.",
       },
-      route: `/growth/os/pilot/lead-research/${pkg.leadId}?packageId=${encodeURIComponent(pkg.packageId)}`,
+      route: buildGrowthReviewPackageHref(pkg.packageId),
       createdAt: pkg.preparedAt,
     })
   }

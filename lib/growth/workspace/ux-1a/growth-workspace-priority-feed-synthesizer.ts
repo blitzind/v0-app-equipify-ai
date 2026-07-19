@@ -81,6 +81,7 @@ export function remapUx1aOperatorHref(href: string | null | undefined): string |
     return UX_1A_REVIEW_PACKAGES_HREF
   }
   if (normalized.includes("/os/approvals")) return remapLegacyHrefToGrowthReview(href)
+  if (normalized.includes("/pilot/lead-research/")) return remapLegacyHrefToGrowthReview(href)
   if (normalized === `${GROWTH_WORKSPACE_BASE_PATH}/os`) return UX_1A_REVIEW_PACKAGES_HREF
   return href
 }

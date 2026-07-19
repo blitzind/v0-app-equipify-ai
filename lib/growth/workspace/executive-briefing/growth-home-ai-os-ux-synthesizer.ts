@@ -24,6 +24,7 @@ import type {
   GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_HOME_AI_OS_UX_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { buildGrowthReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import {
   buildCanonicalOperatorTask,
   buildCanonicalOperatorWaitingSummary,
@@ -648,11 +649,13 @@ export function buildAiOsUxViewModel(input: {
     waitingOnYou: collapsedWaiting,
     waitingOnYouOverflow: canonicalOperatorTask ? Math.max(0, approveItemsCount - 1) : waitingOnYouResult.overflowCount,
     approveItemsHref:
-      approveItemsCount > 0
-        ? `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`
+      input.canonicalOperatorApprovalSnapshot?.topPackage?.reviewHref ??
+      input.canonicalOperatorTask?.href ??
+      (approveItemsCount > 0
+        ? buildGrowthReviewHref({ tab: "packages" })
         : waitingOnYouResult.items[0]?.href ??
           input.needsReview.reviewHref ??
-          `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`,
+          buildGrowthReviewHref({ tab: "packages" })),
     approveItemsCount,
     canonicalOperatorTask,
     canonicalApprovalSnapshot: input.canonicalApprovalSnapshot ?? null,

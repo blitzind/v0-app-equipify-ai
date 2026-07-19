@@ -145,6 +145,40 @@ export function GrowthHomeAvaHeroSection({
         </p>
       ) : null}
 
+      {hero.supervisedSalesProgress &&
+      (!hero.supervisedSalesProgress.headlineSuppressed || hero.supervisedSalesProgress.secondaryContext) ? (
+        <div className="space-y-1" data-qa-section="supervised-sales-progress">
+          {!hero.supervisedSalesProgress.headlineSuppressed ? (
+            <p className="text-sm font-medium leading-relaxed text-foreground" data-qa-field="supervised-sales-headline">
+              {hero.supervisedSalesProgress.headline}
+            </p>
+          ) : null}
+          {!hero.supervisedSalesProgress.headlineSuppressed &&
+          hero.supervisedSalesProgress.supportingSentence ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="supervised-sales-supporting">
+              {hero.supervisedSalesProgress.supportingSentence}
+            </p>
+          ) : null}
+          {hero.supervisedSalesProgress.secondaryContext ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="supervised-sales-secondary">
+              {hero.supervisedSalesProgress.secondaryContext}
+            </p>
+          ) : null}
+          {hero.supervisedSalesProgress.completedSummary ? (
+            <p className="text-xs leading-relaxed text-muted-foreground" data-qa-field="supervised-sales-completed">
+              {hero.supervisedSalesProgress.completedSummary}
+            </p>
+          ) : null}
+          {!hero.primaryDecision &&
+          hero.supervisedSalesProgress.href &&
+          hero.supervisedSalesProgress.ctaLabel ? (
+            <Button asChild size="sm" variant="outline" className="mt-2">
+              <Link href={hero.supervisedSalesProgress.href}>{hero.supervisedSalesProgress.ctaLabel}</Link>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       {hasNarrative ? (
         <div className="space-y-3">
           {hasStructuredNarrative ? (

@@ -3,13 +3,9 @@
 import Link from "next/link"
 import { ArrowRight, CheckCircle2, CircleDashed, PauseCircle } from "lucide-react"
 import {
-  GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE,
-  GROWTH_CUSTOMER_EMPTY_WORK_NEXT_LABEL,
-} from "@/lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
-import {
   GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY,
 } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
-import { GROWTH_TRAINING_COMPANY_PROFILE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
+import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import {
   buildHomeRelationshipScaleLine,
@@ -140,14 +136,14 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progres
           <p className="text-sm text-muted-foreground">
             {eligibleLeadCount === 0
               ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY
-              : GROWTH_CUSTOMER_EMPTY_WORK_MESSAGE}
+              : "Nothing needs your attention in the queue right now. Launch or continue a mission and Ava will keep researching and preparing qualified opportunities."}
           </p>
           {eligibleLeadCount === 0 ? null : (
           <Link
-            href={GROWTH_TRAINING_COMPANY_PROFILE_ROUTE}
+            href={GROWTH_HOME_STARTUP_STEP_PATHS.findLeads}
             className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:underline dark:text-indigo-300"
           >
-            {GROWTH_CUSTOMER_EMPTY_WORK_NEXT_LABEL}
+            Find Leads
             <ArrowRight className="size-3" aria-hidden />
           </Link>
           )}

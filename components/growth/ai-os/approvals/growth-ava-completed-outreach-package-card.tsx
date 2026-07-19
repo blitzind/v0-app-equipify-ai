@@ -40,6 +40,12 @@ import {
   type Approvals2AOperatorReviewPacket,
 } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
 import { GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
+import {
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PRE_ACTION,
+  GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS,
+  GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS,
+  GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_TITLE,
+} from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { needsApproval, recommends } from "@/lib/workspace/ai-teammate-voice"
 
@@ -832,10 +838,27 @@ export function GrowthAvaCompletedOutreachPackageCard({
         <p className="mt-4 text-sm text-muted-foreground">Loading complete review packet…</p>
       )}
 
-      <p className="mt-4 text-xs text-muted-foreground">
-        {needsApproval(teammate)} Approving this package does not send — sequence and transport gates
-        remain.
-      </p>
+      <p className="mt-4 text-xs text-muted-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PRE_ACTION}</p>
+
+      <div className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
+        <p className="font-medium text-foreground">{GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_TITLE}</p>
+        <ol className="mt-2 space-y-2">
+          {GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS.map((step, index) => (
+            <li key={step.id} className="flex gap-2">
+              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-foreground">
+                {index + 1}
+              </span>
+              <div>
+                <p className="font-medium text-foreground">{step.label}</p>
+                <p className="text-xs text-muted-foreground">{step.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Outbound transport is currently blocked. Step 2 applies only when sending is enabled.
+        </p>
+      </div>
 
       {executionReadiness ? (
         <div className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
@@ -881,12 +904,9 @@ export function GrowthAvaCompletedOutreachPackageCard({
             </div>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">
-                Execution request created. Sequence transport still needs your approval before anything
-                sends.
-              </p>
+              <p className="text-sm text-muted-foreground">{GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS}</p>
               <Button asChild size="sm">
-                <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review sequence gate</Link>
+                <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review transport approval</Link>
               </Button>
             </>
           )}

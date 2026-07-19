@@ -48,7 +48,7 @@ export function growthCustomerApprovalsWhenToVisit(teammate: AiTeammatePresentat
 }
 
 export const GROWTH_CUSTOMER_APPROVALS_AFTER_APPROVE =
-  "After you authorize a package, sequence and transport gates still protect sending. After you reject or request revision, I revise and bring it back." as const
+  "After you authorize a package, transport approval remains a separate gate before anything sends." as const
 
 export function growthCustomerApprovalsEmptyHeadline(teammate: AiTeammatePresentation): string {
   return completedWorkHeroEmpty(teammate)

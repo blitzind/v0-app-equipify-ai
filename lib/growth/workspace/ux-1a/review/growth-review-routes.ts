@@ -36,6 +36,21 @@ export function buildGrowthReviewPackageHref(packageId: string): string {
   return buildGrowthReviewHref({ tab: "packages", item: packageId })
 }
 
+/** Canonical operator entry for package authorization — list fallback when id unknown. */
+export function resolveOperatorPackageReviewHref(packageId: string | null | undefined): string {
+  const trimmed = packageId?.trim()
+  return trimmed ? buildGrowthReviewPackageHref(trimmed) : buildGrowthReviewHref({ tab: "packages" })
+}
+
+function extractPackageIdFromHref(href: string, params: URLSearchParams): string | null {
+  return (
+    params.get("item") ??
+    params.get("packageId") ??
+    params.get("package") ??
+    null
+  )
+}
+
 export function buildGrowthReviewSendHref(jobId: string): string {
   return buildGrowthReviewHref({ tab: "sends", item: jobId })
 }
@@ -72,12 +87,14 @@ export function remapLegacyHrefToGrowthReview(href: string): string {
     return jobId ? buildGrowthReviewSendHref(jobId) : buildGrowthReviewHref({ tab: "sends" })
   }
 
+  if (normalized.includes("/pilot/lead-research/")) {
+    const packageId = extractPackageIdFromHref(normalized, params)
+    return resolveOperatorPackageReviewHref(packageId)
+  }
+
   if (normalized.includes("/os/approvals") || /approve|approval|outreach|package/i.test(normalized)) {
-    const packageId =
-      params.get("packageId") ??
-      params.get("package") ??
-      params.get("item")
-    return packageId ? buildGrowthReviewPackageHref(packageId) : buildGrowthReviewHref({ tab: "packages" })
+    const packageId = extractPackageIdFromHref(normalized, params)
+    return resolveOperatorPackageReviewHref(packageId)
   }
 
   if (/send|sequence/i.test(normalized)) {
