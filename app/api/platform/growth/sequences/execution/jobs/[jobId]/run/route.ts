@@ -8,6 +8,7 @@ export const runtime = "nodejs"
 const BodySchema = z.object({
   humanApproved: z.boolean().optional(),
   humanApprovalConfirmed: z.boolean().optional(),
+  canonicalDecisionOverrideReason: z.string().trim().min(1).optional(),
 })
 
 type RouteContext = { params: Promise<{ jobId: string }> }
@@ -34,6 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
       humanApproved: parsed.data.humanApproved ?? true,
       humanApprovalConfirmed: parsed.data.humanApprovalConfirmed ?? true,
       approvedBy: access.userId,
+      canonicalDecisionOverrideReason: parsed.data.canonicalDecisionOverrideReason ?? null,
     })
     return NextResponse.json({ ok: result.ok, result })
   } catch {
