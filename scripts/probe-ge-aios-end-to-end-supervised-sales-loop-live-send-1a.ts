@@ -6,7 +6,10 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
-import { resolveTransportAssetFromPackage } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
+import {
+  prepareOperatorApprovedTransportBody,
+  resolveTransportAssetFromPackage,
+} from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 import { findOutreachPreparationRunByPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-repository"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { loadSuppressedLeadIds } from "@/lib/growth/revenue-workflow/growth-lead-admission-production-analysis"
@@ -19,38 +22,71 @@ import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/g
 import { evaluateCanonicalSequenceStepExecution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
 import { EQUIPIFY_PRODUCTION_ORG_ID } from "@/lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
 import {
-  GE_AIOS_END_TO_END_1A_BLOCK_IMAGING_LEAD_ID,
+  GE_AIOS_END_TO_END_1A_LIVE_SEND_CONFIRM_ENV,
   GE_AIOS_END_TO_END_SUPERVISED_SALES_LOOP_1A_QA_MARKER,
 } from "@/lib/growth/training/end-to-end-supervised-sales-loop-1a-types"
 import { GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV } from "@/lib/growth/sequences/execution/growth-transport-authority-1c-types"
-import { GE_AIOS_END_TO_END_1A_BLOCK_IMAGING_REPAIRED_EMAIL } from "@/lib/growth/training/end-to-end-supervised-sales-loop-copy-repair-1a"
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { normalizeTransportBodyText } from "@/lib/growth/sequences/execution/growth-transport-authority-1c-hash"
 import { ensureSupervisedJobTransportSnapshot } from "@/lib/growth/sequences/execution/growth-transport-authority-job-bind-1c"
 import { parseTransportSnapshot1C } from "@/lib/growth/sequences/execution/growth-transport-snapshot-1c"
 import { resolveTransportAuditChainFromProviderMessageId } from "@/lib/growth/sequences/execution/growth-transport-snapshot-audit-1c"
 
-const JOB_ID = "44b1f1f1-d5b9-4ff9-8aee-61e4ef3207ae" as const
+/** GE-AIOS-END-TO-END-1C.6 — controlled operator-owned mailbox certification target. */
+const CERT_LEAD_ID = "9ac9c211-f856-4caf-b41b-d8a96e756291" as const
+const CERT_JOB_ID = "12f8ec4f-7aae-456a-838d-ba7c4047ac0b" as const
+const CERT_PACKAGE_ID =
+  "outreach-prep:9ac9c211-f856-4caf-b41b-d8a96e756291:2026-07-19T03:14:15.388Z" as const
+const CERT_EXECUTION_REQUEST_ID = "9b3bda04-2245-475a-b906-5a4228045348" as const
+const CERT_TRANSPORT_SNAPSHOT_ID = "ac7de64c-a388-47d3-becc-0ed0b23a05c1" as const
+const CERT_RECIPIENT = "mike@blitzind.com" as const
+const APPROVED_SENDER_ACCOUNT_ID = "6966e8bc-5bbc-4d6a-aeb3-3fcdd4c2d720" as const
+const BLOCK_IMAGING_HISTORICAL_LEAD_ID = "6d9220f0-2960-468c-b4be-5d7595d292c3" as const
+const BLOCK_IMAGING_HISTORICAL_JOB_ID = "44b1f1f1-d5b9-4ff9-8aee-61e4ef3207ae" as const
+const BLOCK_IMAGING_HISTORICAL_DELIVERY_ATTEMPT_ID = "f77426fc-5a87-4a57-9c71-aa08c6d037ed" as const
+const BLOCK_IMAGING_HISTORICAL_RECIPIENT = "josh.block@blockimaging.com" as const
 const BASE_URL = "https://app.equipify.ai" as const
-const PACKAGE_ID =
-  "outreach-prep:6d9220f0-2960-468c-b4be-5d7595d292c3:2026-07-16T00:20:44.387Z" as const
-const RECIPIENT = "josh.block@blockimaging.com" as const
-const EXPECTED_SUBJECT = "Block Imaging service operations" as const
-const APPROVE_ROUTE =
-  "/api/platform/growth/sequences/execution/jobs/44b1f1f1-d5b9-4ff9-8aee-61e4ef3207ae/approve" as const
 const CANONICAL_DECISION_OVERRIDE_REASON =
   "GE-AIOS-END-TO-END-1C transport fidelity operator authorized supervised send (CONFIRM_GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND=1)" as const
-const RUN_ROUTE =
-  "/api/platform/growth/sequences/execution/jobs/44b1f1f1-d5b9-4ff9-8aee-61e4ef3207ae/run" as const
 
-function expectedBodyFromApprovedCopy(): string {
-  const lines = GE_AIOS_END_TO_END_1A_BLOCK_IMAGING_REPAIRED_EMAIL.split("\n")
-  const withoutSubject = lines.slice(lines.findIndex((line) => line.trim() === "") + 1).join("\n").trim()
-  return withoutSubject
+function buildCertRoutes(jobId: string): { approve: string; run: string } {
+  return {
+    approve: `/api/platform/growth/sequences/execution/jobs/${jobId}/approve`,
+    run: `/api/platform/growth/sequences/execution/jobs/${jobId}/run`,
+  }
 }
 
 function normalizeBody(text: string | null | undefined): string {
   return (text ?? "").replace(/\r\n/g, "\n").trim()
+}
+
+function payloadCoreText(text: string | null | undefined): string {
+  const normalized = normalizeBody(text)
+  const signatureMarkers = ["\n\n--\n", "\n\nReply STOP to unsubscribe."]
+  let end = normalized.length
+  for (const marker of signatureMarkers) {
+    const index = normalized.indexOf(marker)
+    if (index >= 0) end = Math.min(end, index)
+  }
+  return normalizeTransportBodyText(normalized.slice(0, end))
+}
+
+function payloadCoreHtml(html: string | null | undefined): string {
+  let chunk = html ?? ""
+  for (const marker of [
+    '<div data-growth-outbound-signature="1b">',
+    '<p style="margin:16px',
+  ]) {
+    const index = chunk.indexOf(marker)
+    if (index >= 0) chunk = chunk.slice(0, index)
+  }
+  const asText = chunk
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+  return normalizeTransportBodyText(asText)
 }
 
 async function buildProductionAuthCookieHeader(
@@ -120,17 +156,40 @@ async function resolveActingUser(admin: SupabaseClient): Promise<{
 
 async function main(): Promise<void> {
   const liveSendConfirmed = process.env[GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV] === "1"
-  console.log(`[${GE_AIOS_END_TO_END_SUPERVISED_SALES_LOOP_1A_QA_MARKER}] Transport fidelity live send (1C)`)
+  const legacyLiveSendFlag = process.env[GE_AIOS_END_TO_END_1A_LIVE_SEND_CONFIRM_ENV] === "1"
+  console.log(`[${GE_AIOS_END_TO_END_SUPERVISED_SALES_LOOP_1A_QA_MARKER}] Transport fidelity live send (1C.6)`)
   console.log(
-    `Transport fidelity live send authorized (${GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV}): ${liveSendConfirmed ? "YES" : "NO"}\n`,
+    `Transport fidelity live send authorized (${GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV}): ${liveSendConfirmed ? "YES" : "NO"}`,
+  )
+  console.log(
+    `Legacy 1A live send flag ignored (${GE_AIOS_END_TO_END_1A_LIVE_SEND_CONFIRM_ENV}): ${legacyLiveSendFlag ? "SET (ignored)" : "unset"}\n`,
   )
 
   const bootstrap = bootstrapGrowthOperatorNotificationsCertEnv({ requireVercelProductionEnvRun: true })
   if (!bootstrap) throw new Error("bootstrap_failed")
 
   const admin = bootstrap.admin
-  const leadId = GE_AIOS_END_TO_END_1A_BLOCK_IMAGING_LEAD_ID
-  const expectedBody = expectedBodyFromApprovedCopy()
+  const leadId = CERT_LEAD_ID
+  const JOB_ID = CERT_JOB_ID
+  const PACKAGE_ID = CERT_PACKAGE_ID
+  const RECIPIENT = CERT_RECIPIENT
+  const { approve: APPROVE_ROUTE, run: RUN_ROUTE } = buildCertRoutes(JOB_ID)
+
+  console.log("=== Certification target ===")
+  console.log(
+    JSON.stringify(
+      {
+        leadId,
+        jobId: JOB_ID,
+        packageId: PACKAGE_ID,
+        executionRequestId: CERT_EXECUTION_REQUEST_ID,
+        transportSnapshotId: CERT_TRANSPORT_SNAPSHOT_ID,
+        recipient: RECIPIENT,
+      },
+      null,
+      2,
+    ),
+  )
 
   let jobBefore = await admin
     .schema("growth")
@@ -215,8 +274,10 @@ async function main(): Promise<void> {
 
   const pkg = packageRun?.approvalPackage ?? null
   const rendered = pkg
-    ? resolveTransportAssetFromPackage(pkg, "email", pkg.companyName ?? "Block Imaging")
+    ? resolveTransportAssetFromPackage(pkg, "email", pkg.companyName ?? lead.data?.contact_email ?? "Certification")
     : null
+  const expectedSubject = rendered?.subject ?? null
+  const expectedBody = rendered?.body ?? null
 
   const actionableJobsForLead = [
     ...(pendingJobs.data ?? []),
@@ -227,39 +288,89 @@ async function main(): Promise<void> {
     { id: 1, check: "Job ID exact", pass: jobBefore.data?.id === JOB_ID },
     {
       id: 2,
+      check: "Not Block Imaging historical lead",
+      pass: leadId !== BLOCK_IMAGING_HISTORICAL_LEAD_ID,
+    },
+    {
+      id: 3,
+      check: "Not Block Imaging historical job",
+      pass: JOB_ID !== BLOCK_IMAGING_HISTORICAL_JOB_ID,
+    },
+    {
+      id: 4,
+      check: "Not Block Imaging historical recipient",
+      pass: lead.data?.contact_email !== BLOCK_IMAGING_HISTORICAL_RECIPIENT,
+    },
+    {
+      id: 5,
       check: "Status pending_approval or approved (retry-safe)",
       pass: jobBefore.data?.status === "pending_approval" || jobBefore.data?.status === "approved",
     },
-    { id: 3, check: "Channel email", pass: jobBefore.data?.channel === "email" },
-    { id: 4, check: "Recipient exact", pass: lead.data?.contact_email === RECIPIENT },
-    { id: 5, check: "Package ID matches", pass: pkg?.packageId === PACKAGE_ID },
-    {
-      id: 6,
-      check: "Subject exact",
-      pass: rendered?.subject === EXPECTED_SUBJECT,
-    },
-    {
-      id: 7,
-      check: "Body matches E2 copy",
-      pass: normalizeBody(rendered?.body) === normalizeBody(expectedBody),
-    },
-    { id: 8, check: "One active enrollment", pass: (enrollments.data ?? []).length === 1 },
+    { id: 6, check: "Channel email", pass: jobBefore.data?.channel === "email" },
+    { id: 7, check: "Recipient exact (operator-owned mailbox)", pass: lead.data?.contact_email === RECIPIENT },
+    { id: 8, check: "Package ID matches", pass: pkg?.packageId === PACKAGE_ID },
     {
       id: 9,
+      check: "transport_snapshot_id present on job",
+      pass: Boolean(jobBefore.data?.transport_snapshot_id),
+    },
+    {
+      id: 10,
+      check: "transport_snapshot_id matches cert snapshot",
+      pass: jobBefore.data?.transport_snapshot_id === CERT_TRANSPORT_SNAPSHOT_ID,
+    },
+    {
+      id: 11,
+      check: "approved_sender_account_id present on job",
+      pass: Boolean(jobBefore.data?.approved_sender_account_id),
+    },
+    {
+      id: 12,
+      check: "Approved package subject present",
+      pass: Boolean(expectedSubject?.trim()),
+    },
+    {
+      id: 13,
+      check: "Approved package body present",
+      pass: Boolean(normalizeBody(expectedBody)),
+    },
+    {
+      id: 14,
+      check: "Approved sender == manual sender (Ava)",
+      pass:
+        jobBefore.data?.manual_sender_account_id === APPROVED_SENDER_ACCOUNT_ID &&
+        jobBefore.data?.approved_sender_account_id === APPROVED_SENDER_ACCOUNT_ID,
+    },
+    {
+      id: 15,
+      check: "allow_auto_rotation disabled",
+      pass: jobBefore.data?.allow_auto_rotation === false,
+    },
+    { id: 16, check: "One active enrollment", pass: (enrollments.data ?? []).length === 1 },
+    {
+      id: 17,
       check: "One actionable job for lead",
       pass: actionableJobsForLead.length === 1 && actionableJobsForLead[0]?.id === JOB_ID,
     },
     {
-      id: 10,
+      id: 18,
       check: "No prior delivery",
       pass: !(priorOutbound.data ?? []).some((row) => row.status === "sent" || row.status === "delivered"),
     },
-    { id: 11, check: "Not suppressed", pass: !suppressedLeadIds.has(leadId) },
-    { id: 12, check: "Outbound kill switch off", pass: killSwitches.autonomy_outbound_enabled === false },
+    { id: 19, check: "Not suppressed", pass: !suppressedLeadIds.has(leadId) },
+    { id: 20, check: "Outbound kill switch off", pass: killSwitches.autonomy_outbound_enabled === false },
     {
-      id: 13,
-      check: "No other approved jobs eligible globally",
-      pass: (approvedJobs.data ?? []).every((row) => row.id === JOB_ID),
+      id: 21,
+      check: "Exactly one pending_approval job globally (cert job)",
+      pass:
+        (pendingJobs.data ?? []).length === 1 &&
+        (pendingJobs.data ?? [])[0]?.id === JOB_ID &&
+        (approvedJobs.data ?? []).length === 0,
+    },
+    {
+      id: 22,
+      check: "Not Block Imaging historical delivery attempt",
+      pass: !(priorOutbound.data ?? []).some((row) => row.id === BLOCK_IMAGING_HISTORICAL_DELIVERY_ATTEMPT_ID),
     },
   ]
 
@@ -316,12 +427,18 @@ async function main(): Promise<void> {
     ),
   )
 
-  if (!liveSendConfirmed) {
-    console.log(
-      `\nAll gates pass. Set ${GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV}=1 to dispatch.`,
-    )
-    process.exit(0)
-  }
+  const [certDeliveryAttempts, certOutboundMessages] = await Promise.all([
+    admin
+      .schema("growth")
+      .from("delivery_attempts")
+      .select("id")
+      .eq("sequence_execution_job_id", JOB_ID),
+    admin
+      .schema("growth")
+      .from("outbound_messages")
+      .select("id, provider_message_id")
+      .eq("lead_id", leadId),
+  ])
 
   const snapshotEnsure = await ensureSupervisedJobTransportSnapshot(admin, {
     jobId: JOB_ID,
@@ -340,68 +457,131 @@ async function main(): Promise<void> {
     .maybeSingle()
   const snapshot = parseTransportSnapshot1C(jobWithSnapshot.data?.transport_snapshot ?? null)
 
-  if (jobBefore.data?.sequence_step_id) {
-    const transportPayload = await buildSequenceExecutionSendPayload(admin, {
-      sequenceStepId: jobBefore.data.sequence_step_id,
-      leadId,
-      sequenceEnrollmentId: jobBefore.data.sequence_enrollment_id,
-      sequenceExecutionJobId: JOB_ID,
-      organizationId: EQUIPIFY_PRODUCTION_ORG_ID,
-      allowAutoRotation: jobBefore.data.allow_auto_rotation,
-      manualSenderAccountId: jobBefore.data.manual_sender_account_id,
-    })
-    if ("error" in transportPayload) {
-      console.error(`Transport payload build failed: ${transportPayload.error}`)
-      process.exit(2)
-    }
+  if (!jobBefore.data?.sequence_step_id) {
+    console.error("Cert job missing sequence_step_id — cannot verify transport payload.")
+    process.exit(2)
+  }
 
-    console.log("\n=== Pre-send transport fidelity ===")
-    const packageSubject = rendered?.subject ?? null
-    const packageBody = normalizeTransportBodyText(rendered?.body)
-    const payloadBody = normalizeTransportBodyText(transportPayload.text)
-    const fidelityChecks = [
+  const transportPayload = await buildSequenceExecutionSendPayload(admin, {
+    sequenceStepId: jobBefore.data.sequence_step_id,
+    leadId,
+    sequenceEnrollmentId: jobBefore.data.sequence_enrollment_id,
+    sequenceExecutionJobId: JOB_ID,
+    organizationId: EQUIPIFY_PRODUCTION_ORG_ID,
+    allowAutoRotation: jobBefore.data.allow_auto_rotation,
+    manualSenderAccountId: jobBefore.data.manual_sender_account_id,
+  })
+  if ("error" in transportPayload) {
+    console.error(`Transport payload build failed: ${transportPayload.error}`)
+    process.exit(2)
+  }
+
+  console.log("\n=== Pre-send transport fidelity (1C.6) ===")
+  const packageSubject = rendered?.subject ?? null
+  const packageBody = normalizeTransportBodyText(
+    prepareOperatorApprovedTransportBody(rendered?.body ?? ""),
+  )
+  const snapshotBody = normalizeTransportBodyText(snapshot?.bodyText)
+  const payloadCore = payloadCoreText(transportPayload.text)
+  const fidelityChecks = [
+    {
+      label: "Zero delivery attempts for cert job",
+      pass: (certDeliveryAttempts.data ?? []).length === 0,
+    },
+    {
+      label: "Zero provider messages for cert lead",
+      pass: !(certOutboundMessages.data ?? []).some((row) => row.provider_message_id),
+    },
+    {
+      label: "Package subject == frozen snapshot subject == payload subject",
+      pass:
+        packageSubject === snapshot?.subject &&
+        snapshot?.subject === transportPayload.subject,
+    },
+    {
+      label: "Package body == frozen snapshot text == payload core text",
+      pass: packageBody === snapshotBody && snapshotBody === payloadCore,
+    },
+    {
+      label: "Payload HTML core text == snapshot body",
+      pass: payloadCoreHtml(transportPayload.html) === snapshotBody,
+    },
+    {
+      label: "Approved sender == manual sender == snapshot sender == payload sender",
+      pass:
+        jobBefore.data?.manual_sender_account_id === APPROVED_SENDER_ACCOUNT_ID &&
+        jobBefore.data?.approved_sender_account_id === APPROVED_SENDER_ACCOUNT_ID &&
+        snapshot?.senderAccountId === APPROVED_SENDER_ACCOUNT_ID &&
+        transportPayload.senderAccountId === APPROVED_SENDER_ACCOUNT_ID,
+    },
+    {
+      label: "Snapshot sender display name present",
+      pass: Boolean(snapshot?.senderDisplayName?.trim()),
+    },
+    {
+      label: "Snapshot reply-to is null (expected)",
+      pass: snapshot?.replyTo === null,
+    },
+    {
+      label: "Job content hash == snapshot content hash == payload content hash",
+      pass:
+        jobWithSnapshot.data?.transport_content_hash === snapshot?.contentHash &&
+        snapshot?.contentHash === transportPayload.transportContentHash,
+    },
+    {
+      label: "Job package fingerprint == snapshot package fingerprint",
+      pass: jobWithSnapshot.data?.package_fingerprint === snapshot?.packageFingerprint,
+    },
+    {
+      label: "Job transport_snapshot_id == cert snapshot ID == payload snapshot ID",
+      pass:
+        jobWithSnapshot.data?.transport_snapshot_id === CERT_TRANSPORT_SNAPSHOT_ID &&
+        snapshot?.transportSnapshotId === CERT_TRANSPORT_SNAPSHOT_ID &&
+        transportPayload.transportSnapshotId === CERT_TRANSPORT_SNAPSHOT_ID,
+    },
+    {
+      label: "Transport authority source is frozen_snapshot",
+      pass: transportPayload.transportAuthoritySource === "frozen_snapshot",
+    },
+    {
+      label: "No generation fallback selected",
+      pass: transportPayload.transportAuthoritySource !== "legacy_generation",
+    },
+    {
+      label: "No sender auto-rotation",
+      pass: jobBefore.data?.allow_auto_rotation === false,
+    },
+  ]
+  for (const check of fidelityChecks) {
+    console.log(`  [${check.pass ? "PASS" : "FAIL"}] ${check.label}`)
+  }
+  if (!fidelityChecks.every((check) => check.pass)) {
+    console.error("Pre-send transport fidelity failed — aborting.")
+    process.exit(2)
+  }
+
+  console.log("\n=== Global outbound safety ===")
+  console.log(
+    JSON.stringify(
       {
-        label: "Package subject == transport subject",
-        pass: packageSubject === transportPayload.subject,
+        autonomy_outbound_enabled: killSwitches.autonomy_outbound_enabled,
+        pending_approval_jobs: pendingJobs.data?.length ?? 0,
+        approved_jobs: approvedJobs.data?.length ?? 0,
+        cert_job_status: jobBefore.data?.status ?? null,
+        delivery_attempts_before_send: certDeliveryAttempts.data?.length ?? 0,
+        legacy_1a_live_send_would_dispatch: legacyLiveSendFlag,
+        transport_fidelity_live_send_required: true,
       },
-      {
-        label: "Package body == transport text",
-        pass: packageBody === payloadBody,
-      },
-      {
-        label: "Snapshot subject == transport subject",
-        pass: !snapshot || snapshot.subject === transportPayload.subject,
-      },
-      {
-        label: "Approved sender == transport sender",
-        pass:
-          !snapshot ||
-          snapshot.senderAccountId === transportPayload.senderAccountId,
-      },
-      {
-        label: "Transport authority is frozen snapshot",
-        pass: transportPayload.transportAuthoritySource === "frozen_snapshot",
-      },
-      {
-        label: "Snapshot ID == job transport_snapshot_id",
-        pass:
-          !snapshot ||
-          jobWithSnapshot.data?.transport_snapshot_id === snapshot.transportSnapshotId,
-      },
-      {
-        label: "Payload snapshot ID == bound snapshot",
-        pass:
-          !snapshot ||
-          transportPayload.transportSnapshotId === snapshot.transportSnapshotId,
-      },
-    ]
-    for (const check of fidelityChecks) {
-      console.log(`  [${check.pass ? "PASS" : "FAIL"}] ${check.label}`)
-    }
-    if (!fidelityChecks.every((check) => check.pass)) {
-      console.error("Pre-send transport fidelity failed — aborting dispatch.")
-      process.exit(2)
-    }
+      null,
+      2,
+    ),
+  )
+
+  if (!liveSendConfirmed) {
+    console.log(
+      `\nPre-send certification passed. Set ${GE_AIOS_TRANSPORT_FIDELITY_1C_LIVE_SEND_CONFIRM_ENV}=1 to dispatch.`,
+    )
+    process.exit(0)
   }
 
   const actingUser = await resolveActingUser(admin)
