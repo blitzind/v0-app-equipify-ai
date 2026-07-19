@@ -135,7 +135,7 @@ export function projectSupervisedSalesProgressNarrative(input: {
       draftsPrepared === 0)
   const packageReadyActive =
     pendingApprovalCount === 0 &&
-    (draftsPrepared > 0 || readyForOutreachReview > 0 || packageCount > 0)
+    (readyForOutreachReview > 0 || packageCount > 0)
   const waitingActive = pendingApprovalCount > 0 || waitingForOperator
 
   if (waitingActive) {
@@ -174,7 +174,7 @@ export function projectSupervisedSalesProgressNarrative(input: {
   if (packageReadyActive) {
     sourceStates.push("missionDiscovery.counters.draftsPrepared", "researchLoopSummary.readyForOutreachReview")
     const companyName = topPackage?.companyName ?? null
-    const count = Math.max(packageCount, readyForOutreachReview, draftsPrepared)
+    const count = Math.max(packageCount, readyForOutreachReview)
     const headline =
       companyName && count <= 1
         ? "1 outreach package is ready for your review."

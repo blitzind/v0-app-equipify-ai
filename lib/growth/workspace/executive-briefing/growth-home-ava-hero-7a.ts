@@ -330,6 +330,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     generatedAt: input.generatedAt,
     leadSnapshotsById,
     salesOutcomes: input.salesOutcomes ?? null,
+    pendingApprovalCount: input.aiOsUx.approveItemsCount,
     organizationalKnowledge: input.organizationalKnowledge ?? null,
     portfolioLeads: input.workspaceSummary.portfolioLeads ?? null,
   })

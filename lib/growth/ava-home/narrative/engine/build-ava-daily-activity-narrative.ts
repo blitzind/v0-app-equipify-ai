@@ -168,14 +168,18 @@ export function buildDailyActivityLearnedLines(
   return buildKnowledgeNarrativeLines(memorySummary?.organizational_knowledge ?? []).slice(0, 2)
 }
 
-/** Waiting on operator — Work Manager queue only. */
+/** Waiting on operator — canonical pending approval count first, then Work Manager queue. */
 export function buildDailyActivityWaitingLines(input: {
   workResult: AvaWorkManagerResult
   salesDailySummary?: SalesOutcomeDailySummary | null
+  pendingApprovalCount?: number
 }): string[] {
   const lines: string[] = []
   const approvalItems = input.workResult.operator_queue.filter((row) => row.type === "approval")
-  const approvalCount = approvalItems.length || input.salesDailySummary?.approvals_pending || 0
+  const approvalCount =
+    input.pendingApprovalCount ??
+    input.salesDailySummary?.approvals_pending ??
+    approvalItems.length
 
   if (approvalCount > 0) {
     lines.push(
@@ -310,6 +314,7 @@ export function buildDailyActivityWorkingNextLines(input: {
 export function buildAvaDailyActivityNarrative(input: {
   memorySummary: AvaMemorySummary | null | undefined
   salesDailySummary?: SalesOutcomeDailySummary | null
+  pendingApprovalCount?: number
   workResult: AvaWorkManagerResult
   operatingRhythm: AvaOperatingRhythm
   specialistOrchestrator?: AvaSpecialistOrchestratorResult | null
@@ -327,9 +332,9 @@ export function buildAvaDailyActivityNarrative(input: {
   const workingNextLines = buildDailyActivityWorkingNextLines(input)
 
   const approvalCount =
-    input.workResult.operator_queue.filter((row) => row.type === "approval").length ||
-    input.salesDailySummary?.approvals_pending ||
-    0
+    input.pendingApprovalCount ??
+    input.salesDailySummary?.approvals_pending ??
+    input.workResult.operator_queue.filter((row) => row.type === "approval").length
   const replyCount = input.workResult.operator_queue.filter((row) => row.type === "reply").length
 
   const discoveryFocus = resolveLeadDiscoveryNarrativeFocus(input.missionDiscovery)

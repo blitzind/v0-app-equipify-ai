@@ -40,9 +40,8 @@ export function GrowthHomeAiOsWaitingOnYouSection({
     waitingCompanyByLeadId,
   )
   const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
-  const hasItems = waitingOnYou.length > 0 || approveItemsCount > 0
-
   const replyCount = waitingOnYou.filter((item) => /reply/i.test(item.label)).length
+  const hasItems = approveItemsCount > 0 || replyCount > 0
   const waitingSummary = formatLivingWaitingSummary({
     approvalCount: approveItemsCount,
     replyCount,

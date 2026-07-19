@@ -74,6 +74,8 @@ export type BuildAvaDailyBriefingInput = {
   organizationId?: string
   generatedAt?: string
   leadSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
+  /** GE-AIOS-OPERATOR-UX-1D — canonical pending approval count shared with Review queue. */
+  pendingApprovalCount?: number
   salesOutcomes?: GrowthHomeSalesOutcomesPayload | null
   /** GE-AIOS-17C — Server-hydrated organizational knowledge */
   portfolioLeads?: import("@/lib/growth/types").GrowthLead[] | null
@@ -164,6 +166,8 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
   const daily_activity_narrative = buildAvaDailyActivityNarrative({
     memorySummary,
     salesDailySummary: input.salesOutcomes?.dailySummary ?? null,
+    pendingApprovalCount:
+      input.pendingApprovalCount ?? input.salesOutcomes?.dailySummary?.approvals_pending,
     workResult,
     operatingRhythm,
     specialistOrchestrator: workResult.specialist_orchestrator_result ?? null,

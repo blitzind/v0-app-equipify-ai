@@ -302,9 +302,6 @@ export function buildCanonicalOperatorWaitingSummary(input: {
   if (packages > 0) {
     return `I've prepared ${packages} outreach ${packages === 1 ? "package" : "packages"} with ${drafts} ${drafts === 1 ? "draft" : "drafts"} that need your approval.`
   }
-  if (drafts > 0) {
-    return formatCanonicalDraftCount(drafts) + " that need your approval."
-  }
   if (replies > 0) {
     return `${replies} ${replies === 1 ? "reply needs" : "replies need"} your review before I can continue.`
   }

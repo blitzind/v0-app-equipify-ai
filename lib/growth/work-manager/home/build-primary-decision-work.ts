@@ -13,14 +13,22 @@ export function buildPrimaryDecisionFromWorkManager(
   workResult: AvaWorkManagerResult,
   aiOsUx: GrowthHomeAiOsUxViewModel,
 ): PrimaryDecisionResult {
-  const top = workResult.operator_queue[0] ?? null
+  const operatorQueue =
+    aiOsUx.approveItemsCount === 0
+      ? workResult.operator_queue.filter((row) => row.type !== "approval")
+      : workResult.operator_queue
+  const top = operatorQueue[0] ?? null
   const totalWaiting = Math.max(
     aiOsUx.approveItemsCount,
     aiOsUx.waitingOnYou.length,
-    workResult.operator_queue.length,
+    operatorQueue.length,
   )
 
   if (!top && totalWaiting === 0) {
+    return { primaryDecision: null, additionalDecisionCount: 0, reviewAllHref: null }
+  }
+
+  if (!top && aiOsUx.approveItemsCount === 0) {
     return { primaryDecision: null, additionalDecisionCount: 0, reviewAllHref: null }
   }
 
@@ -40,7 +48,7 @@ export function buildPrimaryDecisionFromWorkManager(
 
   return {
     primaryDecision,
-    additionalDecisionCount: Math.max(0, workResult.operator_queue.length - 1),
+    additionalDecisionCount: Math.max(0, operatorQueue.length - 1),
     reviewAllHref: aiOsUx.approveItemsHref,
   }
 }
