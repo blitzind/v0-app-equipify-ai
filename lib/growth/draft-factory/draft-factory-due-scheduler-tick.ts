@@ -31,6 +31,7 @@ import { selectPortfolioAwareDueDraftFactoryStates } from "@/lib/growth/draft-fa
 import {
   advanceDraftFactoryCapacityWake,
   getDeferredDraftFactoryStates,
+  listAdmissionIntegrityReconcileDraftFactoryStates,
   listDueDraftFactoryStates,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
 import {
@@ -45,11 +46,13 @@ import {
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ORGS,
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
+  GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
   REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import {
-  GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
   evaluateAdmissionDownstreamReconcileNeed,
+  GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
+  GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
   isAdmissionDownstreamReconcileState,
   isAdmissionReconcileCorrectedOutcome,
 } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
@@ -66,8 +69,10 @@ import type { DuePortfolioSelectionCandidate } from "@/lib/growth/draft-factory/
 import type { AiOsDraftFactoryCanonicalEvidence } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 
 export type DraftFactoryAdmissionReconcileTickStats = {
-  qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER
+  qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER
+  hotfix_1_qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER
   limit_per_org: typeof REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG
+  scan_pool_limit: typeof GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT
   candidates_found: number
   attempted: number
   corrected: number
@@ -212,8 +217,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
   let portfolioAwareClasses = 0
   let budgetExhaustedPhase: BudgetPhase = null
   const admissionReconcileAggregate: DraftFactoryAdmissionReconcileTickStats = {
-    qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
+    qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
+    hotfix_1_qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
     limit_per_org: REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
+    scan_pool_limit: GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
     candidates_found: 0,
     attempted: 0,
     corrected: 0,
@@ -469,13 +476,18 @@ export async function tickDraftFactoryDueStatesForScheduler(
 
       const reconcileStartedAt = Date.now()
       const metadataCache = new Map<string, Record<string, unknown> | null>()
+      const reconcileScanStates = await listAdmissionIntegrityReconcileDraftFactoryStates({
+        organizationId,
+        limit: GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
+        repository,
+      })
       const violationRows: Array<{
-        row: (typeof dueStates)[number]
+        row: (typeof reconcileScanStates)[number]
         need: ReturnType<typeof evaluateAdmissionDownstreamReconcileNeed>
       }> = []
       let orgSkipped = 0
 
-      for (const row of dueStates) {
+      for (const row of reconcileScanStates) {
         if (!isAdmissionDownstreamReconcileState(row.state)) continue
 
         let metadata = metadataCache.get(row.leadId)
@@ -522,6 +534,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
             portfolioSelected: false,
             allowGeneration: false,
             workerId: `df-admission-reconcile:${organizationId}`,
+            completionHints: { admissionIntegrityReconcile: true },
           })
           const corrected = isAdmissionReconcileCorrectedOutcome({
             outcome: result.outcome,
@@ -562,9 +575,12 @@ export async function tickDraftFactoryDueStatesForScheduler(
       admissionReconcileAggregate.remaining_violations += orgRemainingViolations
 
       logGrowthEngine("draft_factory_admission_reconcile_batch", {
-        qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
+        qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
+        hotfix_1_qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
         organization_id: organizationId,
         limit_per_org: REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
+        scan_pool_limit: GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
+        scan_pool_rows: reconcileScanStates.length,
         candidates_found: orgCandidatesFound,
         attempted: orgAttempted,
         corrected: orgCorrected,
@@ -733,7 +749,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
     qa_marker: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
     autonomy_1e_qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
     autonomy_1f_qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
-    revenue_2a_hotfix_1_qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
+    revenue_2a_hotfix_2_qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
     organizations_attempted: organizationIds.length,
     due_states_found: dueStatesFound,
     due_advanced: dueAdvanced,

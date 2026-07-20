@@ -50,3 +50,5 @@ export const GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP = 20
  * Terminals rejected/review rows stuck in DM/package durable states via advanceDraftFactoryForLeadLive only.
  */
 export const REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG = 50
+/** Max downstream rows scanned per org for wake-independent admission integrity reconcile. */
+export const GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT = 100

@@ -1,5 +1,6 @@
 /**
  * GE-AIOS-REVENUE-2A-HOTFIX-1 — Admission downstream reconcile batch planner (client-safe).
+ * GE-AIOS-REVENUE-2A-HOTFIX-2 — Wake-independent candidate scan for integrity violations.
  * Reuses integrity evaluator — no new scheduler, worker, or queue.
  */
 
@@ -8,24 +9,34 @@ import {
   evaluateGrowthPipelinePromotionIntegrity,
   type GrowthPipelinePromotionIntegrityViolation,
 } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
-import { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
+import {
+  GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
+  REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
+} from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import type { GrowthLeadAdmissionState } from "@/lib/growth/revenue-workflow/growth-lead-admission-types"
 
 export const GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER =
   "ge-aios-revenue-2a-hotfix-1-admission-reconcile-v1" as const
 
-export { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG }
+export const GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER =
+  "ge-aios-revenue-2a-hotfix-2-admission-reconcile-selection-v1" as const
 
-/** Durable states that must not host rejected/review admission under canonical truth. */
-export const GROWTH_REVENUE_2A_DOWNSTREAM_RECONCILE_STATES = new Set<
-  AiOsDraftFactoryDurableState | string
->([
+export { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG, GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT }
+
+/** Nonterminal downstream states scanned for admission integrity reconcile (wake-independent). */
+export const GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES = [
   "waiting_for_dm",
   "waiting_for_contact_verification",
   "waiting_for_personalization",
   "waiting_for_generation",
   "draft_ready",
-])
+  "waiting_for_approval",
+] as const satisfies readonly AiOsDraftFactoryDurableState[]
+
+/** @deprecated alias — use GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES */
+export const GROWTH_REVENUE_2A_DOWNSTREAM_RECONCILE_STATES = new Set<
+  AiOsDraftFactoryDurableState | string
+>(GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES)
 
 export type AdmissionDownstreamReconcileDueRow = {
   leadId: string
@@ -146,7 +157,7 @@ export function isAdmissionReconcileCorrectedOutcome(input: {
   outcome: string
   nextState: string | null
 }): boolean {
-  if (input.outcome === "terminal_failure" || input.outcome === "stopped") return true
-  if (input.nextState === "failed" || input.nextState === "paused") return true
+  if (input.outcome === "terminal_failure") return true
+  if (input.nextState === "failed") return true
   return false
 }

@@ -65,6 +65,8 @@ export type AdvanceDraftFactoryForLeadInput = {
     canonicalEnforcementFingerprint?: string
     decisionNextEligibleWakeAt?: string | null
     draftFactoryFailureRecoverability?: "recoverable" | "non_recoverable"
+    /** GE-AIOS-REVENUE-2A-HOTFIX-2 — bypass next_eligible_wake_at retry gate for integrity reconcile. */
+    admissionIntegrityReconcile?: boolean
   }
 }
 
@@ -205,8 +207,14 @@ export async function advanceDraftFactoryForLead(
       }
     }
 
-    // Retry gate
-    if (previous.nextEligibleWakeAt && Date.parse(previous.nextEligibleWakeAt) > Date.parse(now)) {
+    const hints = input.completionHints ?? {}
+
+    // Retry gate — integrity reconcile bypasses wake timing for historical downstream violations.
+    if (
+      !hints.admissionIntegrityReconcile &&
+      previous.nextEligibleWakeAt &&
+      Date.parse(previous.nextEligibleWakeAt) > Date.parse(now)
+    ) {
       const early = buildAdvanceResultV5({
         organizationId: input.organizationId,
         leadId: input.leadId,
@@ -277,7 +285,6 @@ export async function advanceDraftFactoryForLead(
       }
     }
 
-    const hints = input.completionHints ?? {}
     let plan = planDurableStageAdvance({
       evidence,
       wake: wakeType,
@@ -595,6 +602,15 @@ export async function listDueDraftFactoryStates(input: {
 }): Promise<AiOsDraftFactoryDurableLeadState[]> {
   const repo = input.repository ?? createMemoryDraftFactoryRepository("memory")
   return repo.listDueStates(input)
+}
+
+export async function listAdmissionIntegrityReconcileDraftFactoryStates(input: {
+  organizationId: string
+  limit?: number
+  repository?: DraftFactoryDurableRepository
+}): Promise<AiOsDraftFactoryDurableLeadState[]> {
+  const repo = input.repository ?? createMemoryDraftFactoryRepository("memory")
+  return repo.listAdmissionIntegrityReconcileStates(input)
 }
 
 /**

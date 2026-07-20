@@ -191,17 +191,45 @@ async function main(): Promise<void> {
   }
   console.log(`Buying Committee jobs (7d): ${bcRecentCount ?? 0}`)
 
+  const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+  const { data: reconcileReceipts } = await admin
+    .schema("growth")
+    .from("draft_factory_wake_receipts")
+    .select("lead_id, outcome, wake_fingerprint, created_at")
+    .eq("organization_id", organizationId)
+    .gte("created_at", sinceIso)
+    .ilike("wake_fingerprint", `%reconcile:admission:${organizationId}:%`)
+    .order("created_at", { ascending: false })
+    .limit(200)
+
+  const receiptRows = reconcileReceipts ?? []
+  const latestReceiptAt = receiptRows[0]?.created_at ?? null
+  const reconcileAttempted = receiptRows.length
+  const reconcileCorrected = receiptRows.filter((row) => {
+    const outcome = String((row as { outcome?: string }).outcome ?? "")
+    return outcome === "terminal_failure" || outcome === "stopped"
+  }).length
+  const reconcileWaiting = receiptRows.filter(
+    (row) => String((row as { outcome?: string }).outcome ?? "") === "waiting",
+  ).length
+
   const blockingViolations = dmViolations.length + packageViolations.length
   const ticksToClearBacklog =
     blockingViolations > 0
       ? Math.ceil(blockingViolations / REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG)
       : 0
-  console.log("\n--- Reconciliation Throughput (HOTFIX-1) ---")
+  console.log("\n--- Reconciliation Throughput (HOTFIX-1/2) ---")
   console.log(`Reconcile limit per org per scheduler tick: ${REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG}`)
   console.log(`Current integrity violations: ${blockingViolations}`)
   console.log(
     `Expected scheduler ticks to clear backlog (if all remain eligible): ${ticksToClearBacklog}`,
   )
+  console.log("\n--- Latest Reconciliation Batch Telemetry (48h receipts) ---")
+  console.log(`Latest reconcile receipt at: ${latestReceiptAt ?? "none"}`)
+  console.log(`Reconcile receipts (attempted proxy): ${reconcileAttempted}`)
+  console.log(`Reconcile terminal outcomes: ${reconcileCorrected}`)
+  console.log(`Reconcile waiting outcomes (retry-gated before HOTFIX-2): ${reconcileWaiting}`)
+  console.log(`Remaining integrity violations in durable store: ${blockingViolations}`)
 
   console.log("\n--- Pipeline Flow (canonical gates) ---")
   console.log("Admission → Research → Qualification → Portfolio → Decision Maker → Package → Approval")

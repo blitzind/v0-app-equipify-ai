@@ -12,6 +12,7 @@ import {
   incrementDurablePackagesProduced,
   listDeferredDurableDraftFactoryStates,
   listDueDurableDraftFactoryStates,
+  listAdmissionIntegrityReconcileDurableDraftFactoryStates,
   recordDurableWakeReceipt,
   releaseDurableDraftFactoryLease,
   tryAcquireDurableDraftFactoryLease,
@@ -44,6 +45,9 @@ export function createMemoryDraftFactoryRepository(
     },
     async listDueStates(input) {
       return listDueDurableDraftFactoryStates(input)
+    },
+    async listAdmissionIntegrityReconcileStates(input) {
+      return listAdmissionIntegrityReconcileDurableDraftFactoryStates(input)
     },
     async listDeferredStates(organizationId) {
       return listDeferredDurableDraftFactoryStates(organizationId)

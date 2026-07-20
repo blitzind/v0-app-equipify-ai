@@ -422,6 +422,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
           capacity_selected: draftFactoryDue.capacity_selected,
           failures: draftFactoryDue.failures,
           skipped_reason: draftFactoryDue.skipped_reason,
+          admission_reconcile: draftFactoryDue.admission_reconcile ?? null,
         }
       : null,
   })

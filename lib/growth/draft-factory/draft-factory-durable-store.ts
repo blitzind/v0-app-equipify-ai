@@ -10,6 +10,7 @@ import type {
   AiOsDraftFactoryDurableLeadState,
 } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import { AI_OS_DRAFT_FACTORY_DURABLE_QA_MARKER } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import { GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
 
 export type DraftFactoryWakeReceipt = {
   organizationId: string
@@ -193,6 +194,21 @@ export function listDueDurableDraftFactoryStates(input: {
     })
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
   return due.slice(0, input.limit ?? 100)
+}
+
+export function listAdmissionIntegrityReconcileDurableDraftFactoryStates(input: {
+  organizationId: string
+  limit?: number
+}): AiOsDraftFactoryDurableLeadState[] {
+  const scanStates = new Set<string>(GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES)
+  return [...durableDisk.states.values()]
+    .filter((s) => s.organizationId === input.organizationId && scanStates.has(s.state))
+    .sort((a, b) => {
+      const byUpdated = a.updatedAt.localeCompare(b.updatedAt)
+      if (byUpdated !== 0) return byUpdated
+      return a.leadId.localeCompare(b.leadId)
+    })
+    .slice(0, input.limit ?? 100)
 }
 
 export function listDeferredDurableDraftFactoryStates(organizationId: string): AiOsDraftFactoryDurableLeadState[] {

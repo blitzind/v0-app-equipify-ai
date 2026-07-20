@@ -49,6 +49,11 @@ export type DraftFactoryDurableRepository = {
     now: string
     limit?: number
   }): Promise<AiOsDraftFactoryDurableLeadState[]>
+  /** Wake-independent scan of downstream nonterminal states for admission integrity reconcile. */
+  listAdmissionIntegrityReconcileStates(input: {
+    organizationId: string
+    limit?: number
+  }): Promise<AiOsDraftFactoryDurableLeadState[]>
   listDeferredStates(organizationId: string): Promise<AiOsDraftFactoryDurableLeadState[]>
   incrementPackagesProduced(organizationId: string, now: string): Promise<number>
   getPackagesProducedToday(organizationId: string, now: string): Promise<number>

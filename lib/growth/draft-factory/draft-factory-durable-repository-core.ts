@@ -12,6 +12,7 @@ import {
   type AiOsDraftFactoryAdvanceResultV5,
   type AiOsDraftFactoryDurableLeadState,
 } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import { GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
 
 function rowToState(row: Record<string, unknown>): AiOsDraftFactoryDurableLeadState {
   const attempts =
@@ -322,6 +323,24 @@ export function createPostgresDraftFactoryRepository(
           throw new Error(`SV1-5A Postgres fail-closed: ${error.message}`)
         }
         throw new Error(`Draft Factory listDueStates failed: ${error.message}`)
+      }
+      return (data ?? []).map((row) => rowToState(row as Record<string, unknown>))
+    },
+
+    async listAdmissionIntegrityReconcileStates(input) {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("draft_factory_lead_states")
+        .select("*")
+        .eq("organization_id", input.organizationId)
+        .in("state", [...GROWTH_REVENUE_2A_ADMISSION_INTEGRITY_RECONCILE_SCAN_STATES])
+        .order("updated_at", { ascending: true })
+        .limit(input.limit ?? 100)
+      if (error) {
+        if (isMissingRelationError(error)) {
+          throw new Error(`SV1-5A Postgres fail-closed: ${error.message}`)
+        }
+        throw new Error(`Draft Factory listAdmissionIntegrityReconcileStates failed: ${error.message}`)
       }
       return (data ?? []).map((row) => rowToState(row as Record<string, unknown>))
     },
