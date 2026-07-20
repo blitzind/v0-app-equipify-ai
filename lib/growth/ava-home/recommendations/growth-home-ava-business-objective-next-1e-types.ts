@@ -61,4 +61,8 @@ export type GrowthHomeAvaBusinessObjectiveLeadershipPayload = {
   primaryObjective: GrowthHomeAvaBusinessObjectiveProjection | null
   secondaryObjective: GrowthHomeAvaBusinessObjectiveProjection | null
   scoreboard: GrowthHomeAvaBusinessScoreboardMetric[]
+  /** GE-AIOS-NEXT-3C — Evidence-backed objective context line */
+  executiveReasoningLine?: string | null
+  /** GE-AIOS-NEXT-3D — Organizational learning from Production recommendation history */
+  organizationalLearningLine?: string | null
 }

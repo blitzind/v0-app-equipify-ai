@@ -49,6 +49,10 @@ export type GrowthHomeAvaRecommendationItem = {
   explanation?: GrowthHomeAvaRecommendationExplanation
   /** GE-AIOS-NEXT-1D — outcome-first presentation projection */
   outcomeProjection?: import("@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-outcome-next-1d-types").GrowthHomeAvaRecommendationOutcomeProjection
+  /** GE-AIOS-NEXT-3C — Evidence-backed reasoning for this recommendation */
+  executiveReasoningLine?: string | null
+  /** GE-AIOS-NEXT-3D — Organizational learning from Production recommendation history */
+  organizationalLearningLine?: string | null
 }
 
 export type GrowthHomeAvaRecommendationExperience = {
@@ -61,6 +65,12 @@ export type GrowthHomeAvaRecommendationExperience = {
   recommendations: GrowthHomeAvaRecommendationItem[]
   hasRecommendations: boolean
   exhaustedMessage: string
+  /** GE-AIOS-NEXT-3C — Primary evidence-backed reasoning line */
+  executiveReasoningLine?: string | null
+  /** GE-AIOS-NEXT-3D — Organizational learning from Production recommendation history */
+  organizationalLearningLine?: string | null
+  /** GE-AIOS-NEXT-3D — Primary accountability topic for durable operator decision linkage */
+  recommendationTopic?: string | null
 }
 
 export type GrowthHomeAvaOperatorAssignmentPreview = {

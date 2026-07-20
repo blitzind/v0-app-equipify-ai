@@ -107,6 +107,18 @@ export function GrowthHomeAvaBusinessObjectiveSection({ leadership }: Props) {
         <div className="min-w-0 flex-1 space-y-4">
           <ObjectiveCard objective={primary} heading={leadership.teamObjectiveLine} />
 
+          {leadership.executiveReasoningLine ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="business-objective-reasoning">
+              {leadership.executiveReasoningLine}
+            </p>
+          ) : null}
+
+          {leadership.organizationalLearningLine ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="business-objective-organizational-learning">
+              {leadership.organizationalLearningLine}
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => setShowWhy((value) => !value)}>
               Why this objective?

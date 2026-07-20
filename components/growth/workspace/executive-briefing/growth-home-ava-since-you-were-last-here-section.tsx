@@ -93,6 +93,34 @@ export function GrowthHomeAvaSinceYouWereLastHereSection({ briefing, onAcknowled
             </div>
           ) : null}
 
+          {briefing.executiveReasoningLines && briefing.executiveReasoningLines.length > 0 ? (
+            <div data-qa-field="briefing-executive-reasoning">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Executive reasoning</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-foreground">
+                {briefing.executiveReasoningLines.map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span aria-hidden>•</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {briefing.organizationalLearningLines && briefing.organizationalLearningLines.length > 0 ? (
+            <div data-qa-field="briefing-organizational-learning">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Organizational learning</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-foreground">
+                {briefing.organizationalLearningLines.map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span aria-hidden>•</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           {briefing.selfEvaluationLines.length > 0 ? (
             <div data-qa-field="briefing-self-evaluation">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How my last recommendation performed</p>

@@ -47,6 +47,25 @@ export function GrowthHomeAvaStrategicInsightSection({
           </div>
 
           <p className="text-sm leading-relaxed text-foreground">{leadership.insight.observation}</p>
+          {leadership.executiveReasoning?.primary?.evidence?.length ? (
+            <div data-qa-field="executive-reasoning-evidence">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-foreground">
+                {leadership.executiveReasoning.primary.evidence.slice(0, 4).map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span aria-hidden>•</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {leadership.executiveReasoning?.primary?.alternativeExplanations?.[0] ? (
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">Alternative explanation · </span>
+              {leadership.executiveReasoning.primary.alternativeExplanations[0]}
+            </p>
+          ) : null}
           <p className="text-sm leading-relaxed text-muted-foreground">{leadership.insight.whyItMatters}</p>
 
           {leadership.insight.strategicMemoryLine ? (

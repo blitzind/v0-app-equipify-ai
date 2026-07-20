@@ -56,6 +56,16 @@ import { buildGrowthHomeAvaContinuousExecutiveBriefingPayload } from "@/lib/grow
 import type { GrowthHomeAvaContinuousExecutiveBriefingPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a-types"
 import type { GrowthHomeAvaExecutiveBriefingCursor } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a-types"
 import type { GrowthHomeAvaRecommendationPreferenceRecord } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-preference-memory-next-1a"
+import { enrichGrowthHomeExecutiveLanguageNext3c } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-language-enrichment-next-3c"
+import { enrichGrowthHomeOrganizationalLearningNext3d } from "@/lib/growth/ava-home/recommendations/growth-home-ava-organizational-learning-enrichment-next-3d"
+import { enrichExecutiveReasoningWithLearningCertificationNext3e } from "@/lib/growth/ava-home/recommendations/growth-home-ava-organizational-learning-enrichment-next-3e"
+import { buildGrowthHomeAvaRecommendationAccountabilityNext3d } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-accountability-next-3d"
+import type { GrowthOrganizationalEvidenceCompletenessSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-next-3b-types"
+import type { GrowthOrganizationalEffectivenessSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-effectiveness-baseline-next-3a-types"
+import { buildGrowthOrganizationalLearningCertificationNext3e } from "@/lib/growth/organizational-effectiveness/growth-organizational-learning-certification-next-3e"
+import type { GrowthOrganizationalLearningCertificationSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-learning-certification-next-3e-types"
+import type { GrowthHomeAvaExecutiveReasoningPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-reasoning-next-3c-types"
+import type { GrowthHomeAvaRecommendationAccountabilitySnapshot } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-accountability-next-3d-types"
 
 function normalizeOperatorReviewHref(
   href: string | null | undefined,
@@ -118,6 +128,12 @@ export type GrowthHomeAvaHeroViewModel = {
   strategicLeadership?: GrowthHomeAvaStrategicLeadershipPayload | null
   /** GE-AIOS-NEXT-2A — Continuous executive briefing handoff */
   continuousExecutiveBriefing?: GrowthHomeAvaContinuousExecutiveBriefingPayload | null
+  /** GE-AIOS-NEXT-3C — Evidence-backed executive reasoning */
+  executiveReasoning?: GrowthHomeAvaExecutiveReasoningPayload | null
+  /** GE-AIOS-NEXT-3D — Recommendation accountability / organizational learning */
+  recommendationAccountability?: GrowthHomeAvaRecommendationAccountabilitySnapshot | null
+  /** GE-AIOS-NEXT-3E — Organizational learning certification projection */
+  organizationalLearningCertification?: GrowthOrganizationalLearningCertificationSnapshot | null
 }
 
 export type BuildAvaHomeHeroInput = {
@@ -164,6 +180,14 @@ export type BuildAvaHomeHeroInput = {
   recommendationPreferences?: GrowthHomeAvaRecommendationPreferenceRecord[]
   outboundDisabled?: boolean
   outboundWaitingForBusinessHours?: boolean
+  /** GE-AIOS-NEXT-3B/3C — Organizational evidence completeness (optional server projection) */
+  organizationalEvidenceCompleteness?: GrowthOrganizationalEvidenceCompletenessSnapshot | null
+  /** GE-AIOS-NEXT-3D — Pre-built accountability snapshot (optional server projection) */
+  recommendationAccountability?: GrowthHomeAvaRecommendationAccountabilitySnapshot | null
+  /** GE-AIOS-NEXT-3E — Pre-built learning certification (optional server projection) */
+  organizationalLearningCertification?: GrowthOrganizationalLearningCertificationSnapshot | null
+  /** GE-AIOS-NEXT-3A — Baseline snapshot for attribution windows (optional server projection) */
+  organizationalEffectivenessBaseline?: GrowthOrganizationalEffectivenessSnapshot | null
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -494,6 +518,69 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
       })
     : null
 
+  const executiveLanguage = enrichGrowthHomeExecutiveLanguageNext3c({
+    reasoningInput: {
+      evidenceCompleteness: input.organizationalEvidenceCompleteness ?? null,
+      missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+      pendingApprovals: input.aiOsUx.approveItemsCount,
+      outboundDisabled: input.outboundDisabled ?? true,
+      businessObjectiveTitle:
+        input.workspaceSummary.businessObjectiveLeadership?.primaryObjective?.title ?? null,
+    },
+    strategicLeadership,
+    continuousExecutiveBriefing,
+    recommendationExperience,
+    businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
+  })
+
+  const accountability =
+    input.recommendationAccountability ??
+    buildGrowthHomeAvaRecommendationAccountabilityNext3d({
+      organizationId: input.organizationId ?? input.persistedMemoryStore?.organizationId ?? "local-organization",
+      generatedAt: input.generatedAt ?? new Date().toISOString(),
+      evidenceCompleteness: input.organizationalEvidenceCompleteness ?? null,
+      executiveReasoning: executiveLanguage.executiveReasoning,
+      memoryEvents: input.persistedMemoryStore?.events ?? [],
+      recommendationPreferences: input.recommendationPreferences ?? [],
+    })
+
+  const executiveLanguageWithLearning = enrichGrowthHomeOrganizationalLearningNext3d({
+    executiveLanguage,
+    accountability,
+  })
+
+  const organizationalLearningCertification =
+    input.organizationalLearningCertification ??
+    buildGrowthOrganizationalLearningCertificationNext3e({
+      organizationId: input.organizationId ?? input.persistedMemoryStore?.organizationId ?? "local-organization",
+      generatedAt: input.generatedAt ?? new Date().toISOString(),
+      accountability,
+      evidenceCompleteness: input.organizationalEvidenceCompleteness ?? null,
+      baselineSnapshot:
+        input.organizationalEffectivenessBaseline ??
+        input.organizationalEvidenceCompleteness?.baselineSnapshot ??
+        null,
+      baselineEvidence: null,
+      executiveReasoning: executiveLanguageWithLearning.executiveReasoning,
+      memoryEvents: input.persistedMemoryStore?.events ?? [],
+      outboundDisabled: input.outboundDisabled ?? true,
+    })
+
+  const executiveReasoning = enrichExecutiveReasoningWithLearningCertificationNext3e({
+    reasoning: executiveLanguageWithLearning.executiveReasoning,
+    certification: organizationalLearningCertification,
+  })
+
+  const recommendationExperience = executiveLanguageWithLearning.recommendationExperience
+    ? {
+        ...executiveLanguageWithLearning.recommendationExperience,
+        organizationalLearningLine:
+          organizationalLearningCertification.organizationalLearningLine ??
+          executiveLanguageWithLearning.recommendationExperience.organizationalLearningLine ??
+          null,
+      }
+    : null
+
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
     greeting,
@@ -516,9 +603,25 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     discoveryNarrativeTarget,
     supervisedSalesProgress,
     recommendationExperience,
-    businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
-    strategicLeadership,
-    continuousExecutiveBriefing,
+    businessObjectiveLeadership: executiveLanguageWithLearning.businessObjectiveLeadership
+      ? {
+          ...executiveLanguageWithLearning.businessObjectiveLeadership,
+          organizationalLearningLine:
+            organizationalLearningCertification.organizationalLearningLine ??
+            executiveLanguageWithLearning.businessObjectiveLeadership.organizationalLearningLine ??
+            null,
+        }
+      : null,
+    strategicLeadership: executiveLanguageWithLearning.strategicLeadership,
+    continuousExecutiveBriefing: executiveLanguageWithLearning.continuousExecutiveBriefing
+      ? {
+          ...executiveLanguageWithLearning.continuousExecutiveBriefing,
+          organizationalLearningLines: organizationalLearningCertification.executiveReasoningLines.slice(0, 2),
+        }
+      : null,
+    executiveReasoning,
+    recommendationAccountability: executiveLanguageWithLearning.recommendationAccountability,
+    organizationalLearningCertification,
   }
 }
 

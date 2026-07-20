@@ -57,4 +57,6 @@ export type GrowthHomeAvaStrategicLeadershipPayload = {
   recommendation: GrowthHomeAvaStrategicRecommendation | null
   recentWins: string[]
   whatsNext: string[]
+  /** GE-AIOS-NEXT-3C — Evidence-backed executive reasoning projection */
+  executiveReasoning?: import("@/lib/growth/ava-home/recommendations/growth-home-ava-executive-reasoning-next-3c-types").GrowthHomeAvaExecutiveReasoningPayload | null
 }

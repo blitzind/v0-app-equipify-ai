@@ -90,4 +90,8 @@ export type GrowthHomeAvaContinuousExecutiveBriefingPayload = {
   hoursSinceLastAcknowledgment: number | null
   /** Snapshot reference for acknowledgment actions — not rendered directly */
   currentSnapshot?: GrowthHomeAvaExecutiveBriefingCursorSnapshot
+  /** GE-AIOS-NEXT-3C — Evidence-backed reasoning lines (existing section, richer narrative) */
+  executiveReasoningLines?: string[]
+  /** GE-AIOS-NEXT-3D — Organizational learning lines from Production recommendation history */
+  organizationalLearningLines?: string[]
 }

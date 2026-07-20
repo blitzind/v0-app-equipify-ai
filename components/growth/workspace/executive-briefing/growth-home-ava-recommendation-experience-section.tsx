@@ -20,6 +20,7 @@ import {
   recordGrowthHomeAvaRecommendationAccepted,
   recordGrowthHomeAvaRecommendationSkipped,
 } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-preference-memory-next-1a"
+import { mirrorGrowthHomeAvaOperatorDecisionToServer } from "@/lib/growth/ava-home/recommendations/growth-home-ava-operator-decision-client-next-3d"
 import { recordGrowthHomeAvaExecutiveBriefingMeaningfulInteraction } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a"
 import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 import { buildGrowthHomeAvaStrategicEvaluationContext } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
@@ -319,6 +320,12 @@ export function GrowthHomeAvaRecommendationExperienceSection({
       kind: activeRecommendation.kind,
       organizationId,
     })
+    void mirrorGrowthHomeAvaOperatorDecisionToServer({
+      decisionType: "recommendation_accepted",
+      recommendationKind: activeRecommendation.kind,
+      recommendationTopic: experience.recommendationTopic,
+      recommendationId: activeRecommendation.id,
+    })
     recordGrowthHomeAvaExecutiveBriefingMeaningfulInteraction({
       organizationId,
       kind: "recommendation_accepted",
@@ -330,6 +337,12 @@ export function GrowthHomeAvaRecommendationExperienceSection({
     recordGrowthHomeAvaRecommendationSkipped({
       kind: activeRecommendation.kind,
       organizationId,
+    })
+    void mirrorGrowthHomeAvaOperatorDecisionToServer({
+      decisionType: "recommendation_skipped",
+      recommendationKind: activeRecommendation.kind,
+      recommendationTopic: experience.recommendationTopic,
+      recommendationId: activeRecommendation.id,
     })
     recordGrowthHomeAvaExecutiveBriefingMeaningfulInteraction({
       organizationId,
@@ -430,6 +443,16 @@ export function GrowthHomeAvaRecommendationExperienceSection({
       <div className="space-y-2">
         <p className="text-sm leading-relaxed text-muted-foreground">{experience.sinceLastVisitLine}</p>
         <p className="text-sm font-medium text-foreground">{experience.recommendationIntro}</p>
+        {experience.executiveReasoningLine ? (
+          <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-executive-reasoning">
+            {experience.executiveReasoningLine}
+          </p>
+        ) : null}
+        {experience.organizationalLearningLine ? (
+          <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-organizational-learning">
+            {experience.organizationalLearningLine}
+          </p>
+        ) : null}
       </div>
 
       {activeRecommendation ? (
