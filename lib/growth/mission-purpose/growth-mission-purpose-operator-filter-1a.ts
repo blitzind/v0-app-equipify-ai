@@ -80,7 +80,7 @@ export function filterProductionCanonicalOperatorFocus(input: {
   purposeByLeadId: ReadonlyMap<string, GrowthMissionPurposeResolution>
 }): GrowthCanonicalOperatorFocus | null {
   if (!input.focus) return null
-  const purpose = purposeByLeadId.get(input.focus.leadId)?.purpose ?? "production"
+  const purpose = input.purposeByLeadId.get(input.focus.leadId)?.purpose ?? "production"
   return isProductionMissionPurpose(purpose) ? input.focus : null
 }
 
@@ -89,7 +89,7 @@ export function filterProductionCanonicalHeroDecision(input: {
   purposeByLeadId: ReadonlyMap<string, GrowthMissionPurposeResolution>,
 }): GrowthCanonicalDecisionResolution | null {
   if (!input.decision) return null
-  const purpose = purposeByLeadId.get(input.decision.leadId)?.purpose ?? "production"
+  const purpose = input.purposeByLeadId.get(input.decision.leadId)?.purpose ?? "production"
   return isProductionMissionPurpose(purpose) ? input.decision : null
 }
 

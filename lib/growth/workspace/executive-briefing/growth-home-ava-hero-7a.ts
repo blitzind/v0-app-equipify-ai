@@ -35,6 +35,7 @@ import type {
 import {
   buildPersonalizedHomeGreeting,
 } from "@/lib/growth/home/growth-home-living-experience-18e"
+import { resolveHomeOperatorEmployeeStatusFromMission } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import {
   formatOperatorWaitingActivityLabel,
   GROWTH_OPERATOR_REVIEW_CTA_LABEL,
@@ -333,15 +334,33 @@ function mapPrimaryDecision(result: {
   return result
 }
 
+function resolveHeroEmployeeStatus(input: BuildAvaHomeHeroInput): GrowthHomeAiEmployeeStatus {
+  const missionDiscovery = input.workspaceSummary?.missionDiscovery ?? null
+  const missionStatus = resolveHomeOperatorEmployeeStatusFromMission({
+    missionDiscovery,
+    pendingApprovalCount: input.aiOsUx.approveItemsCount,
+    repliesNeedingAttention: input.repliesWaiting,
+    readyForOutreachReview: input.researchLoopSummary?.readyForOutreachReview ?? 0,
+    portfolioBelowTarget:
+      missionDiscovery?.lifecycleState === "finding_leads" ||
+      missionDiscovery?.discoveryAction === "run_prospect_search" ||
+      missionDiscovery?.discoveryAction === "refresh_audience"
+        ? true
+        : undefined,
+  })
+  return missionStatus ?? input.employeeStatus
+}
+
 export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHeroViewModel {
   const greeting = buildPersonalizedHomeGreeting({
     hour: input.hour,
     greeting: input.greeting,
     operatorDisplayName: input.operatorDisplayName,
   })
+  const employeeStatus = resolveHeroEmployeeStatus(input)
 
   const legacyActivities = buildAvaCurrentActivities({
-    employeeStatus: input.employeeStatus,
+    employeeStatus,
     aiOsUx: input.aiOsUx,
     researchLoopSummary: input.researchLoopSummary,
     repliesWaiting: input.repliesWaiting,
@@ -356,8 +375,8 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     return {
       qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
       greeting,
-      statusLabel: input.employeeStatus.label,
-      statusKind: input.employeeStatus.kind,
+      statusLabel: employeeStatus.label,
+      statusKind: employeeStatus.kind,
       currentActivities: legacyActivities,
       sinceLastVisit: legacySinceLastVisit,
       primaryDecision: legacyDecision.primaryDecision,
@@ -584,8 +603,8 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
     greeting,
-    statusLabel: input.employeeStatus.label,
-    statusKind: input.employeeStatus.kind,
+    statusLabel: employeeStatus.label,
+    statusKind: employeeStatus.kind,
     currentActivities: legacyActivities,
     sinceLastVisit: legacySinceLastVisit,
     primaryDecision: decision.primaryDecision,

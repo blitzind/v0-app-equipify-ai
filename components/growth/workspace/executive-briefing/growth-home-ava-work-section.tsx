@@ -132,6 +132,16 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progres
       </div>
 
       {!wm ? (
+        progress?.items.length ? (
+          <ul className="space-y-2">
+            {progress.items.map((item) => (
+              <li key={item.id} className="rounded-lg border border-border/50 px-3 py-2.5">
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                {item.detail ? <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             {eligibleLeadCount === 0
@@ -148,6 +158,7 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null, progres
           </Link>
           )}
         </div>
+        )
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
         {activePresentation ? (

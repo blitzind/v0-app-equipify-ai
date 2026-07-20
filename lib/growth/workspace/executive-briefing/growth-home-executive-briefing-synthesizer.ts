@@ -35,6 +35,7 @@ import {
   formatOperatorWaitingActivityLabel,
   GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
 } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
+import { resolveHomeOperatorEmployeeStatusFromMission } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import { AI_PROACTIVE_FOUND_INTRO, proactiveCalmLine } from "@/lib/workspace/ai-proactive-initiative"
 import {
   teammateAttributeOutcomes,
@@ -152,6 +153,10 @@ export type GrowthHomeExecutiveBriefingInput = {
   teammate?: AiTeammatePresentation
   teammateName?: string | null
   operatorDisplayName?: string | null
+  missionDiscovery?: import("@/lib/growth/mission-center/growth-home-mission-discovery-snapshot").GrowthHomeMissionDiscoverySnapshot | null
+  portfolioBelowTarget?: boolean
+  portfolioTargetCurrent?: number | null
+  portfolioTargetGoal?: number | null
   canonicalOperatorApproval?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
   canonicalOperatorTask?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
   canonicalActiveMissions?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
@@ -583,12 +588,26 @@ function buildAiActivity(
 function deriveEmployeeStatus(
   dashboard: GrowthWorkspaceDashboardViewModel,
   pendingPackageCount?: number | null,
+  input?: {
+    missionDiscovery?: import("@/lib/growth/mission-center/growth-home-mission-discovery-snapshot").GrowthHomeMissionDiscoverySnapshot | null
+    portfolioBelowTarget?: boolean
+    readyForOutreachReview?: number
+  },
 ): GrowthHomeAiEmployeeStatus {
   const briefing = dashboard.briefing
   const legacyPending =
     briefing?.summary.pending_approvals ?? metricValue(dashboard, "campaign-snapshot", "Approval queue")
   const pendingApprovals = pendingPackageCount ?? legacyPending
   const repliesNeedingAttention = briefing?.summary.replies_needing_attention ?? 0
+  const missionStatus = resolveHomeOperatorEmployeeStatusFromMission({
+    missionDiscovery: input?.missionDiscovery ?? null,
+    pendingApprovalCount: pendingApprovals,
+    repliesNeedingAttention,
+    readyForOutreachReview: input?.readyForOutreachReview ?? 0,
+    portfolioBelowTarget: input?.portfolioBelowTarget,
+  })
+  if (missionStatus) return missionStatus
+
   const leads = metricValue(dashboard, "my-queue", "Leads needing action")
   const hot = metricValue(dashboard, "intelligence", "Hot companies")
   const campaigns = metricValue(dashboard, "campaign-snapshot", "Active campaigns")
@@ -1164,6 +1183,10 @@ export function synthesizeGrowthHomeExecutiveBriefing(
   const employeeStatus = deriveEmployeeStatus(
     dashboard,
     input.canonicalOperatorApproval?.pendingApprovalCount,
+    {
+      missionDiscovery: input.missionDiscovery ?? null,
+      portfolioBelowTarget: input.portfolioBelowTarget,
+    },
   )
   const completedToday = buildCompletedToday(dashboard)
   const workingOnNow = buildWorkingOnNow(dashboard, aiActivity)
@@ -1221,6 +1244,9 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     canonicalOperatorTask: input.canonicalOperatorTask ?? null,
     canonicalActiveMissions: input.canonicalActiveMissions ?? null,
     canonicalOperatorFocus: input.canonicalOperatorFocus ?? null,
+    missionDiscovery: input.missionDiscovery ?? null,
+    portfolioTargetCurrent: input.portfolioTargetCurrent ?? null,
+    portfolioTargetGoal: input.portfolioTargetGoal ?? null,
   })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)

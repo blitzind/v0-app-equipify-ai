@@ -584,6 +584,9 @@ export function buildAiOsUxViewModel(input: {
   canonicalOperatorTask?: GrowthCanonicalOperatorTask | null
   canonicalActiveMissions?: GrowthCanonicalActiveMissionsProjection | null
   canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
+  missionDiscovery?: import("@/lib/growth/mission-center/growth-home-mission-discovery-snapshot").GrowthHomeMissionDiscoverySnapshot | null
+  portfolioTargetCurrent?: number | null
+  portfolioTargetGoal?: number | null
 }): GrowthHomeAiOsUxViewModel {
   const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
 
@@ -616,6 +619,9 @@ export function buildAiOsUxViewModel(input: {
     dailyWorkQueue: buildDailyWorkQueueItems(input.dashboard),
     waitingOnYou: collapsedWaiting,
     focusLeadId: input.canonicalOperatorFocus?.leadId ?? input.canonicalOperatorTask?.leadId ?? null,
+    missionDiscovery: input.missionDiscovery ?? null,
+    portfolioTargetCurrent: input.portfolioTargetCurrent ?? null,
+    portfolioTargetGoal: input.portfolioTargetGoal ?? null,
   })
 
   return {

@@ -1,12 +1,159 @@
 /** GE-AIOS-18G — Autonomous lead discovery narrative + decision copy (client-safe). */
 
+import type { GrowthCanonicalOperatorProgressItem } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a"
+import {
+  formatOperatorEmployeeActivityLabel,
+  formatOperatorEmployeeStatusLabel,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import type {
   AutonomousLeadDiscoveryAction,
   GrowthHomeMissionDiscoverySnapshot,
 } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import {
+  missionLifecycleActivityLabel,
+  missionLifecycleStatusLabel,
+} from "@/lib/growth/mission-center/growth-mission-runtime-types"
+import type { GrowthHomeAiEmployeeStatus } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 
 export const GROWTH_AUTONOMOUS_LEAD_DISCOVERY_18G_QA_MARKER =
   "ge-aios-18g-autonomous-lead-discovery-v1" as const
+
+export function isMissionDiscoveryOperatorActive(
+  snapshot: GrowthHomeMissionDiscoverySnapshot | null | undefined,
+): boolean {
+  if (!snapshot?.missionId) return false
+  if (
+    snapshot.lifecycleState === "finding_leads" ||
+    snapshot.lifecycleState === "researching" ||
+    snapshot.lifecycleState === "preparing_recommendations" ||
+    snapshot.discoveryAction === "run_prospect_search" ||
+    snapshot.discoveryAction === "refresh_audience" ||
+    snapshot.discoveryAction === "begin_research"
+  ) {
+    return true
+  }
+  return snapshot.startupDiscoveryReady === true && snapshot.discoveryAction === "monitoring"
+}
+
+/** GE-AIOS-LIVE-3A — Mission-first Home operator status (mission beats dashboard idle). */
+export function resolveHomeOperatorEmployeeStatusFromMission(input: {
+  missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  pendingApprovalCount?: number
+  repliesNeedingAttention?: number
+  readyForOutreachReview?: number
+  portfolioBelowTarget?: boolean
+}): GrowthHomeAiEmployeeStatus | null {
+  const pendingApprovals = Math.max(input.pendingApprovalCount ?? 0, 0)
+  const replies = Math.max(input.repliesNeedingAttention ?? 0, 0)
+  const readyForReview = Math.max(input.readyForOutreachReview ?? 0, 0)
+  const mission = input.missionDiscovery
+
+  if (pendingApprovals > 0) {
+    return {
+      kind: "waiting_for_approval",
+      label: formatOperatorEmployeeStatusLabel(pendingApprovals),
+      activityLabel: formatOperatorEmployeeActivityLabel(pendingApprovals),
+    }
+  }
+
+  if (readyForReview > 0 || mission?.lifecycleState === "preparing_recommendations") {
+    return {
+      kind: "preparing_outreach",
+      label: "Preparing outreach",
+      activityLabel: mission?.activityLabel ?? "preparing personalized outreach",
+    }
+  }
+
+  const researchingCount = mission?.counters.researchingCount ?? 0
+  if (researchingCount > 0 || mission?.lifecycleState === "researching") {
+    return {
+      kind: "researching",
+      label: "Researching companies",
+      activityLabel: mission
+        ? missionLifecycleActivityLabel(mission.lifecycleState, mission.counters)
+        : "researching high-fit prospects",
+    }
+  }
+
+  if (mission && resolveLeadDiscoveryNarrativeFocus(mission) === "discovery") {
+    return {
+      kind: "working",
+      label: missionLifecycleStatusLabel("finding_leads"),
+      activityLabel: missionLifecycleActivityLabel(mission.lifecycleState, mission.counters),
+    }
+  }
+
+  if (replies > 0) {
+    return {
+      kind: "monitoring_replies",
+      label: "Monitoring replies",
+      activityLabel: "watching for replies that need follow-up",
+    }
+  }
+
+  if (mission && isMissionDiscoveryOperatorActive(mission)) {
+    return {
+      kind: "working",
+      label: missionLifecycleStatusLabel(mission.lifecycleState),
+      activityLabel: mission.activityLabel || missionLifecycleActivityLabel(mission.lifecycleState, mission.counters),
+    }
+  }
+
+  if (mission?.missionId && input.portfolioBelowTarget) {
+    return {
+      kind: "working",
+      label: missionLifecycleStatusLabel(mission.lifecycleState),
+      activityLabel: mission.activityLabel,
+    }
+  }
+
+  return null
+}
+
+export function buildMissionDiscoveryOperatorProgressItems(
+  snapshot: GrowthHomeMissionDiscoverySnapshot | null | undefined,
+  input?: {
+    portfolioTargetCurrent?: number | null
+    portfolioTargetGoal?: number | null
+  },
+): GrowthCanonicalOperatorProgressItem[] {
+  if (!snapshot?.missionId || !isMissionDiscoveryOperatorActive(snapshot)) return []
+
+  const items: GrowthCanonicalOperatorProgressItem[] = []
+  const workingNow = buildLeadDiscoveryWorkingNowLine(snapshot)
+  if (workingNow) {
+    items.push({
+      id: `mission:${snapshot.missionId}:working`,
+      label: workingNow.replace(/\.$/, ""),
+      detail: snapshot.lastEventSummary,
+      href: null,
+      kind: "working",
+    })
+  }
+
+  const workingNext = buildLeadDiscoveryWorkingNextLine(snapshot)
+  if (workingNext) {
+    items.push({
+      id: `mission:${snapshot.missionId}:next`,
+      label: workingNext.replace(/\.$/, ""),
+      detail: null,
+      href: null,
+      kind: "queued",
+    })
+  }
+
+  if (input?.portfolioTargetGoal != null && input.portfolioTargetGoal > 0) {
+    items.push({
+      id: `mission:${snapshot.missionId}:portfolio-target`,
+      label: `Portfolio target: ${Math.max(0, input.portfolioTargetCurrent ?? 0)} / ${input.portfolioTargetGoal}`,
+      detail: null,
+      href: null,
+      kind: "background",
+    })
+  }
+
+  return items
+}
 
 function discoveryTarget(snapshot: GrowthHomeMissionDiscoverySnapshot): string | null {
   return snapshot.audienceName?.trim() || snapshot.searchSummary?.trim() || null

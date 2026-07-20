@@ -346,6 +346,28 @@ export function projectSupervisedSalesProgressNarrative(input: {
 
   if (missionStillActive) {
     sourceStates.push("missionDiscovery.lifecycleState=monitoring", "missionDiscovery.discoveryAction")
+    if (discoveringActive) {
+      const target = missionDiscovery.audienceName?.trim() || missionDiscovery.searchSummary?.trim()
+      const headline = target
+        ? `${teammate} is discovering companies that match ${target}.`
+        : `${teammate} is discovering companies that match your current mission.`
+      return {
+        qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
+        primaryStage: "discovering",
+        headline,
+        supportingSentence: "Imported companies move into research once discovery finishes.",
+        secondaryContext: null,
+        completedSummary,
+        companyName: null,
+        count: missionDiscovery.newCompaniesFound > 0 ? missionDiscovery.newCompaniesFound : null,
+        href: GROWTH_HOME_STARTUP_STEP_PATHS.findLeads,
+        ctaLabel: "Find Leads",
+        operatorAttentionRequired: false,
+        headlineSuppressed: false,
+        idleVariant: null,
+        sourceStates,
+      }
+    }
     return {
       qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
       primaryStage: "idle",

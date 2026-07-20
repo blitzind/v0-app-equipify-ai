@@ -8,6 +8,8 @@ import type {
   GrowthHomeDailyWorkQueueItem,
   GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { buildMissionDiscoveryOperatorProgressItems } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
+import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import { GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 
@@ -33,6 +35,9 @@ export function projectCanonicalOperatorProgress(input: {
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   focusLeadId?: string | null
   eligibleLeadCount?: number | null
+  missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  portfolioTargetCurrent?: number | null
+  portfolioTargetGoal?: number | null
 }): GrowthCanonicalOperatorProgressProjection {
   const waitingIds = new Set((input.waitingOnYou ?? []).map((row) => row.id))
   const items: GrowthCanonicalOperatorProgressItem[] = []
@@ -75,18 +80,32 @@ export function projectCanonicalOperatorProgress(input: {
     if (items.length >= 8) break
   }
 
+  const missionProgressItems = buildMissionDiscoveryOperatorProgressItems(input.missionDiscovery, {
+    portfolioTargetCurrent: input.portfolioTargetCurrent,
+    portfolioTargetGoal: input.portfolioTargetGoal,
+  })
+  if (items.length === 0) {
+    items.push(...missionProgressItems)
+  }
+
+  const missionActiveLabel = missionProgressItems[0]?.label ?? null
+
   const activeLabel = wm?.active_work
     ? wm.active_work.company_name ?? wm.active_work.title
-    : items[0]?.label ??
+    : missionActiveLabel ??
+      items[0]?.label ??
       (input.eligibleLeadCount === 0 ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY : null)
+
+  const missionSubtitle = missionProgressItems[1]?.label ?? null
 
   return {
     qaMarker: GROWTH_AIOS_OPERATOR_STORY_IMPLEMENTATION_1A_QA_MARKER,
     title: "Progress",
     subtitle:
-      input.eligibleLeadCount === 0 && !wm?.active_work
+      missionSubtitle ??
+      (input.eligibleLeadCount === 0 && !wm?.active_work && !missionActiveLabel
         ? GROWTH_PORTFOLIO_READY_NO_ELIGIBLE_ACCOUNTS_COPY
-        : "Background work and momentum across your accounts",
+        : "Background work and momentum across your accounts"),
     items,
     activeLabel,
   }

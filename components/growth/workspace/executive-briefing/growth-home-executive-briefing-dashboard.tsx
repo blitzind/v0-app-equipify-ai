@@ -169,12 +169,16 @@ export function GrowthHomeExecutiveBriefingDashboard({
         continueItems,
         teammate,
         operatorDisplayName,
+        missionDiscovery: workspaceSummary?.missionDiscovery ?? null,
+        portfolioBelowTarget: (workspaceSummary?.portfolioManager?.health.needsCount ?? 0) > 0,
+        portfolioTargetCurrent: workspaceSummary?.portfolioManager?.health.counts.activeCompanies ?? null,
+        portfolioTargetGoal: workspaceSummary?.portfolioManager?.target.targetActiveCompanies ?? null,
         canonicalOperatorApproval: workspaceSummary?.canonicalOperatorApproval ?? null,
         canonicalOperatorTask: workspaceSummary?.canonicalOperatorTask ?? null,
         canonicalActiveMissions: workspaceSummary?.canonicalActiveMissions ?? null,
         canonicalOperatorFocus: workspaceSummary?.canonicalOperatorFocus ?? null,
       }),
-    [dashboard, recentViews, continueItems, teammate, operatorDisplayName, workspaceSummary?.canonicalOperatorApproval, workspaceSummary?.canonicalOperatorTask, workspaceSummary?.canonicalActiveMissions, workspaceSummary?.canonicalOperatorFocus],
+    [dashboard, recentViews, continueItems, teammate, operatorDisplayName, workspaceSummary?.canonicalOperatorApproval, workspaceSummary?.canonicalOperatorTask, workspaceSummary?.canonicalActiveMissions, workspaceSummary?.canonicalOperatorFocus, workspaceSummary?.missionDiscovery, workspaceSummary?.portfolioManager],
   )
 
   useEffect(() => {
