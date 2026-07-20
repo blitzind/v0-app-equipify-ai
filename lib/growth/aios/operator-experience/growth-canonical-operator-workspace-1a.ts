@@ -85,10 +85,15 @@ function packagePreviewFromItem(input: {
     draftCount ||
     (typeof assetEvidence?.value === "number" ? assetEvidence.value : 0)
 
+  const leadId =
+    input.pkg?.leadId?.trim() ||
+    (input.item.subjectType === "lead" ? input.item.subjectId?.trim() : "") ||
+    null
+
   return {
     itemId: input.item.id,
     packageId,
-    leadId: input.item.subjectType === "lead" ? input.item.subjectId ?? "" : "",
+    leadId: leadId ?? "",
     companyName,
     decisionMaker: input.item.summary || null,
     draftCount: resolvedDraftCount,
@@ -98,7 +103,12 @@ function packagePreviewFromItem(input: {
       input.pkg?.generatedAssets?.[0]?.channel ??
       (input.item.channel && input.item.channel !== "none" ? input.item.channel : "Email sequence"),
     statusLabel: "Waiting for approval",
-    reviewHref: resolveOperatorPackageReviewHref(packageId),
+    reviewHref:
+      resolveOperatorPackageReviewHref({
+        leadId,
+        packageId,
+        route: input.item.route ?? undefined,
+      }),
   }
 }
 

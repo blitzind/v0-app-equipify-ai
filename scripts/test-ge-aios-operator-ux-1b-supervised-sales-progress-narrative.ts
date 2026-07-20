@@ -8,7 +8,7 @@ import {
   projectSupervisedSalesProgressNarrative,
   GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
 } from "../lib/growth/aios/operator-experience/growth-supervised-sales-progress-narrative-1b"
-import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { buildCustomerPackageReviewHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { GROWTH_HOME_STARTUP_STEP_PATHS } from "../lib/growth/home/growth-home-canonical-startup-experience-18d"
 import type { GrowthCanonicalOperatorApprovalSnapshot } from "../lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import type { GrowthHomeMissionDiscoverySnapshot } from "../lib/growth/mission-center/growth-home-mission-discovery-snapshot"
@@ -176,7 +176,7 @@ const waiting = projectSupervisedSalesProgressNarrative({
       preparedAgoLabel: null,
       channelLabel: "Email sequence",
       statusLabel: "Waiting for approval",
-      reviewHref: buildGrowthReviewPackageHref(PACKAGE_ID),
+      reviewHref: buildCustomerPackageReviewHref("lead-1"),
     },
   }),
   missionDiscovery: mockMissionDiscovery({
@@ -192,7 +192,7 @@ const waiting = projectSupervisedSalesProgressNarrative({
 })
 assert.equal(waiting.primaryStage, "waiting_for_authorization")
 assert.match(waiting.headline, /Block Imaging has an opportunity package ready for your review/)
-assert.equal(waiting.href, buildGrowthReviewPackageHref(PACKAGE_ID))
+assert.equal(waiting.href, buildCustomerPackageReviewHref("lead-1"))
 assert.match(waiting.secondaryContext ?? "", /researching 3 additional companies/)
 assert.equal(waiting.headlineSuppressed, true)
 console.log("  ✓ waiting package outranks research and deep-links Review drawer")
@@ -213,7 +213,7 @@ const waitingPlusResearch = projectSupervisedSalesProgressNarrative({
       preparedAgoLabel: null,
       channelLabel: "Email sequence",
       statusLabel: "Waiting for approval",
-      reviewHref: buildGrowthReviewPackageHref(PACKAGE_ID),
+      reviewHref: buildCustomerPackageReviewHref("lead-1"),
     },
   }),
   missionDiscovery: mockMissionDiscovery({

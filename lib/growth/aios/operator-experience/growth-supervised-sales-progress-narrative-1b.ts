@@ -73,8 +73,12 @@ function qualifiedPreparingLeads(researchLoopSummary: GrowthAvaResearchLoopSumma
 function packageReviewHref(
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined,
 ): string {
-  const packageId = approvalSnapshot?.topPackage?.packageId ?? null
-  return resolveOperatorPackageReviewHref(packageId)
+  const top = approvalSnapshot?.topPackage
+  if (top?.reviewHref) return top.reviewHref
+  return resolveOperatorPackageReviewHref({
+    leadId: top?.leadId,
+    packageId: top?.packageId,
+  })
 }
 
 function missionRefinementHref(missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null | undefined): string {

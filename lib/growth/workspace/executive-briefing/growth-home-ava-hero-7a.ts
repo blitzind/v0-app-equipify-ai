@@ -40,14 +40,20 @@ import {
   GROWTH_OPERATOR_REVIEW_CTA_LABEL,
   GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
 } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
-import { remapLegacyHrefToGrowthReview } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { remapLegacyHrefToGrowthReview, resolveCustomerPackageReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import {
   projectSupervisedSalesProgressNarrative,
   type GrowthSupervisedSalesProgressNarrative,
 } from "@/lib/growth/aios/operator-experience/growth-supervised-sales-progress-narrative-1b"
 
-function normalizeOperatorReviewHref(href: string | null | undefined): string | null {
+function normalizeOperatorReviewHref(
+  href: string | null | undefined,
+  leadId?: string | null,
+): string | null {
   if (!href) return null
+  const customerHref = resolveCustomerPackageReviewHref({ leadId, route: href })
+  if (customerHref) return customerHref
   return remapLegacyHrefToGrowthReview(href)
 }
 
@@ -351,7 +357,10 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
           id: canonicalTask.id,
           label: canonicalTask.title,
           detail: [canonicalTask.detail, canonicalTask.why].filter(Boolean).join(" · ") || null,
-          href: normalizeOperatorReviewHref(canonicalTask.href ?? input.aiOsUx.approveItemsHref),
+          href: normalizeOperatorReviewHref(
+          canonicalTask.href ?? input.aiOsUx.approveItemsHref,
+          canonicalTask.leadId,
+        ),
           canonicalProjection: canonicalHero
             ? projectCanonicalDecisionToHomePrimary({
                 decision: canonicalHero.decision,
@@ -367,7 +376,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
         const homePrimary = projectCanonicalDecisionToHomePrimary({
           decision: canonicalHero.decision,
           freshness: canonicalHero.freshness,
-          href: `/admin/growth/leads/${canonicalHero.leadId}`,
+          href: buildGrowthLeadHref(canonicalHero.leadId),
         })
         return {
           primaryDecision: {

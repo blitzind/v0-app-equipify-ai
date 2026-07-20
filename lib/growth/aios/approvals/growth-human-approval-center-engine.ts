@@ -30,7 +30,7 @@ import {
 } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
 import {
   buildGrowthReviewHref,
-  buildGrowthReviewPackageHref,
+  resolveOperatorPackageReviewHref,
 } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 
 export type GeV15ApprovalInboxSnapshotItem = {
@@ -404,7 +404,10 @@ export function collectOutreachPackageApprovalItems(input: GrowthHumanApprovalCe
         enforcementSource: "autonomous_outreach_preparation_pilot",
         blockedReason: "Transport blocked — draft only until human approval.",
       },
-      route: buildGrowthReviewPackageHref(pkg.packageId),
+      route: resolveOperatorPackageReviewHref({
+        leadId: pkg.leadId,
+        packageId: pkg.packageId,
+      }),
       createdAt: pkg.preparedAt,
     })
   }

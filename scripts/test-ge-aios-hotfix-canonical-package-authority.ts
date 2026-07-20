@@ -25,6 +25,13 @@ import {
   projectReviewPackageDecisionItems,
   synthesizeGrowthReviewDecisionQueue,
 } from "../lib/growth/workspace/ux-1a/review/growth-review-decision-queue-synthesizer"
+import { buildGrowthLeadHref } from "../lib/growth/navigation/growth-workspace-operator-links"
+import {
+  buildCustomerPackageReviewHref,
+  parseLeadIdFromPackageReviewRoute,
+  resolveCustomerPackageReviewHref,
+  resolveOperatorPackageReviewHref,
+} from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
 
 function hasWaitingSectionItems(input: {
@@ -140,6 +147,28 @@ function buildAiOsUxForSnapshot(input: {
 
 console.log("[ge-aios-hotfix-canonical-package-authority-v2] certification")
 
+const LEAD_BLOCK = "9ac9c211-f856-4caf-b41b-d8a96e756291"
+const LEAD_BLITZ = "6d9220f0-2960-468c-b4be-5d7595d292c3"
+const customerHref = buildCustomerPackageReviewHref(LEAD_BLOCK)
+assert.equal(customerHref, `/growth/leads/crm?open=${LEAD_BLOCK}`)
+assert.equal(
+  resolveCustomerPackageReviewHref({ route: `/admin/growth/leads/${LEAD_BLOCK}` }),
+  customerHref,
+)
+assert.equal(
+  resolveCustomerPackageReviewHref({ route: `/growth/leads/crm?open=${LEAD_BLOCK}` }),
+  customerHref,
+)
+assert.equal(
+  resolveCustomerPackageReviewHref({
+    route: `/growth/review?tab=packages&item=${LEAD_BLOCK}`,
+  }),
+  customerHref,
+)
+assert.equal(parseLeadIdFromPackageReviewRoute(`/admin/growth/leads/${LEAD_BLOCK}`), LEAD_BLOCK)
+assert.equal(resolveCustomerPackageReviewHref({ leadId: null, route: "https://evil.example/leak" }), null)
+console.log("  ✓ customer package review routes normalize to CRM lead drawer")
+
 const canonicalRoute = buildGrowthReviewPackageHref("pkg-block-imaging")
 assert.equal(parsePackageIdFromApprovalRoute(canonicalRoute), "pkg-block-imaging")
 console.log("  ✓ Fix A — ?item= routes parse for Review projection")
@@ -155,14 +184,14 @@ console.log("  ✓ Fix A — legacy ?packageId= routes still parse")
 const block = outreachItem({
   id: "hac-block",
   company: "Block Imaging",
-  leadId: "lead-block",
+  leadId: LEAD_BLOCK,
   packageId: "pkg-block-imaging",
   route: buildGrowthReviewPackageHref("pkg-block-imaging"),
 })
 const blitz = outreachItem({
   id: "hac-blitz",
   company: "Blitz Industries",
-  leadId: "lead-blitz",
+  leadId: LEAD_BLITZ,
   packageId: "pkg-blitz-industries",
   route: buildGrowthReviewPackageHref("pkg-blitz-industries"),
 })
@@ -199,6 +228,9 @@ assertHomeApprovalAuthoritySync({
 })
 assert.equal(multiAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Block Imaging"))
 assert.equal(multiAiOsUx.waitingOnYou[1]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
+assert.equal(multiAiOsUx.waitingOnYou[0]?.href, buildCustomerPackageReviewHref(LEAD_BLOCK))
+assert.equal(multiAiOsUx.waitingOnYou[1]?.href, buildCustomerPackageReviewHref(LEAD_BLITZ))
+assert.ok(multiSnapshot.packages.every((pkg) => !pkg.reviewHref.startsWith("/admin/")))
 console.log("  ✓ Test D — multi-package snapshot stays synchronized across Home and Review")
 
 const singleSnapshot = buildCanonicalOperatorApprovalSnapshot({ hacItems: [blitz] })
@@ -216,6 +248,19 @@ assertHomeApprovalAuthoritySync({
   reviewPackageCount: singleReviewQueue.packageCount,
 })
 assert.equal(singleAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
+assert.equal(singleAiOsUx.waitingOnYou[0]?.href, buildCustomerPackageReviewHref(LEAD_BLITZ))
+const adminRouteSnapshot = buildCanonicalOperatorApprovalSnapshot({
+  hacItems: [
+    outreachItem({
+      id: "hac-admin-route",
+      company: "Admin Route Co",
+      leadId: LEAD_BLOCK,
+      packageId: "pkg-admin-route",
+      route: `/admin/growth/leads/${LEAD_BLOCK}`,
+    }),
+  ],
+})
+assert.equal(adminRouteSnapshot.packages[0]?.reviewHref, buildCustomerPackageReviewHref(LEAD_BLOCK))
 console.log("  ✓ Test A — single package synchronizes hero, waiting, and review")
 
 const emptySnapshot = emptyCanonicalOperatorApprovalSnapshot()

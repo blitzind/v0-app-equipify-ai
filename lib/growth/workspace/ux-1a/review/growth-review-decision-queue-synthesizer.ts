@@ -6,9 +6,9 @@ import { formatGrowthCustomerApprovalActionLabel } from "@/lib/growth/customer-e
 import type { GrowthSequenceExecutionJobView } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import { channelTypeLabel } from "@/lib/growth/multichannel/multichannel-types"
 import {
-  buildGrowthReviewPackageHref,
   buildGrowthReviewSendHref,
   GROWTH_REVIEW_QA_MARKER,
+  resolveOperatorPackageReviewHref,
 } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import type {
   GrowthReviewDecisionQueueViewModel,
@@ -74,7 +74,11 @@ export function projectReviewPackageDecisionItems(
         status: statusMeta.status,
         statusLabel: statusMeta.label,
         createdAt: card.timePrepared,
-        href: buildGrowthReviewPackageHref(card.packageId),
+        href: resolveOperatorPackageReviewHref({
+          leadId: card.leadId,
+          packageId: card.packageId,
+          route: card.route,
+        }),
         drawerTarget: {
           kind: "package" as const,
           packageId: card.packageId,
