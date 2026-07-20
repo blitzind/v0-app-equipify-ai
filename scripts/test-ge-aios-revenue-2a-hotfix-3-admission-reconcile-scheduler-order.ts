@@ -273,7 +273,11 @@ async function main(): Promise<void> {
   assert.ok(acceptedAfter.some((row) => row.leadId === "accepted-dm-01"))
   console.log("  ✓ accepted lead remains in downstream state (never terminaled by reconcile)")
 
-  assert.match(schedulerSource, /portfolioSelected:\s*false[\s\S]*allowGeneration:\s*false[\s\S]*admissionIntegrityReconcile:\s*true/)
+  const reconcileFn =
+    schedulerSource.match(
+      /async function runAdmissionIntegrityReconcileForOrganization[\s\S]*?\n\}(?=\n\nexport async function tickDraftFactoryDueStatesForScheduler)/,
+    )?.[0] ?? ""
+  assert.match(reconcileFn, /completionHints:\s*\{\s*admissionIntegrityReconcile:\s*true\s*\}/)
   assert.match(schedulerSource, /selectPortfolioAwareDueDraftFactoryStates/)
   assert.match(schedulerSource, /advanceDraftFactoryCapacityWake/)
   console.log("  ✓ safe reconcile options preserved; portfolio and generation phases still wired")

@@ -19,6 +19,7 @@ import {
   advanceDraftFactoryForLead,
   type AdvanceDraftFactoryForLeadInput,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
+import { buildAdmissionIntegrityReconcileEvidenceFromMetadata } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
 import {
   AI_OS_DRAFT_FACTORY_DURABLE_QA_MARKER,
   type AiOsDraftFactoryAdvanceResultV5,
@@ -128,6 +129,42 @@ export async function advanceDraftFactoryForLeadLive(
 ): Promise<AiOsDraftFactoryAdvanceResultV5> {
   const now = input.now ?? new Date().toISOString()
   const workerId = input.workerId ?? `df-live:${now}`
+
+  if (input.completionHints?.admissionIntegrityReconcile === true) {
+    let repository
+    try {
+      const resolved = await resolveDraftFactoryDurableRepository({
+        runtime: "production",
+        admin,
+      })
+      repository = resolved.repository
+      if (resolved.kind !== "postgres") {
+        throw new Error(`SV1-5A: expected postgres repository, got ${resolved.kind}`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logGrowthEngine("draft_factory_postgres_fail_closed", {
+        organization_id: input.organizationId,
+        lead_id: input.leadId,
+        message: message.slice(0, 400),
+      })
+      throw error
+    }
+
+    const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
+    const evidence = buildAdmissionIntegrityReconcileEvidenceFromMetadata(lead?.metadata)
+
+    return advanceDraftFactoryForLead({
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      wake: input.wake,
+      now,
+      evidence,
+      workerId,
+      repository,
+      completionHints: { admissionIntegrityReconcile: true },
+    })
+  }
 
   const runtimeContext = createGrowthAiOsRuntimeContext(admin, {
     organizationId: input.organizationId,

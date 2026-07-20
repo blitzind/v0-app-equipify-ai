@@ -4,7 +4,11 @@
  * Reuses integrity evaluator — no new scheduler, worker, or queue.
  */
 
-import type { AiOsDraftFactoryDurableState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import type {
+  AiOsDraftFactoryCanonicalEvidence,
+  AiOsDraftFactoryDurableState,
+} from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import { resolveDraftFactoryAdmittedFromLeadMetadata } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import {
   evaluateGrowthPipelinePromotionIntegrity,
   type GrowthPipelinePromotionIntegrityViolation,
@@ -23,6 +27,9 @@ export const GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER =
 
 export const GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER =
   "ge-aios-revenue-2a-hotfix-3-admission-reconcile-scheduler-order-v1" as const
+
+export const GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER =
+  "ge-aios-revenue-2a-hotfix-4-admission-reconcile-throughput-v1" as const
 
 /** Documented due-tick phase order after HOTFIX-3 (client-safe for certification). */
 export const GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_PHASE_ORDER_HOTFIX_3 = [
@@ -177,4 +184,28 @@ export function isAdmissionReconcileCorrectedOutcome(input: {
   if (input.outcome === "terminal_failure") return true
   if (input.nextState === "failed") return true
   return false
+}
+
+/**
+ * Minimal canonical evidence for integrity reconcile — no provider/resource reads.
+ * Forces qualification terminal via !admitted without triggering DM/package work.
+ */
+export function buildAdmissionIntegrityReconcileEvidenceFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): AiOsDraftFactoryCanonicalEvidence {
+  const admission = resolveDraftFactoryAdmittedFromLeadMetadata(metadata)
+  return {
+    admitted: admission.admitted,
+    researchCurrent: true,
+    knowledgeComplete: true,
+    stopInvestment: false,
+    portfolioSelected: false,
+    decisionMakerAvailable: false,
+    contactVerifiedForEmail: false,
+    personalizationReady: false,
+    draftValid: false,
+    approved: false,
+    rejected: admission.rejected,
+    failed: admission.failed,
+  }
 }

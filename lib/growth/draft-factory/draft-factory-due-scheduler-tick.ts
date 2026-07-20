@@ -30,6 +30,7 @@ import {
 import { selectPortfolioAwareDueDraftFactoryStates } from "@/lib/growth/draft-factory/draft-factory-due-portfolio-selection"
 import {
   advanceDraftFactoryCapacityWake,
+  advanceDraftFactoryForLead,
   getDeferredDraftFactoryStates,
   listAdmissionIntegrityReconcileDraftFactoryStates,
   listDueDraftFactoryStates,
@@ -50,10 +51,12 @@ import {
   REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import {
+  buildAdmissionIntegrityReconcileEvidenceFromMetadata,
   evaluateAdmissionDownstreamReconcileNeed,
   GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
   GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
   GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+  GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
   isAdmissionDownstreamReconcileState,
   isAdmissionReconcileCorrectedOutcome,
 } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
@@ -70,7 +73,8 @@ import type { DuePortfolioSelectionCandidate } from "@/lib/growth/draft-factory/
 import type { AiOsDraftFactoryCanonicalEvidence } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 
 export type DraftFactoryAdmissionReconcileTickStats = {
-  qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER
+  qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER
+  hotfix_3_qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER
   hotfix_2_qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER
   hotfix_1_qa_marker: typeof GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER
   limit_per_org: typeof REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG
@@ -82,6 +86,11 @@ export type DraftFactoryAdmissionReconcileTickStats = {
   failed: number
   remaining_violations: number
   elapsed_ms: number
+  candidate_load_ms: number | null
+  lead_fetch_ms: number | null
+  batch_elapsed_ms: number | null
+  avg_per_lead_elapsed_ms: number | null
+  max_per_lead_elapsed_ms: number | null
   budget_remaining_before_reconcile_ms: number | null
   budget_remaining_after_reconcile_ms: number | null
   reconcile_started: boolean
@@ -185,6 +194,40 @@ function remainingDueTickBudgetMs(startedAt: number, maxRuntimeMs: number): numb
   return Math.max(0, maxRuntimeMs - (Date.now() - startedAt))
 }
 
+async function prefetchLeadMetadataForAdmissionReconcile(
+  admin: SupabaseClient,
+  leadIds: string[],
+): Promise<Map<string, Record<string, unknown> | null>> {
+  const metadataByLead = new Map<string, Record<string, unknown> | null>()
+  const uniqueLeadIds = [...new Set(leadIds)]
+  if (uniqueLeadIds.length === 0) return metadataByLead
+
+  for (let offset = 0; offset < uniqueLeadIds.length; offset += 100) {
+    const chunk = uniqueLeadIds.slice(offset, offset + 100)
+    const { data, error } = await admin
+      .schema("growth")
+      .from("leads")
+      .select("id, metadata")
+      .in("id", chunk)
+    if (error) continue
+    for (const row of data ?? []) {
+      metadataByLead.set(
+        String((row as { id: string }).id),
+        ((row as { metadata?: Record<string, unknown> | null }).metadata ?? null) as Record<
+          string,
+          unknown
+        > | null,
+      )
+    }
+  }
+
+  for (const leadId of uniqueLeadIds) {
+    if (!metadataByLead.has(leadId)) metadataByLead.set(leadId, null)
+  }
+
+  return metadataByLead
+}
+
 type AdmissionReconcileOrgResult = {
   orgCandidatesFound: number
   orgAttempted: number
@@ -193,9 +236,15 @@ type AdmissionReconcileOrgResult = {
   orgFailed: number
   orgRemainingViolations: number
   reconcileElapsedMs: number
+  candidateLoadMs: number
+  leadFetchMs: number
+  batchElapsedMs: number
+  avgPerLeadElapsedMs: number | null
+  maxPerLeadElapsedMs: number | null
   budgetRemainingBeforeMs: number
   budgetRemainingAfterMs: number
   budgetExhaustedDuringReconcile: boolean
+  secondCandidateBlockedByBudgetGuard: boolean
 }
 
 async function runAdmissionIntegrityReconcileForOrganization(
@@ -212,34 +261,41 @@ async function runAdmissionIntegrityReconcileForOrganization(
   const budgetRemainingBeforeMs = remainingDueTickBudgetMs(input.startedAt, input.maxRuntimeMs)
 
   logGrowthEngine("draft_factory_admission_reconcile_started", {
-    qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+    qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
+    hotfix_3_qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
     organization_id: input.organizationId,
     budget_remaining_before_reconcile_ms: budgetRemainingBeforeMs,
+    budget_before_ms: budgetRemainingBeforeMs,
     limit_per_org: REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
   })
 
-  const metadataCache = new Map<string, Record<string, unknown> | null>()
+  const candidateLoadStartedAt = Date.now()
   const reconcileScanStates = await listAdmissionIntegrityReconcileDraftFactoryStates({
     organizationId: input.organizationId,
     limit: GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
     repository: input.repository,
   })
+  const candidateLoadMs = Date.now() - candidateLoadStartedAt
+
+  const downstreamLeadIds = reconcileScanStates
+    .filter((row) => isAdmissionDownstreamReconcileState(row.state))
+    .map((row) => row.leadId)
+
+  const leadFetchStartedAt = Date.now()
+  const metadataCache = await prefetchLeadMetadataForAdmissionReconcile(admin, downstreamLeadIds)
+  const leadFetchMs = Date.now() - leadFetchStartedAt
 
   const violationRows: Array<{
     row: Awaited<ReturnType<typeof listAdmissionIntegrityReconcileDraftFactoryStates>>[number]
     need: ReturnType<typeof evaluateAdmissionDownstreamReconcileNeed>
+    metadata: Record<string, unknown>
   }> = []
   let orgSkipped = 0
 
   for (const row of reconcileScanStates) {
     if (!isAdmissionDownstreamReconcileState(row.state)) continue
 
-    let metadata = metadataCache.get(row.leadId)
-    if (metadata === undefined) {
-      const lead = await fetchGrowthLeadById(admin, row.leadId).catch(() => null)
-      metadata = (lead?.metadata ?? null) as Record<string, unknown> | null
-      metadataCache.set(row.leadId, metadata)
-    }
+    const metadata = metadataCache.get(row.leadId) ?? null
     if (metadata == null) {
       orgSkipped += 1
       continue
@@ -251,7 +307,7 @@ async function runAdmissionIntegrityReconcileForOrganization(
       continue
     }
 
-    violationRows.push({ row, need })
+    violationRows.push({ row, need, metadata })
   }
 
   const orgCandidatesFound = violationRows.length
@@ -259,35 +315,55 @@ async function runAdmissionIntegrityReconcileForOrganization(
   let orgCorrected = 0
   let orgFailed = 0
   let budgetExhaustedDuringReconcile = false
+  let secondCandidateBlockedByBudgetGuard = false
+  const perLeadElapsedMs: number[] = []
 
-  for (const { row, need } of violationRows.slice(0, REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG)) {
-    if (remainingDueTickBudgetMs(input.startedAt, input.maxRuntimeMs) <= 0) {
+  for (const { row, need, metadata } of violationRows.slice(0, REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG)) {
+    const budgetBeforeAttemptMs = remainingDueTickBudgetMs(input.startedAt, input.maxRuntimeMs)
+    if (budgetBeforeAttemptMs <= 0) {
       budgetExhaustedDuringReconcile = true
+      if (orgAttempted === 1) secondCandidateBlockedByBudgetGuard = true
       break
     }
 
     orgAttempted += 1
+    const perLeadStartedAt = Date.now()
+    let evidenceBuildMs = 0
+    let advanceMs = 0
 
     try {
-      const result = await advanceDraftFactoryForLeadLive(admin, {
+      const evidenceStartedAt = Date.now()
+      const evidence = buildAdmissionIntegrityReconcileEvidenceFromMetadata(metadata)
+      evidenceBuildMs = Date.now() - evidenceStartedAt
+
+      const advanceStartedAt = Date.now()
+      const result = await advanceDraftFactoryForLead({
         organizationId: input.organizationId,
         leadId: row.leadId,
         wake: {
           type: "scheduled_resume",
           sourceId: `reconcile:admission:${input.organizationId}:${row.leadId}:${input.now}`,
         },
-        portfolioSelected: false,
-        allowGeneration: false,
+        now: input.now,
+        evidence,
         workerId: `df-admission-reconcile:${input.organizationId}`,
+        repository: input.repository,
         completionHints: { admissionIntegrityReconcile: true },
       })
+      advanceMs = Date.now() - advanceStartedAt
+
       const corrected = isAdmissionReconcileCorrectedOutcome({
         outcome: result.outcome,
         nextState: result.nextState,
       })
       if (corrected) orgCorrected += 1
+
+      const perLeadElapsed = Date.now() - perLeadStartedAt
+      perLeadElapsedMs.push(perLeadElapsed)
+
       logGrowthEngine("draft_factory_admission_downstream_reconciled", {
-        qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+        qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
+        hotfix_3_qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
         hotfix_2_qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
         organization_id: input.organizationId,
         lead_id: row.leadId,
@@ -298,14 +374,23 @@ async function runAdmissionIntegrityReconcileForOrganization(
         dm_violation: need.dmViolation,
         package_violation: need.packageViolation,
         corrected,
+        evidence_build_ms: evidenceBuildMs,
+        advance_ms: advanceMs,
+        per_lead_elapsed_ms: perLeadElapsed,
+        budget_before_ms: budgetBeforeAttemptMs,
+        budget_after_ms: remainingDueTickBudgetMs(input.startedAt, input.maxRuntimeMs),
       })
     } catch (error) {
       orgFailed += 1
+      perLeadElapsedMs.push(Date.now() - perLeadStartedAt)
       logGrowthEngine("draft_factory_admission_downstream_reconcile_failed", {
-        qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+        qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
         organization_id: input.organizationId,
         lead_id: row.leadId,
         previous_state: row.state,
+        evidence_build_ms: evidenceBuildMs,
+        advance_ms: advanceMs,
+        per_lead_elapsed_ms: Date.now() - perLeadStartedAt,
         message: error instanceof Error ? error.message.slice(0, 240) : String(error).slice(0, 240),
       })
     }
@@ -314,9 +399,15 @@ async function runAdmissionIntegrityReconcileForOrganization(
   const orgRemainingViolations = Math.max(0, orgCandidatesFound - orgCorrected)
   const reconcileElapsedMs = Date.now() - reconcileStartedAt
   const budgetRemainingAfterMs = remainingDueTickBudgetMs(input.startedAt, input.maxRuntimeMs)
+  const avgPerLeadElapsedMs =
+    perLeadElapsedMs.length > 0
+      ? Math.round(perLeadElapsedMs.reduce((sum, value) => sum + value, 0) / perLeadElapsedMs.length)
+      : null
+  const maxPerLeadElapsedMs = perLeadElapsedMs.length > 0 ? Math.max(...perLeadElapsedMs) : null
 
   logGrowthEngine("draft_factory_admission_reconcile_batch", {
-    qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+    qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
+    hotfix_3_qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
     hotfix_2_qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
     hotfix_1_qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
     organization_id: input.organizationId,
@@ -330,13 +421,22 @@ async function runAdmissionIntegrityReconcileForOrganization(
     failed: orgFailed,
     remaining_violations: orgRemainingViolations,
     elapsed_ms: reconcileElapsedMs,
+    candidate_load_ms: candidateLoadMs,
+    lead_fetch_ms: leadFetchMs,
+    batch_elapsed_ms: reconcileElapsedMs,
+    avg_per_lead_elapsed_ms: avgPerLeadElapsedMs,
+    max_per_lead_elapsed_ms: maxPerLeadElapsedMs,
     budget_remaining_before_reconcile_ms: budgetRemainingBeforeMs,
     budget_remaining_after_reconcile_ms: budgetRemainingAfterMs,
+    budget_before_ms: budgetRemainingBeforeMs,
+    budget_after_ms: budgetRemainingAfterMs,
     budget_exhausted: budgetExhaustedDuringReconcile,
+    second_candidate_blocked_by_budget_guard: secondCandidateBlockedByBudgetGuard,
+    lightweight_reconcile_path: true,
   })
 
   logGrowthEngine("draft_factory_admission_reconcile_completed", {
-    qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+    qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
     organization_id: input.organizationId,
     candidates_found: orgCandidatesFound,
     attempted: orgAttempted,
@@ -344,8 +444,12 @@ async function runAdmissionIntegrityReconcileForOrganization(
     failed: orgFailed,
     remaining_violations: orgRemainingViolations,
     elapsed_ms: reconcileElapsedMs,
+    batch_elapsed_ms: reconcileElapsedMs,
     budget_remaining_after_reconcile_ms: budgetRemainingAfterMs,
+    budget_after_ms: budgetRemainingAfterMs,
     budget_exhausted: budgetExhaustedDuringReconcile,
+    avg_per_lead_elapsed_ms: avgPerLeadElapsedMs,
+    max_per_lead_elapsed_ms: maxPerLeadElapsedMs,
   })
 
   return {
@@ -356,9 +460,15 @@ async function runAdmissionIntegrityReconcileForOrganization(
     orgFailed,
     orgRemainingViolations,
     reconcileElapsedMs,
+    candidateLoadMs,
+    leadFetchMs,
+    batchElapsedMs: reconcileElapsedMs,
+    avgPerLeadElapsedMs,
+    maxPerLeadElapsedMs,
     budgetRemainingBeforeMs,
     budgetRemainingAfterMs,
     budgetExhaustedDuringReconcile,
+    secondCandidateBlockedByBudgetGuard,
   }
 }
 
@@ -404,7 +514,8 @@ export async function tickDraftFactoryDueStatesForScheduler(
   let portfolioAwareClasses = 0
   let budgetExhaustedPhase: BudgetPhase = null
   const admissionReconcileAggregate: DraftFactoryAdmissionReconcileTickStats = {
-    qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
+    qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
+    hotfix_3_qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
     hotfix_2_qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
     hotfix_1_qa_marker: GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER,
     limit_per_org: REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
@@ -416,6 +527,11 @@ export async function tickDraftFactoryDueStatesForScheduler(
     failed: 0,
     remaining_violations: 0,
     elapsed_ms: 0,
+    candidate_load_ms: null,
+    lead_fetch_ms: null,
+    batch_elapsed_ms: null,
+    avg_per_lead_elapsed_ms: null,
+    max_per_lead_elapsed_ms: null,
     budget_remaining_before_reconcile_ms: null,
     budget_remaining_after_reconcile_ms: null,
     reconcile_started: false,
@@ -464,6 +580,11 @@ export async function tickDraftFactoryDueStatesForScheduler(
       admissionReconcileAggregate.failed += reconcileResult.orgFailed
       admissionReconcileAggregate.remaining_violations += reconcileResult.orgRemainingViolations
       admissionReconcileAggregate.elapsed_ms += reconcileResult.reconcileElapsedMs
+      admissionReconcileAggregate.candidate_load_ms = reconcileResult.candidateLoadMs
+      admissionReconcileAggregate.lead_fetch_ms = reconcileResult.leadFetchMs
+      admissionReconcileAggregate.batch_elapsed_ms = reconcileResult.batchElapsedMs
+      admissionReconcileAggregate.avg_per_lead_elapsed_ms = reconcileResult.avgPerLeadElapsedMs
+      admissionReconcileAggregate.max_per_lead_elapsed_ms = reconcileResult.maxPerLeadElapsedMs
       admissionReconcileAggregate.budget_remaining_before_reconcile_ms =
         reconcileResult.budgetRemainingBeforeMs
       admissionReconcileAggregate.budget_remaining_after_reconcile_ms =
@@ -846,6 +967,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
     qa_marker: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
     autonomy_1e_qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
     autonomy_1f_qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+    revenue_2a_hotfix_4_qa_marker: GROWTH_REVENUE_2A_HOTFIX_4_QA_MARKER,
     revenue_2a_hotfix_3_qa_marker: GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER,
     revenue_2a_hotfix_2_qa_marker: GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER,
     organizations_attempted: organizationIds.length,
