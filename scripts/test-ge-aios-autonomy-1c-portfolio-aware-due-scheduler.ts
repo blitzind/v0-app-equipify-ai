@@ -74,6 +74,10 @@ assert.equal(
 assert.equal(mapDurableStateToPortfolioCapacityClass("waiting_for_personalization"), "llm_drafting")
 assert.equal(mapDurableStateToPortfolioCapacityClass("waiting_for_generation"), "llm_drafting")
 assert.equal(mapDurableStateToPortfolioCapacityClass("waiting_for_approval"), null)
+assert.equal(
+  mapDurableStateToPortfolioCapacityClass("paused", { earliestIncompleteStage: "portfolio" }),
+  "cheap_validation",
+)
 assert.equal(mapPortfolioCapacityClassToResourceClass("decision_maker_discovery"), "datamoon_enrichment")
 assert.equal(mapPortfolioCapacityClassToResourceClass("website_research"), "website_research")
 console.log("  ✓ durable stage → capacity class → resource class mapping")

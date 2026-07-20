@@ -47,6 +47,8 @@ import {
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { evaluateGrowthPortfolioLeadEligibility } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
+import { evaluateGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
@@ -56,6 +58,16 @@ import type { AiOsInvestmentState } from "@/lib/growth/resource-allocation/resou
 import type { AiOsPortfolioCapacityClass } from "@/lib/growth/portfolio-allocation/portfolio-allocation-types"
 import type { DuePortfolioSelectionCandidate } from "@/lib/growth/draft-factory/draft-factory-due-portfolio-selection"
 import type { AiOsDraftFactoryCanonicalEvidence } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import type { AiOsDraftFactoryDurableState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+
+const GROWTH_REVENUE_2A_DOWNSTREAM_RECONCILE_STATES = new Set<AiOsDraftFactoryDurableState | string>([
+  "waiting_for_dm",
+  "waiting_for_contact_verification",
+  "waiting_for_personalization",
+  "waiting_for_generation",
+  "draft_ready",
+])
+const GROWTH_REVENUE_2A_MAX_ADMISSION_RECONCILE_PER_ORG = 5
 
 export type DraftFactoryDueSchedulerTickResult = {
   qa_marker: typeof GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER
@@ -237,6 +249,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
           leadId: state.leadId,
           state: state.state,
           updatedAt: state.updatedAt,
+          earliestIncompleteStage: state.earliestIncompleteStage,
         })),
         totalAdvanceBudget: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
         perClassCandidateCap: GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP,
@@ -246,6 +259,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
       const enrichedCountByClass: Record<string, number> = {}
       let enrichmentFailureCount = 0
       let enrichmentBudgetExhausted = false
+      const dueStateByLead = new Map(dueStates.map((row) => [row.leadId, row]))
 
       for (const candidate of admission.sampledCandidates) {
         if (Date.now() - startedAt >= maxRuntimeMs) {
@@ -271,20 +285,40 @@ export async function tickDraftFactoryDueStatesForScheduler(
             reason: investment.enrichmentFailureReason,
           })
           // Fail closed for this lead — still include stop so SV1-2 can skip consistently.
-        }
+        } else {
+          const dueRow = dueStateByLead.get(candidate.leadId)
+          const lead = await fetchGrowthLeadById(admin, candidate.leadId).catch(() => null)
+          if (lead) {
+            const portfolioEligibility = evaluateGrowthPortfolioLeadEligibility({
+              lead,
+              organizationId,
+            })
+            if (!portfolioEligibility.eligible) {
+              logGrowthEngine("draft_factory_due_admission_excluded", {
+                qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+                organization_id: organizationId,
+                lead_id: candidate.leadId,
+                capacity_class: candidate.capacityClass,
+                reason: portfolioEligibility.reasonCode,
+              })
+              continue
+            }
+          }
 
-        enriched.push({
-          leadId: candidate.leadId,
-          state: candidate.state,
-          updatedAt: candidate.updatedAt,
-          investmentState: investment.investmentState,
-          spendAuthorized: investment.spendAuthorized,
-          companyName: investment.companyName,
-          researchFresh: investment.researchFresh,
-          researchStale: investment.researchStale,
-        })
-        enrichedCountByClass[candidate.capacityClass] =
-          (enrichedCountByClass[candidate.capacityClass] ?? 0) + 1
+          enriched.push({
+            leadId: candidate.leadId,
+            state: candidate.state,
+            updatedAt: candidate.updatedAt,
+            earliestIncompleteStage: dueRow?.earliestIncompleteStage ?? null,
+            investmentState: investment.investmentState,
+            spendAuthorized: investment.spendAuthorized,
+            companyName: investment.companyName,
+            researchFresh: investment.researchFresh,
+            researchStale: investment.researchStale,
+          })
+          enrichedCountByClass[candidate.capacityClass] =
+            (enrichedCountByClass[candidate.capacityClass] ?? 0) + 1
+        }
       }
 
       // Portfolio selection runs on whatever was enriched; discovered classes already logged.
@@ -353,8 +387,6 @@ export async function tickDraftFactoryDueStatesForScheduler(
         perRunCap: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
       })
 
-      const dueStateByLead = new Map(dueStates.map((row) => [row.leadId, row]))
-
       if (dueBatch.wakeExecutionEnabled && dueBatch.effectiveLimit > 0) {
         for (const leadId of selection.selectedLeadIds.slice(0, dueBatch.effectiveLimit)) {
           if (Date.now() - startedAt >= maxRuntimeMs) {
@@ -411,6 +443,48 @@ export async function tickDraftFactoryDueStatesForScheduler(
             outcome: result.outcome,
           })
         }
+      }
+
+      let admissionReconciled = 0
+      for (const row of dueStates) {
+        if (admissionReconciled >= GROWTH_REVENUE_2A_MAX_ADMISSION_RECONCILE_PER_ORG) break
+        if (Date.now() - startedAt >= maxRuntimeMs) break
+        if (!GROWTH_REVENUE_2A_DOWNSTREAM_RECONCILE_STATES.has(row.state)) continue
+
+        const lead = await fetchGrowthLeadById(admin, row.leadId).catch(() => null)
+        if (!lead) continue
+
+        const dmIntegrity = evaluateGrowthPipelinePromotionIntegrity({
+          metadata: lead.metadata,
+          boundary: "decision_maker",
+        })
+        const packageIntegrity = evaluateGrowthPipelinePromotionIntegrity({
+          metadata: lead.metadata,
+          boundary: "package",
+        })
+        if (dmIntegrity.ok && packageIntegrity.ok) continue
+
+        const result = await advanceDraftFactoryForLeadLive(admin, {
+          organizationId,
+          leadId: row.leadId,
+          wake: {
+            type: "scheduled_resume",
+            sourceId: `reconcile:admission:${organizationId}:${row.leadId}:${now}`,
+          },
+          portfolioSelected: false,
+          allowGeneration: false,
+          workerId: `df-admission-reconcile:${organizationId}`,
+        })
+        admissionReconciled += 1
+        logGrowthEngine("draft_factory_admission_downstream_reconciled", {
+          organization_id: organizationId,
+          lead_id: row.leadId,
+          previous_state: row.state,
+          outcome: result.outcome,
+          next_state: result.nextState,
+          dm_violation: dmIntegrity.violation,
+          package_violation: packageIntegrity.violation,
+        })
       }
 
       // AUTONOMY-1F — capacity wake discovers waiting_for_generation + deferred.
@@ -474,6 +548,22 @@ export async function tickDraftFactoryDueStatesForScheduler(
               reason: investment.enrichmentFailureReason ?? "stop_investment",
             })
             continue
+          }
+          const lead = await fetchGrowthLeadById(admin, row.leadId).catch(() => null)
+          if (lead) {
+            const portfolioEligibility = evaluateGrowthPortfolioLeadEligibility({
+              lead,
+              organizationId,
+            })
+            if (!portfolioEligibility.eligible) {
+              logGrowthEngine("draft_factory_generation_capacity_admission_excluded", {
+                qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+                organization_id: organizationId,
+                lead_id: row.leadId,
+                reason: portfolioEligibility.reasonCode,
+              })
+              continue
+            }
           }
           const evidence = await buildCanonicalEvidenceForLead(admin, {
             organizationId,

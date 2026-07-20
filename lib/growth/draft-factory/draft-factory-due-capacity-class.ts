@@ -3,7 +3,10 @@
  * Client-safe. Does not invent investment or portfolio scores.
  */
 
-import type { AiOsDraftFactoryDurableState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import type {
+  AiOsDraftFactoryDurableStage,
+  AiOsDraftFactoryDurableState,
+} from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import type { AiOsPortfolioCapacityClass } from "@/lib/growth/portfolio-allocation/portfolio-allocation-types"
 import type { AiOsScarceResourceClass } from "@/lib/growth/resource-allocation/resource-allocation-types"
 
@@ -17,6 +20,7 @@ export const GROWTH_AIOS_AUTONOMY_1C_QA_MARKER =
  */
 export function mapDurableStateToPortfolioCapacityClass(
   state: AiOsDraftFactoryDurableState | string,
+  options?: { earliestIncompleteStage?: AiOsDraftFactoryDurableStage | string | null },
 ): AiOsPortfolioCapacityClass | null {
   switch (state) {
     case "waiting_for_research":
@@ -32,6 +36,10 @@ export function mapDurableStateToPortfolioCapacityClass(
     case "draft_ready":
       return "llm_drafting"
     case "paused":
+      if (options?.earliestIncompleteStage === "portfolio") {
+        return "cheap_validation"
+      }
+      return null
     case "rejected":
     case "waiting_for_approval":
     case "approved":

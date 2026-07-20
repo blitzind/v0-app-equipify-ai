@@ -11,7 +11,10 @@ import {
   GROWTH_AIOS_AUTONOMY_1C_QA_MARKER,
   mapDurableStateToPortfolioCapacityClass,
 } from "@/lib/growth/draft-factory/draft-factory-due-capacity-class"
-import type { AiOsDraftFactoryDurableState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import type {
+  AiOsDraftFactoryDurableStage,
+  AiOsDraftFactoryDurableState,
+} from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import { evaluatePortfolioAllocationFacade } from "@/lib/growth/portfolio-allocation/portfolio-allocation-facade-engine"
 import type {
   AiOsPortfolioCandidate,
@@ -23,6 +26,7 @@ export type DuePortfolioSelectionCandidate = {
   leadId: string
   state: AiOsDraftFactoryDurableState | string
   updatedAt: string
+  earliestIncompleteStage?: AiOsDraftFactoryDurableStage | string | null
   investmentState: AiOsInvestmentState | null
   spendAuthorized?: boolean | null
   companyName?: string | null
@@ -81,7 +85,9 @@ export function selectPortfolioAwareDueDraftFactoryStates(
   let skippedUnmappedState = 0
 
   for (const row of input.dueStates) {
-    const capacityClass = mapDurableStateToPortfolioCapacityClass(row.state)
+    const capacityClass = mapDurableStateToPortfolioCapacityClass(row.state, {
+      earliestIncompleteStage: row.earliestIncompleteStage,
+    })
     if (!capacityClass) {
       skippedUnmappedState += 1
       continue

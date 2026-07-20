@@ -9,7 +9,10 @@ import {
   allocateDueSlotsByCapacityClass,
   mapDurableStateToPortfolioCapacityClass,
 } from "@/lib/growth/draft-factory/draft-factory-due-capacity-class"
-import type { AiOsDraftFactoryDurableState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
+import type {
+  AiOsDraftFactoryDurableStage,
+  AiOsDraftFactoryDurableState,
+} from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import { GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import type { AiOsPortfolioCapacityClass } from "@/lib/growth/portfolio-allocation/portfolio-allocation-types"
 
@@ -66,6 +69,7 @@ export function planFairDueCapacityClassAdmission(input: {
     leadId: string
     state: AiOsDraftFactoryDurableState | string
     updatedAt: string
+    earliestIncompleteStage?: AiOsDraftFactoryDurableStage | string | null
   }>
   totalAdvanceBudget: number
   perClassCandidateCap?: number
@@ -79,7 +83,9 @@ export function planFairDueCapacityClassAdmission(input: {
   let skippedUnmappedState = 0
 
   for (const row of input.dueStates) {
-    const capacityClass = mapDurableStateToPortfolioCapacityClass(row.state)
+    const capacityClass = mapDurableStateToPortfolioCapacityClass(row.state, {
+      earliestIncompleteStage: row.earliestIncompleteStage,
+    })
     if (!capacityClass) {
       skippedUnmappedState += 1
       continue

@@ -365,6 +365,15 @@ export function planDurableStageAdvance(input: {
   }
 
   if (stage === "portfolio" || input.portfolioDeferred) {
+    if (stage === "portfolio" && evidence.portfolioSelected) {
+      return {
+        stageEvaluated: "portfolio",
+        outcome: "completed",
+        reason: "Portfolio slot selected — advance to downstream stages.",
+        nextEvidence: evidence,
+        nextEligibleWakeAt: null,
+      }
+    }
     return {
       stageEvaluated: "portfolio",
       outcome: "deferred",

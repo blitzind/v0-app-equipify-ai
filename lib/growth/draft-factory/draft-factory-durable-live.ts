@@ -29,6 +29,10 @@ import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
+import {
+  assertGrowthPipelinePromotionIntegrity,
+  resolveDraftFactoryAdmittedFromLeadMetadata,
+} from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 
 export async function buildCanonicalEvidenceForLead(
   admin: SupabaseClient,
@@ -85,8 +89,10 @@ export async function buildCanonicalEvidenceForLead(
     lead.decisionMakerStatus === "confirmed" ||
     (Boolean(lead.contactEmail?.includes("@")) && decisionMakerAvailable)
 
+  const admissionEvidence = resolveDraftFactoryAdmittedFromLeadMetadata(lead.metadata)
+
   return {
-    admitted: true,
+    admitted: admissionEvidence.admitted,
     researchCurrent,
     researchRunId: lead.latestProspectResearchRunId,
     knowledgeComplete: researchCurrent,
@@ -99,7 +105,8 @@ export async function buildCanonicalEvidenceForLead(
     personalizationReady: researchCurrent && decisionMakerAvailable && contactVerifiedForEmail,
     draftValid: false,
     approved: false,
-    rejected: false,
+    rejected: admissionEvidence.rejected,
+    failed: admissionEvidence.failed,
   }
 }
 
@@ -228,6 +235,20 @@ export async function advanceDraftFactoryForLeadLive(
   const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
   const leadLifecycle = lead ? await buildLeadLifecycleSnapshotForAuthority(admin, lead) : undefined
 
+  const dmIntegrity = assertGrowthPipelinePromotionIntegrity({
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    metadata: lead?.metadata ?? null,
+    boundary: "decision_maker",
+  })
+
+  const packageIntegrity = assertGrowthPipelinePromotionIntegrity({
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    metadata: lead?.metadata ?? null,
+    boundary: "package",
+  })
+
   const canonicalDecision = await runtimeContext.getDecision().catch(() => null)
   const draftFactoryGate = evaluateDraftFactoryDecisionGate(canonicalDecision, {
     wakeCondition: wakeType,
@@ -273,7 +294,22 @@ export async function advanceDraftFactoryForLeadLive(
     allowGeneration = false
   }
 
-  const shouldDiscoverDecisionMaker =
+  if (!packageIntegrity.ok) {
+    if (input.allowGeneration !== false) {
+      logGrowthEngine("growth_pipeline_promotion_integrity_violation", {
+        qa_marker: packageIntegrity.qaMarker,
+        organization_id: input.organizationId,
+        lead_id: input.leadId,
+        boundary: packageIntegrity.boundary,
+        violation: packageIntegrity.violation,
+        admission_state: packageIntegrity.admissionState,
+        diagnostic: packageIntegrity.diagnostic,
+      })
+    }
+    allowGeneration = false
+  }
+
+  const wouldDiscoverDecisionMaker =
     !evidence.decisionMakerAvailable ||
     wakeType === "decision_maker_required" ||
     wakeType === "datamoon_person_requested" ||
@@ -281,7 +317,25 @@ export async function advanceDraftFactoryForLeadLive(
     wakeType === "datamoon_person_failed" ||
     wakeType === "provider_capacity_available"
 
-  if (shouldDiscoverDecisionMaker && !evidence.stopInvestment) {
+  if (wouldDiscoverDecisionMaker && !dmIntegrity.ok) {
+    logGrowthEngine("growth_pipeline_promotion_integrity_violation", {
+      qa_marker: dmIntegrity.qaMarker,
+      organization_id: input.organizationId,
+      lead_id: input.leadId,
+      boundary: dmIntegrity.boundary,
+      violation: dmIntegrity.violation,
+      admission_state: dmIntegrity.admissionState,
+      diagnostic: dmIntegrity.diagnostic,
+    })
+  }
+
+  const shouldDiscoverDecisionMaker =
+    evidence.admitted &&
+    !dmIntegrity.blocked &&
+    wouldDiscoverDecisionMaker &&
+    !evidence.stopInvestment
+
+  if (shouldDiscoverDecisionMaker) {
     try {
       const { evaluateAndEnrichDecisionMakerForLead } = await import(
         "@/lib/growth/datamoon-decision-maker/datamoon-dm-service"

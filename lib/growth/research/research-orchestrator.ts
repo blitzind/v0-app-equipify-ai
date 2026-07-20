@@ -17,6 +17,7 @@ import {
   resolveVerifiedIndustryGuess,
 } from "@/lib/growth/research/company-evidence/company-evidence-intelligence-enrichment"
 import { promoteCompanyEvidenceToCompanyIntelligence } from "@/lib/growth/company-intelligence/promote-from-company-evidence"
+import { triggerBuyingCommitteeIntelligenceAfterCompanyIntelligence } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-triggers"
 import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons/canonical-person-repository"
 import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
@@ -349,6 +350,13 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
         promoted: promotion.promoted,
         skippedReason: promotion.skippedReason,
         rejectedCount: promotion.rejected.length,
+      }
+
+      if (promotion.companyId && promotion.skippedReason === null) {
+        void triggerBuyingCommitteeIntelligenceAfterCompanyIntelligence(input.admin, {
+          company_id: promotion.companyId,
+          created_by: input.createdBy ?? null,
+        })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 120) : "promotion_failed"

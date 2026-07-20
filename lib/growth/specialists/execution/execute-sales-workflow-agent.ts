@@ -24,6 +24,9 @@ import {
 import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import { mapAslWorkflowAgentToActionKind } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-action-policy-1a"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { assertGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
+import { logGrowthEngine } from "@/lib/growth/access"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 export type ExecuteSalesWorkflowAgentResult =
@@ -143,6 +146,29 @@ export async function executeSalesWorkflowAgent(
     case "outreach_agent": {
       if (!leadId) {
         return { executed: false, workflow_agent: workflowAgent, skip_reason: "lead_id_required" }
+      }
+      const lead = await fetchGrowthLeadById(admin, leadId).catch(() => null)
+      const outboundIntegrity = assertGrowthPipelinePromotionIntegrity({
+        organizationId: input.organizationId,
+        leadId,
+        metadata: lead?.metadata ?? null,
+        boundary: "outbound",
+      })
+      if (!outboundIntegrity.ok) {
+        logGrowthEngine("growth_pipeline_promotion_integrity_violation", {
+          qa_marker: outboundIntegrity.qaMarker,
+          organization_id: input.organizationId,
+          lead_id: leadId,
+          boundary: outboundIntegrity.boundary,
+          violation: outboundIntegrity.violation,
+          admission_state: outboundIntegrity.admissionState,
+          diagnostic: outboundIntegrity.diagnostic,
+        })
+        return {
+          executed: false,
+          workflow_agent: workflowAgent,
+          skip_reason: `promotion_integrity:${outboundIntegrity.violation ?? "blocked"}`,
+        }
       }
       const readModel = await runAutonomousOutreachPreparationManualRequest(admin, {
         organizationId: input.organizationId,
