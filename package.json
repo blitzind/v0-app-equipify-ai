@@ -848,6 +848,7 @@
     "test:ge-aios-revenue-2a-orchestration-integrity": "tsx scripts/test-ge-aios-revenue-2a-orchestration-integrity.ts",
     "test:ge-aios-revenue-2a-hotfix-1-admission-reconcile": "tsx scripts/test-ge-aios-revenue-2a-hotfix-1-admission-reconcile.ts",
     "test:ge-aios-revenue-2a-hotfix-2-admission-reconcile-selection": "tsx scripts/test-ge-aios-revenue-2a-hotfix-2-admission-reconcile-selection.ts",
+    "test:ge-aios-revenue-2a-hotfix-3-admission-reconcile-scheduler-order": "tsx scripts/test-ge-aios-revenue-2a-hotfix-3-admission-reconcile-scheduler-order.ts",
     "test:ge-aios-21c-production-cleanup": "tsx scripts/test-ge-aios-21c-production-cleanup.ts",
     "test:ge-aios-22-company-evidence": "tsx scripts/test-ge-aios-22-company-evidence.ts",
     "test:ge-aios-23-runtime-canonicalization": "tsx scripts/test-ge-aios-23-runtime-canonicalization.ts",

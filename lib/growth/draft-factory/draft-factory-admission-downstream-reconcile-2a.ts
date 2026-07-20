@@ -21,6 +21,23 @@ export const GROWTH_REVENUE_2A_HOTFIX_1_QA_MARKER =
 export const GROWTH_REVENUE_2A_HOTFIX_2_QA_MARKER =
   "ge-aios-revenue-2a-hotfix-2-admission-reconcile-selection-v1" as const
 
+export const GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER =
+  "ge-aios-revenue-2a-hotfix-3-admission-reconcile-scheduler-order-v1" as const
+
+/** Documented due-tick phase order after HOTFIX-3 (client-safe for certification). */
+export const GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_PHASE_ORDER_HOTFIX_3 = [
+  "load_due_pool",
+  "load_reconcile_pool",
+  "admission_reconcile",
+  "datamoon_dm_poll",
+  "classification",
+  "enrichment",
+  "portfolio_selection",
+  "lead_advancement",
+  "generation_capacity",
+  "telemetry",
+] as const
+
 export { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG, GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT }
 
 /** Nonterminal downstream states scanned for admission integrity reconcile (wake-independent). */

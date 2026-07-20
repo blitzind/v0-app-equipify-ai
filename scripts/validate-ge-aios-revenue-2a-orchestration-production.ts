@@ -11,6 +11,7 @@ import { GROWTH_PIPELINE_PROMOTION_INTEGRITY_2A_QA_MARKER } from "@/lib/growth/d
 import { evaluateGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import { GROWTH_CERT_DEFAULT_AI_ORG_ID } from "@/lib/growth/qa/verified-channels-cert-env-bootstrap"
 import { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
+import { GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 
 export const GE_AIOS_REVENUE_2A_PRODUCTION_VALIDATION_QA_MARKER =
@@ -218,7 +219,8 @@ async function main(): Promise<void> {
     blockingViolations > 0
       ? Math.ceil(blockingViolations / REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG)
       : 0
-  console.log("\n--- Reconciliation Throughput (HOTFIX-1/2) ---")
+  console.log("\n--- Reconciliation Throughput (HOTFIX-1/2/3) ---")
+  console.log(`HOTFIX-3 QA marker: ${GROWTH_REVENUE_2A_HOTFIX_3_QA_MARKER}`)
   console.log(`Reconcile limit per org per scheduler tick: ${REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG}`)
   console.log(`Current integrity violations: ${blockingViolations}`)
   console.log(
@@ -230,6 +232,9 @@ async function main(): Promise<void> {
   console.log(`Reconcile terminal outcomes: ${reconcileCorrected}`)
   console.log(`Reconcile waiting outcomes (retry-gated before HOTFIX-2): ${reconcileWaiting}`)
   console.log(`Remaining integrity violations in durable store: ${blockingViolations}`)
+  console.log(
+    "Expected after HOTFIX-3 deploy + one scheduler tick: attempted > 0, corrected > 0, budget_exhausted_phase null in draft_factory_due_scheduler_tick logs.",
+  )
 
   console.log("\n--- Pipeline Flow (canonical gates) ---")
   console.log("Admission → Research → Qualification → Portfolio → Decision Maker → Package → Approval")
