@@ -133,6 +133,14 @@ export async function approveBusinessProfileForOrganization(
     profileId: input.profileId,
   })
 
+  const { ensureAutonomousProductionMissionBootstrap } = await import(
+    "@/lib/growth/mission-purpose/growth-autonomous-production-mission-bootstrap-2a-service"
+  )
+  void ensureAutonomousProductionMissionBootstrap(admin, {
+    organizationId: input.organizationId,
+    approvedProfile: approved,
+  }).catch(() => undefined)
+
   return approved
 }
 

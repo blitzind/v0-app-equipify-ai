@@ -21,6 +21,7 @@ import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/
 import { tickAutonomousSalesLoopForScheduler } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
 import { tickDraftFactoryDueStatesForScheduler } from "@/lib/growth/draft-factory/draft-factory-due-scheduler-tick"
 import { tickAutonomousPortfolioManagerForScheduler } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-scheduler-tick-1a"
+import { tickAutonomousProductionMissionBootstrapForScheduler } from "@/lib/growth/mission-purpose/growth-autonomous-production-mission-bootstrap-2a-service"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
   classifySchedulerFailure,
@@ -206,6 +207,18 @@ export async function runGrowthObjectiveRuntimeScheduler(
   })
   telemetry.organizationsConsidered = selection.organizationsConsidered
   telemetry.organizationsSelected = selection.organizationsSelected
+
+  const productionMissionBootstrap =
+    killSwitches.autonomy_enabled && killSwitches.autonomy_objective_mode_enabled && budget.mayBeginWork(3_000)
+      ? await tickAutonomousProductionMissionBootstrapForScheduler(admin, {
+          maxOrganizations: MAX_ORGS_PER_TICK,
+        }).catch(() => null)
+      : null
+
+  if (productionMissionBootstrap) {
+    telemetry.productionMissionBootstrapsAttempted = productionMissionBootstrap.organizationsAttempted
+    telemetry.productionMissionBootstrapsCompleted = productionMissionBootstrap.organizationsBootstrapped
+  }
 
   const schedulerOrganizationIds = await listActiveRunningGrowthObjectiveOrganizationIds(admin)
 

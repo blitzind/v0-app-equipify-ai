@@ -85,6 +85,24 @@ export async function getActiveApprovedBusinessProfile(
   return mapRow(data as ProfileRow)
 }
 
+export async function listOrganizationIdsWithApprovedBusinessProfiles(
+  admin: SupabaseClient,
+  input?: { limit?: number },
+): Promise<string[]> {
+  const { data, error } = await profilesTable(admin)
+    .select("organization_id")
+    .eq("status", "approved")
+    .order("approved_at", { ascending: false })
+    .limit(input?.limit ?? 50)
+
+  if (error) {
+    if (isMissingTableError(error)) return []
+    throw new Error(error.message)
+  }
+
+  return [...new Set((data ?? []).map((row) => String(row.organization_id)).filter(Boolean))]
+}
+
 export async function getLatestDraftBusinessProfile(
   admin: SupabaseClient,
   organizationId: string,

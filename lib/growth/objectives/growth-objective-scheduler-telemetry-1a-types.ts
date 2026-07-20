@@ -12,6 +12,7 @@ export const GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A = {
     "kill_switch_probe",
     "eligible_objective_fetch",
     "org_fairness_selection",
+    "production_mission_bootstrap_tick",
     "autonomous_sales_loop_tick",
     "draft_factory_due_tick",
     "objective_runtime_ticks",
@@ -52,6 +53,8 @@ export type GrowthObjectiveSchedulerTickTelemetry = {
   packagesGenerated: number
   portfolioReplenishmentsAttempted?: number
   portfolioReplenishmentsCompleted?: number
+  productionMissionBootstrapsAttempted?: number
+  productionMissionBootstrapsCompleted?: number
   elapsedMs: number
   remainingMsAtStop: number
   stopReason: string | null

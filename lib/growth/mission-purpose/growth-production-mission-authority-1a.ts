@@ -24,7 +24,8 @@ export function buildProductionMissionAuthority(input: {
   const discovery = input.missionDiscovery
   const portfolioBelowTarget = (portfolio?.health.needsCount ?? 0) > 0
   const discoveryActive =
-    portfolio?.replenishment.shouldLaunchDiscovery === true ||
+    portfolio?.replenishment.shouldReplenish === true ||
+    portfolio?.replenishment.shouldResumeActiveDiscovery === true ||
     portfolio?.operator.discoveryRunning === true ||
     discovery?.discoveryAction === "run_prospect_search" ||
     discovery?.discoveryAction === "refresh_audience"
