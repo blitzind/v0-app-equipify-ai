@@ -571,7 +571,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     certification: organizationalLearningCertification,
   })
 
-  const recommendationExperience = executiveLanguageWithLearning.recommendationExperience
+  const enrichedRecommendationExperience = executiveLanguageWithLearning.recommendationExperience
     ? {
         ...executiveLanguageWithLearning.recommendationExperience,
         organizationalLearningLine:
@@ -602,7 +602,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     specialistOrchestrator: dailyBriefing.specialist_orchestrator_result ?? null,
     discoveryNarrativeTarget,
     supervisedSalesProgress,
-    recommendationExperience,
+    recommendationExperience: enrichedRecommendationExperience,
     businessObjectiveLeadership: executiveLanguageWithLearning.businessObjectiveLeadership
       ? {
           ...executiveLanguageWithLearning.businessObjectiveLeadership,
