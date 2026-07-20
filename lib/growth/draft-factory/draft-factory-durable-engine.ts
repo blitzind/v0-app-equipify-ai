@@ -23,6 +23,10 @@ export const AI_OS_DRAFT_FACTORY_RETRY_BACKOFF_MS = {
   generation: [10 * 60_000, 30 * 60_000, 2 * 60 * 60_000],
 } as const
 
+/** GE-AIOS-REVENUE-2H — SV1-5 consumes SV1-1 before waiting_for_generation. */
+export const GE_AIOS_REVENUE_2H_INVESTMENT_GATE_QA_MARKER =
+  "ge-aios-revenue-2h-sv1-5-investment-gate-alignment-v1" as const
+
 export function normalizeDraftFactoryWake(wake: string | AiOsDraftFactoryWakeInput): AiOsDraftFactoryCanonicalWake {
   const raw = typeof wake === "string" ? wake : wake.type
   const mapped = AI_OS_DRAFT_FACTORY_WAKE_NORMALIZATION[raw] ?? (raw as AiOsDraftFactoryCanonicalWake)
@@ -30,6 +34,15 @@ export function normalizeDraftFactoryWake(wake: string | AiOsDraftFactoryWakeInp
     return mapped
   }
   return "scheduled_resume"
+}
+
+/** SV1-1 email_drafting billable drafting authorization — consumer gate only; does not evaluate policy. */
+export function isBillableDraftingAuthorized(
+  evidence: Pick<AiOsDraftFactoryCanonicalEvidence, "investmentState" | "spendAuthorized">,
+): boolean {
+  return (
+    evidence.investmentState === "increase_investment" && evidence.spendAuthorized === true
+  )
 }
 
 export function buildDraftFactoryWakeFingerprint(input: {
@@ -56,6 +69,7 @@ export function resolveEarliestIncompleteDurableStage(
   if (!evidence.decisionMakerAvailable) return "decision_maker"
   if (!evidence.contactVerifiedForEmail) return "contact_verification"
   if (!evidence.personalizationReady) return "personalization"
+  if (!isBillableDraftingAuthorized(evidence)) return "investment"
   if (!evidence.draftValid) return "generation"
   if (!evidence.rejected && evidence.draftValid) return "approval"
   if (evidence.rejected) return "generation"
@@ -355,11 +369,20 @@ export function planDurableStageAdvance(input: {
   }
 
   if (stage === "investment") {
+    if (evidence.investmentState === "stop_investment" || evidence.stopInvestment) {
+      return {
+        stageEvaluated: "investment",
+        outcome: "stopped",
+        reason: "Stop Investment — scarce downstream work halted.",
+        nextEvidence: { ...evidence, paused: true },
+        nextEligibleWakeAt: null,
+      }
+    }
     return {
       stageEvaluated: "investment",
-      outcome: "stopped",
-      reason: "Investment gate blocked scarce work.",
-      nextEvidence: { ...evidence, paused: true },
+      outcome: "waiting",
+      reason: "Investment gate — billable drafting not authorized by SV1-1.",
+      nextEvidence: evidence,
       nextEligibleWakeAt: null,
     }
   }
@@ -447,6 +470,15 @@ export function planDurableStageAdvance(input: {
   }
 
   if (stage === "generation") {
+    if (!isBillableDraftingAuthorized(evidence)) {
+      return {
+        stageEvaluated: "investment",
+        outcome: "waiting",
+        reason: "Investment gate — billable drafting not authorized by SV1-1.",
+        nextEvidence: evidence,
+        nextEligibleWakeAt: null,
+      }
+    }
     if (input.generationCapacityAvailable === false) {
       return {
         stageEvaluated: "generation",

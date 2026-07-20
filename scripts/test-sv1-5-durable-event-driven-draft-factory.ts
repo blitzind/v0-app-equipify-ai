@@ -55,6 +55,17 @@ function baseEvidence(partial?: Partial<AiOsDraftFactoryCanonicalEvidence>): AiO
   }
 }
 
+/** SV1-1 increase_investment + spend_authorized — required for generation-stage assertions. */
+function billableDraftingEvidence(
+  partial?: Partial<AiOsDraftFactoryCanonicalEvidence>,
+): AiOsDraftFactoryCanonicalEvidence {
+  return baseEvidence({
+    investmentState: "increase_investment",
+    spendAuthorized: true,
+    ...partial,
+  })
+}
+
 function growth5fStub(leadId: string, now: string) {
   return async () => ({
     packageId: `growth5f:${leadId}:${now}`,
@@ -256,7 +267,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "personalization_improved", sourceId: "pers-1" },
     now: "2026-07-12T10:22:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -275,7 +286,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "generation_required", eventId: "gen-1" },
     now: "2026-07-12T10:23:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -297,7 +308,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "generation_required", eventId: "gen-2" },
     now: "2026-07-12T10:24:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -321,7 +332,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "approval_rejected", eventId: "rej-copy", rejectionScope: "copy" },
     now: "2026-07-12T10:25:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -435,7 +446,8 @@ async function main(): Promise<void> {
       {
         leadId: "cap-a",
         investmentState: "increase_investment",
-        evidence: baseEvidence({
+        spendAuthorized: true,
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           decisionMakerAvailable: true,
@@ -447,7 +459,8 @@ async function main(): Promise<void> {
       {
         leadId: "cap-b",
         investmentState: "increase_investment",
-        evidence: baseEvidence({
+        spendAuthorized: true,
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           decisionMakerAvailable: true,
@@ -459,7 +472,8 @@ async function main(): Promise<void> {
       {
         leadId: "cap-c",
         investmentState: "increase_investment",
-        evidence: baseEvidence({
+        spendAuthorized: true,
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           decisionMakerAvailable: true,
@@ -516,7 +530,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "manual_rebuild", requestId: "rebuild-abc" },
     now: "2026-07-12T12:30:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -530,7 +544,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "manual_rebuild", requestId: "rebuild-abc" },
     now: "2026-07-12T12:31:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -548,7 +562,7 @@ async function main(): Promise<void> {
   const reconstructed = reconstructDraftFactoryStateFromCanonicalData({
     organizationId: ORG,
     leadId: "lead-reconstruct",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -567,7 +581,7 @@ async function main(): Promise<void> {
     leadId: "lead-reconstruct",
     wake: { type: "scheduled_resume", eventId: "resume-1" },
     now: t0,
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -620,7 +634,7 @@ async function main(): Promise<void> {
       leadId,
       wake: { type: "new_lead", eventId: `seed-${leadId}` },
       now: new Date(nowBase).toISOString(),
-      evidence: baseEvidence({
+      evidence: billableDraftingEvidence({
         researchCurrent: true,
         knowledgeComplete: true,
         portfolioSelected: true,
@@ -652,7 +666,7 @@ async function main(): Promise<void> {
       leads: due.slice(0, perCycle).map((s) => ({
         leadId: s.leadId,
         wake: { type: "capacity_available", sourceId: `cycle-${cycle}:${s.leadId}` },
-        evidence: baseEvidence({
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           portfolioSelected: true,

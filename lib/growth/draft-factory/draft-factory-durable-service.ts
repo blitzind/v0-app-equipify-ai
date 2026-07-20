@@ -9,6 +9,7 @@ import {
   applyWakeInvalidationToEvidence,
   buildAdvanceResultV5,
   buildDraftFactoryWakeFingerprint,
+  isBillableDraftingAuthorized,
   normalizeDraftFactoryWake,
   planDurableStageAdvance,
   projectDurableStateFromStage,
@@ -366,6 +367,7 @@ export async function advanceDraftFactoryForLead(
     if (
       mayGenerateThisWake &&
       stageNow === "generation" &&
+      isBillableDraftingAuthorized(nextEvidence) &&
       hints.generationCapacityAvailable !== false &&
       !hints.portfolioDeferred &&
       !nextEvidence.stopInvestment &&

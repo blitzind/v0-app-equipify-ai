@@ -146,6 +146,8 @@ export type AiOsDraftFactoryCanonicalEvidence = {
   researchRunId?: string | null
   knowledgeComplete: boolean
   investmentState?: string | null
+  /** Canonical SV1-1 projection for email_drafting — consumer must not reinterpret. */
+  spendAuthorized?: boolean | null
   stopInvestment: boolean
   portfolioSelected: boolean
   decisionMakerAvailable: boolean

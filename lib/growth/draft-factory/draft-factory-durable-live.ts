@@ -66,8 +66,8 @@ export async function buildCanonicalEvidenceForLead(
     accountId: lead.id,
     resourceClass: "email_drafting",
     signals: buildResourceAllocationSignalsFromLead(lead, {
-      approvalRequired: true,
-      approvalGranted: false,
+      budgetAvailable: true,
+      killSwitchActive: false,
     }),
   })
 
@@ -98,6 +98,7 @@ export async function buildCanonicalEvidenceForLead(
     researchRunId: lead.latestProspectResearchRunId,
     knowledgeComplete: researchCurrent,
     investmentState: resource.investment_state,
+    spendAuthorized: resource.spend_authorized,
     stopInvestment: resource.investment_state === "stop_investment",
     portfolioSelected: input.portfolioSelected === true,
     decisionMakerAvailable,

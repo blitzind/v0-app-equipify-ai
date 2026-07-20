@@ -53,6 +53,16 @@ function baseEvidence(partial?: Partial<AiOsDraftFactoryCanonicalEvidence>): AiO
   }
 }
 
+function billableDraftingEvidence(
+  partial?: Partial<AiOsDraftFactoryCanonicalEvidence>,
+): AiOsDraftFactoryCanonicalEvidence {
+  return baseEvidence({
+    investmentState: "increase_investment",
+    spendAuthorized: true,
+    ...partial,
+  })
+}
+
 async function main(): Promise<void> {
   console.log("[SV1-5A] Production durable Draft Factory certification")
   clearDurableDraftFactoryStoreForTests()
@@ -221,7 +231,7 @@ async function main(): Promise<void> {
   const reconstructed = reconstructDraftFactoryStateFromCanonicalData({
     organizationId: ORG,
     leadId: "recon-1",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -239,7 +249,7 @@ async function main(): Promise<void> {
     leadId: "recon-1",
     wake: { type: "scheduled_resume", eventId: "sr1" },
     now: t0,
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -346,7 +356,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "personalization_improved", sourceId: "p1" },
     now: "2026-07-12T14:23:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -363,7 +373,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "generation_required", eventId: "g1" },
     now: "2026-07-12T14:24:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -390,7 +400,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "capacity_available", sourceId: "sched-1" },
     now: "2026-07-12T14:25:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -408,7 +418,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "generation_required", eventId: "prov-1" },
     now: "2026-07-12T14:25:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -466,7 +476,8 @@ async function main(): Promise<void> {
       {
         leadId: "cap-1",
         investmentState: "increase_investment",
-        evidence: baseEvidence({
+        spendAuthorized: true,
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           decisionMakerAvailable: true,
@@ -478,7 +489,8 @@ async function main(): Promise<void> {
       {
         leadId: "cap-2",
         investmentState: "increase_investment",
-        evidence: baseEvidence({
+        spendAuthorized: true,
+        evidence: billableDraftingEvidence({
           researchCurrent: true,
           knowledgeComplete: true,
           decisionMakerAvailable: true,
@@ -538,7 +550,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "manual_rebuild", requestId: "rebuild-xyz" },
     now: "2026-07-12T15:30:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
@@ -553,7 +565,7 @@ async function main(): Promise<void> {
     leadId: leadDm,
     wake: { type: "manual_rebuild", requestId: "rebuild-xyz" },
     now: "2026-07-12T15:31:00.000Z",
-    evidence: baseEvidence({
+    evidence: billableDraftingEvidence({
       researchCurrent: true,
       knowledgeComplete: true,
       portfolioSelected: true,
