@@ -25,8 +25,8 @@ import {
 } from "../lib/growth/workspace/ux-1a/review/growth-review-decision-queue-synthesizer"
 import { GROWTH_REVIEW_QA_MARKER } from "../lib/growth/workspace/ux-1a/review/growth-review-decision-queue-types"
 import {
+  buildCustomerPackageReviewHref,
   buildGrowthReviewHref,
-  buildGrowthReviewPackageHref,
   buildGrowthReviewSendHref,
   GROWTH_REVIEW_LEGACY_APPROVALS_HREF,
   GROWTH_REVIEW_LEGACY_SEQUENCE_HREF,
@@ -220,7 +220,7 @@ function main(): void {
   ])
   assert.equal(packages.length, 1)
   assert.equal(packages[0]?.kind, "package")
-  assert.equal(packages[0]?.href, buildGrowthReviewPackageHref("pkg-1"))
+  assert.equal(packages[0]?.href, buildCustomerPackageReviewHref("lead-1"))
   console.log("  ✓ packages tab shows actionable outreach package approvals only")
 
   const sends = projectReviewSendDecisionItems([
@@ -267,13 +267,13 @@ function main(): void {
   )
   assert.equal(
     remapUx1aOperatorHref("/growth/os/approvals?packageId=pkg-1"),
-    buildGrowthReviewPackageHref("pkg-1"),
+    buildGrowthReviewHref({ tab: "packages" }),
   )
   assert.equal(
     remapLegacyHrefToGrowthReview(
       "/growth/os/pilot/lead-research/lead-1?packageId=outreach-prep%3Alead-1%3A2026",
     ),
-    buildGrowthReviewPackageHref("outreach-prep:lead-1:2026"),
+    buildCustomerPackageReviewHref("lead-1"),
   )
   assert.equal(remapLegacyHrefToGrowthReview(GROWTH_REVIEW_LEGACY_SEQUENCE_HREF), buildGrowthReviewHref({ tab: "sends" }))
   console.log("  ✓ workspace and legacy hrefs deep-link into Review tabs/items")

@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import Link from "next/link"
 import { ArrowRight, Bot, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,13 @@ import {
   GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER,
 } from "@/lib/growth/ava-home/narrative/engine/growth-home-narrative-intelligence-18f"
 import { GROWTH_OPERATOR_REVIEW_CTA_LABEL } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
+import { GrowthHomeAvaRecommendationExperienceSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-recommendation-experience-section"
+import { GrowthHomeAvaBusinessObjectiveSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-business-objective-section"
+import { GrowthHomeAvaStrategicInsightSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-strategic-insight-section"
+import { GrowthHomeAvaScoreboardSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-scoreboard-section"
+import { GrowthHomeAvaExecutiveBriefingFooterSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-executive-briefing-footer-section"
+import { GrowthHomeAvaSinceYouWereLastHereSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-since-you-were-last-here-section"
+import { acknowledgeGrowthHomeAvaExecutiveBriefing } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a"
 import {
   GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER,
   HOME_LIVING_ALL_CLEAR_WITH_NARRATIVE,
@@ -33,6 +41,7 @@ import {
 import { GROWTH_SALES_OPERATIONS_CENTER_ROUTE } from "@/lib/growth/operations-center/growth-sales-operations-center-types"
 import { GROWTH_AVA_ABOUT_WORKSPACE_ROUTE } from "@/lib/growth/ava-about/growth-ava-about-workspace-types"
 import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
+import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 
 type Props = {
   hero: GrowthHomeAvaHeroViewModel
@@ -41,6 +50,11 @@ type Props = {
   leadsNeedingAction?: number
   pendingApprovals?: number
   relationshipSnapshotCount?: number
+  organizationId?: string | null
+  companyCandidates?: Array<{ leadId: string; companyName: string }>
+  activeMissionLabel?: string | null
+  strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
+  onBriefingAcknowledged?: () => void
 }
 
 function statusTone(kind: GrowthHomeAvaHeroViewModel["statusKind"]): string {
@@ -60,8 +74,24 @@ export function GrowthHomeAvaHeroSection({
   leadsNeedingAction = 0,
   pendingApprovals = 0,
   relationshipSnapshotCount = 0,
+  organizationId = null,
+  companyCandidates = [],
+  activeMissionLabel = null,
+  strategicAdvisorContext = null,
+  onBriefingAcknowledged,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
+  const handleBriefingAcknowledge = useCallback(() => {
+    const briefing = hero.continuousExecutiveBriefing
+    if (!briefing?.currentSnapshot) return
+    acknowledgeGrowthHomeAvaExecutiveBriefing({
+      organizationId,
+      snapshot: briefing.currentSnapshot,
+      state: briefing.state,
+      headline: briefing.openingLine,
+    })
+    onBriefingAcknowledged?.()
+  }, [hero.continuousExecutiveBriefing, onBriefingAcknowledged, organizationId])
   const scaleLine = buildHomeRelationshipScaleLine(leadPool, {
     relationshipSnapshotCount,
     leadsNeedingAction,
@@ -141,10 +171,46 @@ export function GrowthHomeAvaHeroSection({
         </p>
       ) : null}
 
-      {openingLine ? (
+      {openingLine && !hero.continuousExecutiveBriefing ? (
         <p className="text-sm leading-relaxed text-foreground" data-qa-field="home-living-opening-line">
           {openingLine}
         </p>
+      ) : null}
+
+      {hero.continuousExecutiveBriefing ? (
+        <GrowthHomeAvaSinceYouWereLastHereSection
+          briefing={hero.continuousExecutiveBriefing}
+          onAcknowledge={handleBriefingAcknowledge}
+        />
+      ) : null}
+
+      {hero.businessObjectiveLeadership ? (
+        <GrowthHomeAvaBusinessObjectiveSection leadership={hero.businessObjectiveLeadership} />
+      ) : null}
+
+      {hero.recommendationExperience ? (
+        <GrowthHomeAvaRecommendationExperienceSection
+          experience={hero.recommendationExperience}
+          organizationId={organizationId}
+          companyCandidates={companyCandidates}
+          activeMissionLabel={activeMissionLabel}
+          strategicAdvisorContext={strategicAdvisorContext}
+        />
+      ) : null}
+
+      {hero.strategicLeadership ? (
+        <GrowthHomeAvaStrategicInsightSection leadership={hero.strategicLeadership} />
+      ) : null}
+
+      {hero.businessObjectiveLeadership?.scoreboard?.length ? (
+        <GrowthHomeAvaScoreboardSection metrics={hero.businessObjectiveLeadership.scoreboard} />
+      ) : null}
+
+      {hero.strategicLeadership ? (
+        <GrowthHomeAvaExecutiveBriefingFooterSection
+          recentWins={hero.strategicLeadership.recentWins}
+          whatsNext={hero.strategicLeadership.whatsNext}
+        />
       ) : null}
 
       {hero.supervisedSalesProgress &&
@@ -252,7 +318,7 @@ export function GrowthHomeAvaHeroSection({
       ) : null}
 
       <div className={cn(hasNarrative && "border-t border-border/50 pt-4")}>
-        {hero.primaryDecision ? (
+        {!hero.recommendationExperience && hero.primaryDecision ? (
           <div
             className={cn(
               "rounded-xl border p-4",
@@ -297,12 +363,12 @@ export function GrowthHomeAvaHeroSection({
               </Link>
             ) : null}
           </div>
-        ) : (
+        ) : !hero.recommendationExperience ? (
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
             <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
             <p className="text-sm font-medium text-foreground">{allClearLine}</p>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   )

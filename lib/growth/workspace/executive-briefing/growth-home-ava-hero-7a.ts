@@ -46,6 +46,16 @@ import {
   projectSupervisedSalesProgressNarrative,
   type GrowthSupervisedSalesProgressNarrative,
 } from "@/lib/growth/aios/operator-experience/growth-supervised-sales-progress-narrative-1b"
+import { buildGrowthHomeAvaRecommendationExperience } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-queue-next-1a"
+import type { GrowthHomeAvaRecommendationExperience } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-next-1a-types"
+import { buildGrowthHomeAvaStrategicLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-leadership-next-1f"
+import type { GrowthHomeAvaStrategicLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-leadership-next-1f-types"
+import type { GrowthHomeAvaStrategicOverrideRecord } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-override-memory-next-1c"
+import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
+import { buildGrowthHomeAvaContinuousExecutiveBriefingPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-continuous-executive-briefing-next-2a"
+import type { GrowthHomeAvaContinuousExecutiveBriefingPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a-types"
+import type { GrowthHomeAvaExecutiveBriefingCursor } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a-types"
+import type { GrowthHomeAvaRecommendationPreferenceRecord } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-preference-memory-next-1a"
 
 function normalizeOperatorReviewHref(
   href: string | null | undefined,
@@ -100,6 +110,14 @@ export type GrowthHomeAvaHeroViewModel = {
   discoveryNarrativeTarget?: string | null
   /** GE-AIOS-OPERATOR-UX-1B — Supervised sales journey narrative */
   supervisedSalesProgress?: GrowthSupervisedSalesProgressNarrative | null
+  /** GE-AIOS-NEXT-1A — Ranked recommendation-driven Home experience */
+  recommendationExperience?: GrowthHomeAvaRecommendationExperience | null
+  /** GE-AIOS-NEXT-1E — Business objective leadership centerpiece */
+  businessObjectiveLeadership?: import("@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types").GrowthHomeAvaBusinessObjectiveLeadershipPayload | null
+  /** GE-AIOS-NEXT-1F — Strategic leadership (insights + executive briefing footer) */
+  strategicLeadership?: GrowthHomeAvaStrategicLeadershipPayload | null
+  /** GE-AIOS-NEXT-2A — Continuous executive briefing handoff */
+  continuousExecutiveBriefing?: GrowthHomeAvaContinuousExecutiveBriefingPayload | null
 }
 
 export type BuildAvaHomeHeroInput = {
@@ -123,6 +141,7 @@ export type BuildAvaHomeHeroInput = {
     | "missionDiscovery"
     | "portfolioLeads"
     | "eligibleLeadCount"
+    | "businessObjectiveLeadership"
   >
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
@@ -139,6 +158,12 @@ export type BuildAvaHomeHeroInput = {
   operatorDisplayName?: string | null
   /** GE-AIOS-DECISION-ENGINE-1B — server-resolved canonical hero decision */
   canonicalHeroDecision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
+  strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
+  overrideRecords?: GrowthHomeAvaStrategicOverrideRecord[]
+  executiveBriefingCursor?: GrowthHomeAvaExecutiveBriefingCursor | null
+  recommendationPreferences?: GrowthHomeAvaRecommendationPreferenceRecord[]
+  outboundDisabled?: boolean
+  outboundWaitingForBusinessHours?: boolean
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -424,6 +449,51 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     researchLoopSummary: input.researchLoopSummary,
   })
 
+  const recommendationExperience = buildGrowthHomeAvaRecommendationExperience({
+    greeting,
+    aiOsUx: input.aiOsUx,
+    primaryDecision: decision.primaryDecision,
+    canonicalOperatorTask: input.aiOsUx.canonicalOperatorTask,
+    canonicalHeroDecision: input.canonicalHeroDecision ?? null,
+    canonicalOperatorFocus: input.aiOsUx.canonicalOperatorFocus,
+    workManager,
+    waitingOnYou: input.waitingOnYou ?? input.aiOsUx.waitingOnYou,
+    dailyWorkQueue: input.dailyWorkQueue ?? input.aiOsUx.dailyWorkQueue,
+    missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+    supervisedSalesProgress,
+    businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
+  })
+
+  const strategicLeadership = buildGrowthHomeAvaStrategicLeadershipPayload({
+    businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
+    missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+    strategicAdvisorContext: input.strategicAdvisorContext ?? null,
+    salesOutcomes: input.salesOutcomes ?? null,
+    recommendationExperience,
+    pendingApprovals: input.aiOsUx.approveItemsCount,
+    meetingsThisWeek: input.workspaceSummary.meetings?.thisWeek ?? 0,
+    overrideRecords: input.overrideRecords ?? [],
+  })
+
+  const continuousExecutiveBriefing = input.executiveBriefingCursor
+    ? buildGrowthHomeAvaContinuousExecutiveBriefingPayload({
+        greeting,
+        hour: input.hour,
+        cursor: input.executiveBriefingCursor,
+        metricsSnapshot: dailyBriefing.metrics_snapshot,
+        missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
+        businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
+        recommendationExperience,
+        strategicLeadership,
+        salesOutcomes: input.salesOutcomes ?? null,
+        recommendationPreferences: input.recommendationPreferences ?? [],
+        pendingApprovals: input.aiOsUx.approveItemsCount,
+        outboundDisabled: input.outboundDisabled ?? true,
+        outboundWaitingForBusinessHours: input.outboundWaitingForBusinessHours ?? false,
+        generatedAt: input.generatedAt,
+      })
+    : null
+
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
     greeting,
@@ -445,6 +515,10 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     specialistOrchestrator: dailyBriefing.specialist_orchestrator_result ?? null,
     discoveryNarrativeTarget,
     supervisedSalesProgress,
+    recommendationExperience,
+    businessObjectiveLeadership: input.workspaceSummary.businessObjectiveLeadership ?? null,
+    strategicLeadership,
+    continuousExecutiveBriefing,
   }
 }
 

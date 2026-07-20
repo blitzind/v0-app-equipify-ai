@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useAiEmployeeStatus } from "@/components/growth/ai-teammate/ai-employee-status-provider"
 import { GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER } from "@/lib/growth/ava-home/narrative"
@@ -32,6 +32,13 @@ import {
   buildExecutiveSnapshotKpis,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { buildAvaHomeHero } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
+import { readGrowthHomeAvaStrategicOverrideRecords } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-override-memory-next-1c"
+import {
+  readGrowthHomeAvaExecutiveBriefingCursor,
+  recordGrowthHomeAvaExecutiveBriefingGenerated,
+  recordGrowthHomeAvaExecutiveBriefingHomeVisit,
+} from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a"
+import { readGrowthHomeAvaRecommendationPreferences } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-preference-memory-next-1a"
 import {
   GROWTH_HOME_ADVANCED_OPERATIONS_SUBTITLE,
   GROWTH_HOME_ADVANCED_OPERATIONS_TITLE,
@@ -110,6 +117,7 @@ function buildEngineWorkspaceSummary(
     missionDiscovery: payload.missionDiscovery ?? null,
     portfolioLeads: payload.portfolioLeads,
     eligibleLeadCount: payload.eligibleLeadCount,
+    businessObjectiveLeadership: payload.businessObjectiveLeadership ?? null,
   }
 }
 
@@ -126,6 +134,7 @@ type BuildAvaHomeHeroEngineSummary = Pick<
   | "missionDiscovery"
   | "portfolioLeads"
   | "eligibleLeadCount"
+  | "businessObjectiveLeadership"
 >
 
 type Props = {
@@ -186,6 +195,25 @@ export function GrowthHomeExecutiveBriefingDashboard({
     [workspaceSummary?.organizationalMemory],
   )
   const operatingRhythmMemory = useMemo(() => readOperatingRhythmMemory(), [dashboard.generatedAt])
+  const strategicOverrideRecords = useMemo(
+    () => readGrowthHomeAvaStrategicOverrideRecords(sessionIdentity?.authUserId),
+    [sessionIdentity?.authUserId, workspaceSummary?.generatedAt],
+  )
+  const [briefingCursorVersion, setBriefingCursorVersion] = useState(0)
+  const executiveBriefingCursor = useMemo(
+    () => readGrowthHomeAvaExecutiveBriefingCursor(sessionIdentity?.authUserId),
+    [sessionIdentity?.authUserId, workspaceSummary?.generatedAt, briefingCursorVersion],
+  )
+  const recommendationPreferences = useMemo(
+    () => readGrowthHomeAvaRecommendationPreferences(sessionIdentity?.authUserId),
+    [sessionIdentity?.authUserId, workspaceSummary?.generatedAt],
+  )
+
+  useEffect(() => {
+    recordGrowthHomeAvaExecutiveBriefingHomeVisit({
+      organizationId: sessionIdentity?.authUserId ?? null,
+    })
+  }, [sessionIdentity?.authUserId])
 
   const engineWorkspaceSummary = useMemo(
     () => (workspaceSummary ? buildEngineWorkspaceSummary(workspaceSummary, avaConsole) : undefined),
@@ -215,6 +243,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
           organizationalKnowledge: workspaceSummary?.organizationalKnowledge?.store.items ?? null,
           operatorDisplayName,
           canonicalHeroDecision: workspaceSummary?.canonicalHeroDecision ?? null,
+          strategicAdvisorContext: workspaceSummary?.strategicAdvisorContext ?? null,
+          overrideRecords: strategicOverrideRecords,
+          executiveBriefingCursor,
+          recommendationPreferences,
+          outboundDisabled: true,
+          outboundWaitingForBusinessHours: false,
         }),
       ),
     [
@@ -231,9 +265,22 @@ export function GrowthHomeExecutiveBriefingDashboard({
       workspaceSummary?.generatedAt,
       workspaceSummary?.organizationalKnowledge,
       workspaceSummary?.canonicalHeroDecision,
+      workspaceSummary?.strategicAdvisorContext,
       operatorDisplayName,
+      strategicOverrideRecords,
+      executiveBriefingCursor,
+      recommendationPreferences,
+      briefingCursorVersion,
     ],
   )
+
+  useEffect(() => {
+    if (avaHero.continuousExecutiveBriefing) {
+      recordGrowthHomeAvaExecutiveBriefingGenerated({
+        organizationId: sessionIdentity?.authUserId ?? null,
+      })
+    }
+  }, [avaHero.continuousExecutiveBriefing?.openingLine, sessionIdentity?.authUserId])
 
   useEffect(() => {
     const dailyBriefing = avaHero.dailyBriefing
@@ -287,6 +334,29 @@ export function GrowthHomeExecutiveBriefingDashboard({
     briefing.renewalsMonitoring.length > 0 ||
     briefing.customerWins.length > 0
 
+  const companyCandidates = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const item of workspaceSummary?.sources?.dailyRevenueWorkQueueDisplay?.top_items ?? []) {
+      const company = item.company_name?.trim()
+      if (item.lead_id && company) map.set(item.lead_id, company)
+    }
+    for (const pkg of aiOsUx.canonicalApprovalSnapshot?.packages ?? []) {
+      if (pkg.leadId && pkg.companyName) map.set(pkg.leadId, pkg.companyName)
+    }
+    for (const row of aiOsUx.dailyWorkQueue) {
+      if (row.href) {
+        const match = row.href.match(/[?&]open=([^&]+)/)
+        const leadId = match?.[1]
+        if (leadId && row.companyName) map.set(leadId, row.companyName)
+      }
+    }
+    return [...map.entries()].map(([leadId, companyName]) => ({ leadId, companyName }))
+  }, [
+    workspaceSummary?.sources?.dailyRevenueWorkQueueDisplay?.top_items,
+    aiOsUx.canonicalApprovalSnapshot?.packages,
+    aiOsUx.dailyWorkQueue,
+  ])
+
   const setupIncomplete = avaHero.dailyActivityNarrative?.focus === "setup"
   const setupMessage =
     avaHero.dailyActivityNarrative?.working_next[0] ??
@@ -313,6 +383,11 @@ export function GrowthHomeExecutiveBriefingDashboard({
           leadsNeedingAction={workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0}
           pendingApprovals={canonicalPendingApprovals}
           relationshipSnapshotCount={relationshipSnapshotCount}
+          organizationId={sessionIdentity?.authUserId ?? null}
+          companyCandidates={companyCandidates}
+          activeMissionLabel={workspaceSummary?.missionDiscovery?.audienceName ?? workspaceSummary?.missionDiscovery?.activityLabel ?? null}
+          strategicAdvisorContext={workspaceSummary?.strategicAdvisorContext ?? null}
+          onBriefingAcknowledged={() => setBriefingCursorVersion((value) => value + 1)}
         />
 
         <GrowthHomeTrainingSetupCta setupIncomplete={setupIncomplete} setupMessage={setupMessage} />

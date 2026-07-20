@@ -40,7 +40,7 @@ export type GrowthHomeMissionDiscoverySnapshot = {
   startupDiscoveryReady: boolean
 }
 
-function selectAcquisitionMission(objectives: GrowthObjective[]): GrowthObjective | null {
+export function selectAcquisitionMission(objectives: GrowthObjective[]): GrowthObjective | null {
   const active = objectives.filter(
     (entry) =>
       (entry.status === "active" || entry.status === "planning" || entry.runtime?.running) &&

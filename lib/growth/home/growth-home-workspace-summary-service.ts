@@ -66,8 +66,12 @@ import {
 import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
 import { loadPortfolioDatamoonDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
+import { buildGrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
-import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
+import { buildGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import { loadGrowthHomeMissionDiscoveryObjectives } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
+import { buildGrowthHomeAvaBusinessObjectiveLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e"
+import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
 import { loadCanonicalOperatorApprovalSnapshotForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-loader"
 import {
@@ -566,15 +570,18 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     degraded: leadPoolPage.leadPool.degraded || relationshipSnapshots.meta.degraded,
   }
 
+  let missionDiscoveryObjectives: GrowthObjective[] = []
   const missionDiscovery = organizationId
     ? await withGrowthHomeLoaderBudget({
         label: "mission_discovery",
         budgetMs: loaderBudgetMs,
-        fn: () =>
-          loadGrowthHomeMissionDiscoverySnapshot(input.admin, {
-            organizationId,
+        fn: async () => {
+          missionDiscoveryObjectives = await loadGrowthHomeMissionDiscoveryObjectives(input.admin, organizationId)
+          return buildGrowthHomeMissionDiscoverySnapshot({
+            objectives: missionDiscoveryObjectives,
             leadPool,
-          }),
+          })
+        },
         fallback: null,
       }).then((step) => {
         stageTimings.push(step.timing)
@@ -767,6 +774,19 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     stageTimingsMs: Object.fromEntries(stageTimings.map((row) => [row.label, row.durationMs])),
   }
 
+  const businessObjectiveLeadership =
+    organizationId && missionDiscoveryObjectives.length > 0
+      ? buildGrowthHomeAvaBusinessObjectiveLeadershipPayload({
+          objectives: missionDiscoveryObjectives,
+          missionDiscovery,
+          businessProfileApproved: Boolean(approvedBusinessProfile?.profile),
+          pendingApprovalCount: canonicalApprovalCount,
+          meetingsThisWeek: meetings.thisWeek,
+          openOpportunities: kpis.openOpportunities,
+          leadPoolVisible: leadPool.visible_count,
+        })
+      : null
+
   return {
     ok: true,
     qaMarker: GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER,
@@ -797,6 +817,12 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     portfolioLeads: leads,
     eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
     portfolioManager,
+    strategicAdvisorContext: buildGrowthHomeAvaStrategicAdvisorContextPayload({
+      approvedProfile: approvedBusinessProfile?.profile ?? null,
+      organizationalKnowledge: organizationalKnowledge?.store.items ?? [],
+      organizationPreferences: organizationalMemory?.store.preferences ?? [],
+    }),
+    businessObjectiveLeadership,
   }
 }
 

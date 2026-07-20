@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   assert.match(page, /packageId/)
 
   const hac = readSource("lib/growth/aios/approvals/growth-human-approval-center-engine.ts")
-  assert.match(hac, /buildGrowthReviewPackageHref/)
+  assert.match(hac, /resolveOperatorPackageReviewHref/)
 
   console.log(`[${PHASE}] passed`)
 }
