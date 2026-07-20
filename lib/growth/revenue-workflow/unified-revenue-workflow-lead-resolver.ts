@@ -8,7 +8,7 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
-import { createGrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-repository"
+import { buildDefaultProductionLeadMetadata } from "@/lib/growth/mission-purpose/growth-mission-purpose-canonical-1b"
 import { findImportDedupeMatch } from "@/lib/growth/import/dedupe"
 import {
   createGrowthLead,
@@ -132,7 +132,7 @@ export async function resolveUnifiedLeadFromIntake(
     createdBy: actor?.userId ?? null,
     status: admission.leadStatus,
     intakeBindingSource: mapIntakeSourceToBindingSource(intake.source),
-    metadata: {
+    metadata: buildDefaultProductionLeadMetadata({
       ...intake.metadata,
       unified_intake_source: intake.source,
       identity_uncertain: intake.identityUncertain,
@@ -140,7 +140,7 @@ export async function resolveUnifiedLeadFromIntake(
       linkedin_url: intake.linkedinUrl,
       contact_title: intake.title,
       ...buildLeadAdmissionMetadata(admission),
-    },
+    }),
   })
 
   if (intake.contactName) {

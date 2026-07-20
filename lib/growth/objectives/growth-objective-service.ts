@@ -83,7 +83,10 @@ export async function createGrowthObjectiveWithPlan(
     actorUserEmail?: string
   },
 ): Promise<{ objective: GrowthObjective; orchestration: Awaited<ReturnType<typeof evaluateObjectivePlanOrchestration>> }> {
-  const created = await insertGrowthObjective(admin, organizationId, input)
+  const created = await insertGrowthObjective(admin, organizationId, {
+    ...input,
+    missionPurpose: options?.certificationMode ? "certification" : input.missionPurpose,
+  })
   const plan = planGrowthObjective(created)
   const subscriptions = buildGrowthObjectiveEventSubscriptions({ ...created, plan })
   const orchestration = await evaluateObjectivePlanOrchestration(admin, {

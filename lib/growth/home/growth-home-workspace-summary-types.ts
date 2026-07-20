@@ -22,6 +22,7 @@ import type {
 import type { GrowthCanonicalActiveMissionsProjection } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-types"
 import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 import type { GrowthHomeAvaBusinessObjectiveLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types"
+import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -153,4 +154,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
   /** GE-AIOS-NEXT-1E — Primary business objective leadership projection (existing objective authority) */
   businessObjectiveLeadership?: GrowthHomeAvaBusinessObjectiveLeadershipPayload | null
+  /** GE-AIOS-LIVE-1A — Production mission authority for Home / Operations */
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
 }

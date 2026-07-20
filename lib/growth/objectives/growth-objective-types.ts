@@ -1,6 +1,7 @@
 /** GE-AUTO-2G — Objective-driven planning & runtime types (client-safe). */
 
 import type { GrowthAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-types"
+import type { GrowthMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
 
 export const GROWTH_OBJECTIVE_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
@@ -209,6 +210,8 @@ export type GrowthObjectiveExecutionContext = {
   version: 1
   stages: Partial<Record<GrowthObjectiveStageId, GrowthObjectiveStageExecutionContext>>
   recoveredAt: string | null
+  /** GE-AIOS-LIVE-1B — canonical operational scope for this objective. */
+  missionPurpose?: import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthMissionPurpose
   /** GE-AVA-MISSION-RUNTIME-1A — persistent mission loop state (presentation orchestration). */
   missionRuntime?: import("@/lib/growth/mission-center/growth-mission-runtime-types").GrowthObjectiveMissionRuntimeState | null
 }
@@ -381,6 +384,8 @@ export type GrowthObjectiveCreateInput = {
   priority?: GrowthObjectivePriority
   autonomyLevel?: GrowthObjectiveAutonomyLevel
   safetyMode?: GrowthObjectiveSafetyMode
+  /** GE-AIOS-LIVE-1B — explicit mission scope at creation (defaults to production). */
+  missionPurpose?: GrowthMissionPurpose
 }
 
 export type GrowthObjectiveOrchestrationRequest = {

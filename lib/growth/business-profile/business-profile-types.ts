@@ -79,6 +79,14 @@ export type BusinessProfileSalesMarketingSection = {
   qualificationCriteria: string[]
 }
 
+/** GE-AIOS-LIVE-1A — generic certification fixture classification policy (operator-configured). */
+export type BusinessProfileCertificationFixturePolicy = {
+  metadataMissionPurposeKey?: string
+  companyNamePatterns?: string[]
+  metadataKeyPrefixes?: string[]
+  metadataKeySuffixes?: string[]
+}
+
 /** GE-AIOS-AUTONOMOUS-PORTFOLIO-MANAGER-1A — operator portfolio targets (canonical owner: Business Profile). */
 export type BusinessProfilePortfolioManagementSection = {
   targetActiveCompanies: number
@@ -87,6 +95,8 @@ export type BusinessProfilePortfolioManagementSection = {
   maximumDailyDiscovery: number
   maximumConcurrentResearch: number
   maximumQueuedAdmissions: number
+  /** GE-AIOS-LIVE-1A — certification fixture inference for Operations/Home filtering. */
+  certificationFixturePolicy?: BusinessProfileCertificationFixturePolicy
 }
 
 export type BusinessProfileConfidenceSection = {

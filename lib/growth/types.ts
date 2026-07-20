@@ -13,6 +13,7 @@ import type { GrowthLeadAssignmentSource } from "@/lib/growth/assignment/assignm
 
 export type { GrowthLeadAssignmentSource } from "@/lib/growth/assignment/assignment-types"
 import type { GrowthContactTemperature } from "@/lib/growth/outbound/types"
+import type { GrowthMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
 import type { GrowthEngagementTier, GrowthEngagementTopSignal } from "@/lib/growth/engagement-types"
 import type {
   GrowthOpportunityAccelerator,
@@ -296,6 +297,8 @@ export type CreateGrowthLeadInput = {
   sourceVendor?: string | null
   assignedTo?: string | null
   createdBy?: string | null
+  /** GE-AIOS-LIVE-1B — explicit mission scope at creation (defaults to production). */
+  missionPurpose?: GrowthMissionPurpose
   /** GE-AIOS-15C — canonical relationship graph binding at intake */
   intakeBindingSource?: import("@/lib/growth/relationship/intake-relationship-graph-binding").IntakeRelationshipBindingSource
 }

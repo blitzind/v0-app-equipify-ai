@@ -14,6 +14,10 @@ import {
   type GrowthObjectiveStageId,
 } from "@/lib/growth/objectives/growth-objective-types"
 import { planGrowthObjective } from "@/lib/growth/objectives/growth-objective-planner"
+import {
+  buildDefaultProductionObjectiveExecutionContext,
+  buildObjectiveExecutionContextWithMissionPurpose,
+} from "@/lib/growth/mission-purpose/growth-mission-purpose-canonical-1b"
 import { normalizeObjectiveExecutionContext } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { probeRuntimeTable } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
 import {
@@ -138,6 +142,7 @@ function resolveObjectivePlanForPersistence(objective: GrowthObjective): GrowthO
 
 function buildDefaultObjective(organizationId: string, input: GrowthObjectiveCreateInput): GrowthObjective {
   const now = new Date().toISOString()
+  const missionPurpose = input.missionPurpose ?? "production"
   return {
     id: crypto.randomUUID(),
     organizationId,
@@ -159,7 +164,10 @@ function buildDefaultObjective(organizationId: string, input: GrowthObjectiveCre
     recentSignals: [],
     recommendations: [],
     eventSubscriptions: null,
-    executionContext: null,
+    executionContext: buildObjectiveExecutionContextWithMissionPurpose({
+      purpose: missionPurpose,
+      existing: buildDefaultProductionObjectiveExecutionContext(null),
+    }),
     emergencyStopActive: false,
     qa_marker: GROWTH_OBJECTIVE_QA_MARKER,
     createdAt: now,

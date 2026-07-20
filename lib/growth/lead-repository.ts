@@ -20,6 +20,10 @@ import {
   parseGrowthHomeLeadPoolCursor,
   type GrowthHomeLeadPoolSummary,
 } from "@/lib/growth/home/growth-home-lead-pool-pagination"
+import {
+  applyCanonicalLeadMissionPurposeMetadata,
+  buildDefaultProductionLeadMetadata,
+} from "@/lib/growth/mission-purpose/growth-mission-purpose-canonical-1b"
 import { bindIntakeRelationshipGraph } from "@/lib/growth/relationship/bind-intake-relationship-graph"
 import { buildIntakeBindingInputFromCreateLead } from "@/lib/growth/relationship/infer-intake-binding-source"
 import {
@@ -620,7 +624,9 @@ export async function createGrowthLead(
   }
 
   const bindingPlan = buildIntakeBindingInputFromCreateLead(input)
-  const metadata = input.metadata ?? {}
+  const metadata = input.missionPurpose
+    ? applyCanonicalLeadMissionPurposeMetadata(input.metadata ?? {}, input.missionPurpose)
+    : buildDefaultProductionLeadMetadata(input.metadata)
 
   const row = {
     source_kind: input.sourceKind ?? "manual",

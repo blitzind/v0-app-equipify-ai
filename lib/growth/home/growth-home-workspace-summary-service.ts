@@ -70,6 +70,21 @@ import { buildGrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/a
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { buildGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import { loadGrowthHomeMissionDiscoveryObjectives } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
+import { buildMissionPurposeResolutionContext } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a"
+import { loadDraftFactoryStatesForMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-draft-factory-loader-1a"
+import {
+  ensureCanonicalLeadMissionPurposes,
+  ensureCanonicalObjectiveMissionPurposes,
+} from "@/lib/growth/mission-purpose/growth-mission-purpose-migration-1b"
+import {
+  buildProductionMissionDiscoverySnapshot,
+  buildProductionMissionPurposeProjection,
+  filterProductionActiveMissionsProjection,
+  filterProductionCanonicalHeroDecision,
+  filterProductionCanonicalOperatorFocus,
+  filterProductionCanonicalOperatorTask,
+} from "@/lib/growth/mission-purpose/growth-mission-purpose-operator-filter-1a"
+import { buildProductionMissionAuthority } from "@/lib/growth/mission-purpose/growth-production-mission-authority-1a"
 import { buildGrowthHomeAvaBusinessObjectiveLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
@@ -361,8 +376,8 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     dailyRevenueWorkQueueDisplay: dailyWorkQueueBundle.display,
   }
 
-  const dashboard = buildGrowthWorkspaceDashboardViewModel(sources)
-  const kpis = buildKpis(sources)
+  let dashboard = buildGrowthWorkspaceDashboardViewModel(sources)
+  let kpis = buildKpis(sources)
 
   const leadsNeedingAction = countInboxSections(sources.leadInboxSections, ["high_priority", "needs_review"])
   const callReadyLeads = sources.cadenceSummary?.callTasksDueCount ?? 0
@@ -666,9 +681,123 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     })
   }
 
-  const canonicalOperatorApproval = organizationId
+  const canonicalOperatorApprovalRaw = organizationId
     ? (canonicalOperatorApprovalLoaded ?? emptyCanonicalOperatorApprovalSnapshot())
     : null
+
+  const revenueQueueLeadIdRaw =
+    dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
+    leads.find((row) => row.id)?.id ??
+    null
+
+  let canonicalOperatorApproval = canonicalOperatorApprovalRaw
+  let productionMissionDiscovery = missionDiscovery
+  let productionMissionAuthority: ReturnType<typeof buildProductionMissionAuthority> | null = null
+  let productionPortfolioEligibility = portfolioEligibility
+  let productionAvaResearchLoopSummary = avaResearchLoopSummary
+  let productionLeadsForOperations = leads
+  let productionEligibleLeadCount = portfolioEligibility?.eligibleCount ?? leads.length
+  let productionObjectives = missionDiscoveryObjectives
+  let productionPortfolioManager = portfolioManager
+  let productionRevenueQueueSections = revenueQueueSections
+  let productionPurposeByLeadId = new Map<string, import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthMissionPurposeResolution>()
+
+  if (organizationId && canonicalOperatorApprovalRaw) {
+    const pendingApprovalLeadIds = new Set(
+      (canonicalOperatorApprovalRaw.packages ?? [])
+        .map((row) => row.leadId?.trim())
+        .filter((leadId): leadId is string => Boolean(leadId)),
+    )
+    const draftFactoryLeadIds = [
+      ...pendingApprovalLeadIds,
+      revenueQueueLeadIdRaw,
+      dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id,
+    ].filter((leadId): leadId is string => Boolean(leadId))
+
+    const draftFactoryStateByLeadId = await loadDraftFactoryStatesForMissionPurpose(input.admin, {
+      organizationId,
+      leadIds: draftFactoryLeadIds,
+    })
+
+    const missionPurposeContext = buildMissionPurposeResolutionContext({
+      organizationId,
+      productionMissionActivatedAt: approvedBusinessProfile?.approvedAt ?? null,
+      certificationFixturePolicy:
+        approvedBusinessProfile?.profile?.portfolioManagement?.certificationFixturePolicy ?? null,
+      draftFactoryStateByLeadId,
+      pendingApprovalLeadIds,
+    })
+
+    const canonicalLeadMigration = await ensureCanonicalLeadMissionPurposes(input.admin, {
+      leads,
+      context: missionPurposeContext,
+      generatedAt,
+    })
+    const canonicalObjectiveMigration = await ensureCanonicalObjectiveMissionPurposes(input.admin, {
+      organizationId,
+      objectives: missionDiscoveryObjectives,
+      generatedAt,
+    })
+    const canonicalLeads = canonicalLeadMigration.leads
+    const canonicalObjectives = canonicalObjectiveMigration.objectives
+
+    const productionProjection = buildProductionMissionPurposeProjection({
+      organizationId,
+      leads: canonicalLeads,
+      objectives: canonicalObjectives,
+      context: missionPurposeContext,
+      approvalSnapshot: canonicalOperatorApprovalRaw,
+      researchLoopSummary: avaResearchLoopSummaryRaw,
+    })
+
+    canonicalOperatorApproval = productionProjection.productionApproval
+    productionPortfolioEligibility = productionProjection.portfolioEligibility
+    productionAvaResearchLoopSummary = productionProjection.sanitizedResearchLoop
+    productionRevenueQueueSections = productionProjection.revenueQueueSections
+    productionLeadsForOperations = productionProjection.productionLeads
+    productionEligibleLeadCount = productionProjection.portfolioEligibility.eligibleCount
+    productionObjectives = productionProjection.productionObjectives
+    productionPurposeByLeadId = productionProjection.purposeByLeadId
+    sources.leadInboxSections = productionProjection.revenueQueueSections
+    revenueQueue.sectionCounts = productionProjection.revenueQueueSections.map((section) => ({
+      id: section.id,
+      count: section.items.length,
+    }))
+    revenueQueue.total = productionProjection.productionLeads.length
+
+    productionMissionDiscovery = buildProductionMissionDiscoverySnapshot({
+      objectives: canonicalObjectives,
+      leadPool,
+    })
+
+    productionPortfolioManager =
+      organizationId
+        ? buildGrowthPortfolioManagerSnapshot({
+            organizationId,
+            generatedAt,
+            leads: productionProjection.productionLeads,
+            eligibleLeadCount: productionProjection.portfolioEligibility.eligibleCount,
+            approvedProfile: approvedBusinessProfile?.profile ?? null,
+            organizationalMemory: organizationalMemory?.store ?? null,
+            missionDiscovery: productionMissionDiscovery,
+            validatedLearnings: organizationalKnowledge?.store.items ?? [],
+            salesOutcomes: salesOutcomes.outcomes,
+            datamoonDiscovery: datamoonDiscoveryState,
+            discoveryAlreadyRunning: datamoonDiscoveryState?.jobActive === true,
+          })
+        : portfolioManager
+
+    productionMissionAuthority = buildProductionMissionAuthority({
+      portfolioManager: productionPortfolioManager,
+      missionDiscovery: productionMissionDiscovery,
+    })
+
+    dashboard = buildGrowthWorkspaceDashboardViewModel(sources)
+    operatorTasks.leadsNeedingAction = countInboxSections(sources.leadInboxSections, [
+      "high_priority",
+      "needs_review",
+    ])
+  }
 
   const canonicalApprovalCount = resolveCanonicalApprovalQueueCount(canonicalOperatorApproval, 0)
   const canonicalDraftCount = resolveCanonicalOutreachDraftCount(canonicalOperatorApproval, 0)
@@ -682,14 +811,12 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
       : null
 
-  const revenueQueueLeadId =
-    dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
-    leads.find((row) => row.id)?.id ??
-    null
-  const revenueQueueCompanyName =
-    dailyWorkQueueBundle.display?.top_items?.[0]?.company_name ??
-    leads.find((row) => row.id === revenueQueueLeadId)?.companyName ??
-    null
+  const productionRevenueQueueLead =
+    productionLeadsForOperations.find(
+      (row) => row.id === dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id,
+    ) ?? productionLeadsForOperations[0] ?? null
+  const revenueQueueLeadId = productionRevenueQueueLead?.id ?? null
+  const revenueQueueCompanyName = productionRevenueQueueLead?.companyName ?? null
 
   const preliminaryMissions =
     organizationId && canonicalOperatorApproval
@@ -699,17 +826,20 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         })
       : []
 
-  const preliminaryFocus = buildCanonicalOperatorFocus({
-    approvalSnapshot: canonicalOperatorApproval,
-    missions: preliminaryMissions,
-    revenueQueueLeadId,
-    revenueQueueCompanyName,
-    leads: leads.map((row) => ({ id: row.id, companyName: row.companyName })),
+  const preliminaryFocus = filterProductionCanonicalOperatorFocus({
+    focus: buildCanonicalOperatorFocus({
+      approvalSnapshot: canonicalOperatorApproval,
+      missions: preliminaryMissions,
+      revenueQueueLeadId,
+      revenueQueueCompanyName,
+      leads: productionLeadsForOperations.map((row) => ({ id: row.id, companyName: row.companyName })),
+    }),
+    purposeByLeadId: productionPurposeByLeadId,
   })
 
   const heroLeadId = preliminaryFocus?.leadId ?? revenueQueueLeadId
 
-  const canonicalHeroDecision =
+  const canonicalHeroDecisionRaw =
     organizationId && heroLeadId
       ? await withGrowthHomeLoaderBudget({
           label: "canonical_hero_decision",
@@ -730,17 +860,27 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         })
       : null
 
-  const canonicalOperatorFocus = buildCanonicalOperatorFocus({
-    approvalSnapshot: canonicalOperatorApproval,
-    missions: preliminaryMissions,
-    decisionResolution: canonicalHeroDecision,
-    revenueQueueLeadId,
-    revenueQueueCompanyName,
-    leads: leads.map((row) => ({ id: row.id, companyName: row.companyName })),
-  }) ?? preliminaryFocus
+  const canonicalHeroDecision = filterProductionCanonicalHeroDecision({
+    decision: canonicalHeroDecisionRaw,
+    purposeByLeadId: productionPurposeByLeadId,
+  })
 
-  const canonicalOperatorTask =
-    canonicalOperatorApproval?.topPackage
+  const canonicalOperatorFocus =
+    filterProductionCanonicalOperatorFocus({
+      focus:
+        buildCanonicalOperatorFocus({
+          approvalSnapshot: canonicalOperatorApproval,
+          missions: preliminaryMissions,
+          decisionResolution: canonicalHeroDecision,
+          revenueQueueLeadId,
+          revenueQueueCompanyName,
+          leads: productionLeadsForOperations.map((row) => ({ id: row.id, companyName: row.companyName })),
+        }) ?? preliminaryFocus,
+      purposeByLeadId: productionPurposeByLeadId,
+    })
+
+  const canonicalOperatorTask = filterProductionCanonicalOperatorTask({
+    task: canonicalOperatorApproval?.topPackage
       ? buildCanonicalOperatorTask({
           approvalSnapshot: canonicalOperatorApproval,
           decision: canonicalHeroDecision
@@ -753,18 +893,23 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
           focusCompanyName: canonicalOperatorFocus?.companyName ?? null,
           focusHref: canonicalOperatorFocus?.href ?? null,
         })
-      : null
+      : null,
+    purposeByLeadId: productionPurposeByLeadId,
+  })
 
   const heroLeadCompanyName =
-    leads.find((row) => row.id === heroLeadId)?.companyName ?? null
+    productionLeadsForOperations.find((row) => row.id === heroLeadId)?.companyName ?? null
 
-  const canonicalActiveMissions = projectCanonicalActiveMissionsForHome({
-    organizationId,
-    canonicalOperatorApproval,
-    canonicalHeroDecision,
-    canonicalOperatorTask,
-    heroLeadCompanyName,
-  })
+  const canonicalActiveMissions = filterProductionActiveMissionsProjection(
+    projectCanonicalActiveMissionsForHome({
+      organizationId,
+      canonicalOperatorApproval,
+      canonicalHeroDecision,
+      canonicalOperatorTask,
+      heroLeadCompanyName,
+    }),
+    productionPurposeByLeadId,
+  )
 
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
@@ -775,15 +920,15 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const businessObjectiveLeadership =
-    organizationId && missionDiscoveryObjectives.length > 0
+    organizationId && productionObjectives.length > 0
       ? buildGrowthHomeAvaBusinessObjectiveLeadershipPayload({
-          objectives: missionDiscoveryObjectives,
-          missionDiscovery,
+          objectives: productionObjectives,
+          missionDiscovery: productionMissionDiscovery,
           businessProfileApproved: Boolean(approvedBusinessProfile?.profile),
           pendingApprovalCount: canonicalApprovalCount,
           meetingsThisWeek: meetings.thisWeek,
           openOpportunities: kpis.openOpportunities,
-          leadPoolVisible: leadPool.visible_count,
+          leadPoolVisible: productionEligibleLeadCount,
         })
       : null
 
@@ -800,7 +945,13 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     operatorTasks,
     dailyRevenueWorkQueue: dailyWorkQueueBundle,
     kpis,
-    avaConsole,
+    avaConsole: {
+      ...avaConsole,
+      researchLoopSummary: productionAvaResearchLoopSummary,
+      suggestedNextAction:
+        productionMissionAuthority?.operatorSummaryLines[0] ??
+        avaConsole.suggestedNextAction,
+    },
     briefing: null,
     salesOutcomes,
     organizationalMemory,
@@ -808,21 +959,22 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     optimization,
     relationshipSnapshots,
     leadPool,
-    missionDiscovery,
+    missionDiscovery: productionMissionDiscovery,
     canonicalHeroDecision,
     canonicalOperatorApproval,
     canonicalOperatorTask,
     canonicalActiveMissions,
     canonicalOperatorFocus,
-    portfolioLeads: leads,
-    eligibleLeadCount: portfolioEligibility?.eligibleCount ?? leads.length,
-    portfolioManager,
+    portfolioLeads: productionLeadsForOperations,
+    eligibleLeadCount: productionEligibleLeadCount,
+    portfolioManager: productionPortfolioManager,
     strategicAdvisorContext: buildGrowthHomeAvaStrategicAdvisorContextPayload({
       approvedProfile: approvedBusinessProfile?.profile ?? null,
       organizationalKnowledge: organizationalKnowledge?.store.items ?? [],
       organizationPreferences: organizationalMemory?.store.preferences ?? [],
     }),
     businessObjectiveLeadership,
+    productionMissionAuthority,
   }
 }
 

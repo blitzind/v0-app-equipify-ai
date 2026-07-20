@@ -2,6 +2,8 @@
 
 import type { BusinessProfileDraftContent, BusinessProfileInput } from "@/lib/growth/business-profile/business-profile-types"
 import { enrichBusinessProfileWithEquipifyMasterKnowledge } from "@/lib/growth/business-profile/equipify-master-knowledge-merge"
+import { defaultPortfolioManagementSection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-target-1a"
+import { buildDefaultCertificationFixturePolicy } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a"
 
 export const GE_AIOS_LIVE_1B_QA_MARKER = "ge-aios-live-1b-equipify-equipment-service-icp-v1" as const
 
@@ -175,11 +177,16 @@ export function buildLive1bEquipifyCompanyProfileContent(): BusinessProfileDraft
         "Manufacturing qualifies only with dedicated maintenance team, field service division, installed-base service, or recurring service contracts",
       ],
     },
+    portfolioManagement: {
+      ...defaultPortfolioManagementSection(),
+      certificationFixturePolicy: buildDefaultCertificationFixturePolicy(),
+    },
     confidence: {
       score: 0.95,
       assumptions: [
         "Operator-approved LIVE-1B ICP focuses on equipment maintenance and service operations, not manufacturing as primary ICP.",
         "NAICS/SIC codes listed are starting search filters — admission still requires evidence per lead.",
+        "Certification fixtures are classified via mission_purpose metadata and generic fixture signals — not hardcoded lead IDs.",
       ],
       missingInformation: [],
     },
