@@ -35,6 +35,10 @@ import {
 } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-outcome-next-1d-types"
 import { GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types"
 import {
+  GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE,
+  GROWTH_HOME_SECTION_RECOMMENDATION_TITLE,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
+import {
   buildStrategicMarketKey,
   readGrowthHomeAvaStrategicOverrideRecords,
   recordGrowthHomeAvaStrategicOverride,
@@ -440,6 +444,13 @@ export function GrowthHomeAvaRecommendationExperienceSection({
       data-qa-marker-next-1e={GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER}
       className="space-y-4 rounded-xl border border-indigo-200/70 bg-indigo-50/30 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20 sm:p-5"
     >
+      <div className="border-b border-border/40 pb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {GROWTH_HOME_SECTION_RECOMMENDATION_TITLE}
+        </h2>
+        <p className="text-sm text-muted-foreground">{GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE}</p>
+      </div>
+
       <div className="space-y-2">
         <p className="text-sm leading-relaxed text-muted-foreground">{experience.sinceLastVisitLine}</p>
         <p className="text-sm font-medium text-foreground">{experience.recommendationIntro}</p>

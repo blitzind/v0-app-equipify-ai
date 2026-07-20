@@ -9,6 +9,7 @@ import {
   type GrowthHomeAvaBusinessObjectiveProjection,
   type GrowthHomeAvaObjectiveHealthStatus,
 } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types"
+import { GROWTH_HOME_SECTION_OBJECTIVE_SUBTITLE, GROWTH_HOME_SECTION_OBJECTIVE_TITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 
 type Props = {
   leadership: GrowthHomeAvaBusinessObjectiveLeadershipPayload
@@ -52,7 +53,7 @@ function ObjectiveCard({
         <p className="text-base font-semibold leading-snug text-foreground">{objective.title}</p>
       </div>
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Progress</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Success target</p>
         <ProgressBar percent={objective.progressPercent} />
         <p className="text-sm text-foreground">{objective.progressLabel}</p>
         {objective.milestoneLabel ? (
@@ -102,6 +103,12 @@ export function GrowthHomeAvaBusinessObjectiveSection({ leadership }: Props) {
       data-qa-marker={GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER}
       className="space-y-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-slate-800/60 dark:bg-slate-950/20 sm:p-5"
     >
+      <div className="border-b border-border/40 pb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {GROWTH_HOME_SECTION_OBJECTIVE_TITLE}
+        </h2>
+        <p className="text-sm text-muted-foreground">{GROWTH_HOME_SECTION_OBJECTIVE_SUBTITLE}</p>
+      </div>
       <div className="flex items-start gap-3">
         <Target className="mt-0.5 size-4 shrink-0 text-slate-700 dark:text-slate-200" aria-hidden />
         <div className="min-w-0 flex-1 space-y-4">

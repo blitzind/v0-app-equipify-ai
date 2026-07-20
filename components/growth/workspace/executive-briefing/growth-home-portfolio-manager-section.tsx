@@ -8,68 +8,79 @@ import {
   buildManualProspectSearchDiscoverHref,
   GROWTH_PORTFOLIO_MANAGER_MANUAL_FIND_OPTIONS,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a"
-import {
-  GROWTH_OPERATOR_REVIEW_CTA_LABEL,
-  GROWTH_OPERATOR_PORTFOLIO_EXPLANATION,
-} from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
+import { GROWTH_OPERATOR_PORTFOLIO_EXPLANATION } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
+import { GrowthHomeProgressBar } from "@/components/growth/workspace/executive-briefing/growth-home-progress-bar"
+import {
+  GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
+  GROWTH_HOME_SECTION_PORTFOLIO_SUBTITLE,
+  GROWTH_HOME_SECTION_PORTFOLIO_TITLE,
+  humanizeOperatorFacingCopy,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 
 type Props = {
   portfolio: GrowthPortfolioManagerOperatorProjection | null | undefined
 }
 
-function StatusRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground tabular-nums">{value}</span>
-    </div>
-  )
+function portfolioFillPercent(portfolio: GrowthPortfolioManagerOperatorProjection): number {
+  if (portfolio.targetActiveCompanies <= 0) return 0
+  return Math.round((portfolio.currentActiveCompanies / portfolio.targetActiveCompanies) * 100)
 }
 
 export function GrowthHomePortfolioManagerSection({ portfolio }: Props) {
   if (!portfolio) return null
 
   const healthy = portfolio.healthState === "healthy"
+  const fillPercent = portfolioFillPercent(portfolio)
 
   return (
     <section
       data-qa-section="home-portfolio-manager"
+      data-qa-marker-live-3b={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card/70 p-5 shadow-sm"
     >
-      <div className="mb-4 flex items-start justify-between gap-3 border-b border-border/50 pb-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Target className="size-4 text-indigo-600 dark:text-indigo-300" aria-hidden />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Portfolio
-            </h2>
-          </div>
-          <p className="text-sm text-muted-foreground">{portfolio.healthLabel}</p>
-          <p className="text-xs text-muted-foreground">{GROWTH_OPERATOR_PORTFOLIO_EXPLANATION}</p>
+      <div className="mb-4 border-b border-border/50 pb-3">
+        <div className="flex items-center gap-2">
+          <Target className="size-4 text-indigo-600 dark:text-indigo-300" aria-hidden />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {GROWTH_HOME_SECTION_PORTFOLIO_TITLE}
+          </h2>
         </div>
+        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_SECTION_PORTFOLIO_SUBTITLE}</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <StatusRow label="Target" value={portfolio.targetActiveCompanies} />
-        <StatusRow label="Current" value={portfolio.currentActiveCompanies} />
-        <StatusRow label="Healthy minimum" value={portfolio.minimumHealthyCompanies} />
-        <StatusRow label="Needs" value={portfolio.needsCount} />
-        <StatusRow
-          label="Discovery"
-          value={portfolio.discoveryStatusDisplay}
-        />
-        {portfolio.nextBatchSize != null && !portfolio.discoveryRunning ? (
-          <StatusRow label="Next batch" value={portfolio.nextBatchSize} />
-        ) : null}
-        <StatusRow
-          label="Research"
-          value={portfolio.researchRunning ? `Running (${portfolio.researchRunningCount})` : "Idle"}
-        />
-        <StatusRow label="Admissions pending" value={portfolio.admissionsPending} />
-        {portfolio.projectedCompletionLabel && portfolio.showEstimatedHealthy ? (
-          <StatusRow label="Estimated healthy" value={portfolio.projectedCompletionLabel} />
-        ) : null}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-base font-semibold text-foreground">{humanizeOperatorFacingCopy(portfolio.healthLabel)}</p>
+            <p className="text-sm font-medium tabular-nums text-foreground">
+              {portfolio.currentActiveCompanies} / {portfolio.targetActiveCompanies}
+            </p>
+          </div>
+          <GrowthHomeProgressBar percent={fillPercent} />
+          <p className="text-xs text-muted-foreground">{GROWTH_OPERATOR_PORTFOLIO_EXPLANATION}</p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-border/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Needs</p>
+            <p className="text-sm font-medium tabular-nums text-foreground">{portfolio.needsCount}</p>
+          </div>
+          <div className="rounded-lg border border-border/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Research</p>
+            <p className="text-sm font-medium text-foreground">
+              {portfolio.researchRunning ? `Running (${portfolio.researchRunningCount})` : "Idle"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Discovery</p>
+            <p className="text-sm font-medium text-foreground">{portfolio.discoveryStatusDisplay}</p>
+          </div>
+          <div className="rounded-lg border border-border/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Admissions pending</p>
+            <p className="text-sm font-medium tabular-nums text-foreground">{portfolio.admissionsPending}</p>
+          </div>
+        </div>
       </div>
 
       {!healthy ? (

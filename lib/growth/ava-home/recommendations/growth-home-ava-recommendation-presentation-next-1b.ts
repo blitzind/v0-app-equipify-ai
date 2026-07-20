@@ -92,25 +92,25 @@ function buildEmployeeCopy(item: GrowthHomeAvaRecommendationItem): {
   if (item.kind === "approval_package") {
     return {
       employeeHeadline: company
-        ? `I recommend reviewing the opportunity package for ${company}.`
-        : "I recommend reviewing the next opportunity package.",
+        ? `I found a strong fit at ${company}.`
+        : "I found a company that looks like a strong match.",
       employeeLeadParagraph:
         item.supportingLine ??
-        "I've finished preparing this package and it's ready for your judgment.",
+        "I'd recommend reviewing the outreach package before I continue preparing the remaining opportunities.",
       employeeSupportingParagraph:
-        item.outcomeLine ?? "Your authorization is the last step before outreach can begin.",
+        item.outcomeLine ?? "Once you've reviewed it, I'll keep building the rest of today's pipeline.",
     }
   }
 
   if ((item.kind === "lead_decision" || item.kind === "operator_focus") && company) {
     return {
-      employeeHeadline: `I recommend finishing the research for ${company}.`,
+      employeeHeadline: `I found a strong fit at ${company}.`,
       employeeLeadParagraph:
         item.supportingLine ??
-        "I've already verified the company and collected most of the buying signals.",
+        "I'd recommend reviewing the outreach package before I continue preparing the remaining opportunities.",
       employeeSupportingParagraph:
         item.outcomeLine ??
-        "Completing the remaining research will allow me to prepare an outreach package for your approval.",
+        "If you'd like, I can finish the remaining research and prepare the package for your review.",
     }
   }
 
@@ -124,9 +124,16 @@ function buildEmployeeCopy(item: GrowthHomeAvaRecommendationItem): {
   }
 
   return {
-    employeeHeadline: `I recommend ${item.headline.charAt(0).toLowerCase()}${item.headline.slice(1)}.`,
-    employeeLeadParagraph: item.supportingLine ?? item.detail ?? "This is the next highest-value move in your queue.",
-    employeeSupportingParagraph: item.outcomeLine,
+    employeeHeadline: item.headline.match(/^prepare another/i)
+      ? "I found a company that looks like a strong match."
+      : `I recommend ${item.headline.charAt(0).toLowerCase()}${item.headline.slice(1)}.`,
+    employeeLeadParagraph:
+      item.supportingLine ??
+      item.detail ??
+      "I'd recommend taking this step before I continue with the rest of today's plan.",
+    employeeSupportingParagraph:
+      item.outcomeLine ??
+      "I'll keep the rest of the pipeline moving once you've had a chance to review.",
   }
 }
 
