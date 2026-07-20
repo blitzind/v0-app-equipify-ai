@@ -30,10 +30,10 @@ import { resolveObjectiveActorContext } from "@/lib/growth/objectives/growth-obj
 import { getGrowthObjective, updateGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
 import type { GrowthObjective, GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import {
-  importDatamoonAudiencePreviewRecords,
-  pollDatamoonAudienceImportRun,
-  startDatamoonAudienceImportRun,
-} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
+  enrollMissionBoundDatamoonRunInCanonicalDiscovery,
+  handoffMissionDatamoonDiscoveryCreationToCanonicalRuntime,
+  syncMissionRuntimeFromCanonicalDiscovery,
+} from "@/lib/growth/mission-center/growth-mission-datamoon-canonical-discovery-handoff-live-4b"
 import type { GrowthAudienceSnapshotProgress } from "@/lib/growth/audiences/growth-audience-types"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/growth-mission-runtime-orchestration-readiness"
@@ -259,7 +259,37 @@ async function orchestrateDatamoonMonitoring(
 ): Promise<GrowthObjectiveMissionRuntimeState> {
   const binding = runtime.datamoon
   if (!binding?.importRequestJson) return runtime
-  if (!isAudienceRefreshDue(runtime, "daily")) {
+
+  const generatedAt = new Date().toISOString()
+  let batchSize = 25
+  try {
+    const parsed = JSON.parse(binding.importRequestJson) as { limit?: number }
+    if (typeof parsed.limit === "number" && parsed.limit > 0) {
+      batchSize = parsed.limit
+    }
+  } catch {
+    batchSize = 25
+  }
+
+  await enrollMissionBoundDatamoonRunInCanonicalDiscovery(admin, {
+    organizationId: objective.organizationId,
+    lastRunId: binding.lastRunId,
+    batchSize,
+    generatedAt,
+  })
+
+  const synced = await syncMissionRuntimeFromCanonicalDiscovery(admin, {
+    organizationId: objective.organizationId,
+    runtime,
+  })
+  if (synced) {
+    runtime = synced
+  }
+
+  const activeCanonicalRun = synced?.datamoon?.lastRunId ?? binding.lastRunId
+  const hasCanonicalOwnership = Boolean(activeCanonicalRun?.trim())
+
+  if (hasCanonicalOwnership && !isAudienceRefreshDue(runtime, "daily")) {
     return appendEvent(runtime, "Monitoring Datamoon audience.", "monitoring")
   }
 
@@ -267,79 +297,17 @@ async function orchestrateDatamoonMonitoring(
     return appendEvent(runtime, "Datamoon audience refresh scheduled.", "finding_leads")
   }
 
-  let request: DatamoonAudienceImportRequest
-  try {
-    request = JSON.parse(binding.importRequestJson) as DatamoonAudienceImportRequest
-  } catch {
-    return runtime
-  }
+  const handedOff = await handoffMissionDatamoonDiscoveryCreationToCanonicalRuntime(admin, {
+    organizationId: objective.organizationId,
+    runtime,
+    batchSize,
+    generatedAt,
+    actorUserId: actor.userId,
+  })
 
-  const isFirstDiscoveryRun =
-    (runtime.counters.recordsImported ?? 0) === 0 && !binding.lastRunId?.trim()
+  if (handedOff) return handedOff
 
-  const refreshRequest: DatamoonAudienceImportRequest = isFirstDiscoveryRun
-    ? request
-    : requestHasOnlyNewSinceLastRefresh(request)
-      ? request
-      : {
-          ...request,
-          workbench_context: {
-            ...request.workbench_context,
-            onlyNewSinceLastRefresh: true,
-          },
-        }
-
-  const started = await startDatamoonAudienceImportRun(admin, refreshRequest, actor)
-  if (!started.ok) return runtime
-
-  const polled = await pollDatamoonAudienceImportRun(admin, started.run.id)
-  if (!polled.ok) return runtime
-
-  const previewCount = polled.run.previewCount ?? 0
-  let next = appendEvent(
-    {
-      ...runtime,
-      datamoon: {
-        ...binding,
-        lastRunId: started.run.id,
-        lastPollAt: new Date().toISOString(),
-        lastImportedCount: 0,
-      },
-      counters: {
-        ...runtime.counters,
-        newCompaniesFound: previewCount,
-      },
-    },
-    previewCount > 0 ? `Found ${previewCount} new preview leads.` : "Monitoring Datamoon audience.",
-    previewCount > 0 ? "finding_leads" : "monitoring",
-  )
-
-  if (previewCount > 0 && runtime.approved && actor.userId) {
-    const imported = await importDatamoonAudiencePreviewRecords(admin, started.run.id, {
-      importAllPreviewed: true,
-      actor: { userId: actor.userId, email: actor.email ?? null },
-    })
-    if (imported.ok) {
-      next = appendEvent(
-        {
-          ...next,
-          datamoon: {
-            ...next.datamoon!,
-            lastImportedCount: imported.imported,
-          },
-          counters: {
-            ...next.counters,
-            recordsImported: imported.imported,
-            researchingCount: imported.imported,
-          },
-        },
-        `Imported ${imported.imported} new records.`,
-        "researching",
-      )
-    }
-  }
-
-  return next
+  return appendEvent(runtime, "Monitoring Datamoon audience.", "monitoring")
 }
 
 async function countMissionPendingApprovals(
