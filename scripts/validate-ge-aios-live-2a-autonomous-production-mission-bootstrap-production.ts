@@ -20,9 +20,13 @@ import { buildProductionMissionAuthority } from "@/lib/growth/mission-purpose/gr
 import { readCanonicalObjectiveMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-canonical-1b"
 import { listGrowthObjectives } from "@/lib/growth/objectives/growth-objective-repository"
 import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
-import { loadPortfolioDatamoonDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { GROWTH_CERT_DEFAULT_AI_ORG_ID } from "@/lib/growth/qa/verified-channels-cert-env-bootstrap"
+import {
+  GROWTH_PRODUCTION_AUTHORITATIVE_DATAMOON_VALIDATION_2D_QA_MARKER,
+  isLocalEncryptedProductionSecretsUnreadable,
+  resolveProductionAuthoritativeDatamoonValidation,
+} from "@/lib/growth/qa/growth-production-authoritative-datamoon-validation-2d"
 import {
   EQUIPIFY_PRODUCTION_ORG_ID,
   LIVE_1B_EQUIPIFY_MISSION_TITLE,
@@ -32,13 +36,14 @@ const PHASE = "GE-AIOS-LIVE-2A" as const
 
 type ValidationGate = {
   id: string
-  status: "pass" | "warn" | "fail" | "blocked"
+  status: "pass" | "warn" | "fail" | "blocked" | "inconclusive"
   detail: string
 }
 
 async function main(): Promise<void> {
   console.log(`[${PHASE}] Autonomous production mission bootstrap validation (read-only)`)
   console.log(`QA marker: ${GROWTH_AUTONOMOUS_PRODUCTION_MISSION_BOOTSTRAP_2A_QA_MARKER}`)
+  console.log(`Authority marker: ${GROWTH_PRODUCTION_AUTHORITATIVE_DATAMOON_VALIDATION_2D_QA_MARKER}`)
 
   const bootstrap = bootstrapGrowthOperatorNotificationsCertEnv({ requireVercelProductionEnvRun: true })
   if (!bootstrap) {
@@ -54,6 +59,17 @@ async function main(): Promise<void> {
   const organizationId = getGrowthEngineAiOrgId() ?? EQUIPIFY_PRODUCTION_ORG_ID
   const generatedAt = new Date().toISOString()
   const gates: ValidationGate[] = []
+
+  const authoritative = await resolveProductionAuthoritativeDatamoonValidation({
+    supabaseUrl: bootstrap.url,
+    serviceRoleKey: bootstrap.jwt,
+    env: process.env,
+    admin,
+    organizationId,
+  })
+  const { configuration } = authoritative
+  const deployedDatamoonStatusLabel = configuration.statusLabel
+  const deployedDatamoonJobEligible = configuration.datamoonEligibleForAutonomousDiscovery === true
 
   const [approvedProfile, objectives, killSwitches, portfolioSnapshot, missionDiscovery] =
     await Promise.all([
@@ -123,6 +139,28 @@ async function main(): Promise<void> {
 
   const portfolioManager = portfolioSnapshot?.portfolioManager ?? null
   const portfolioDeficit = portfolioManager?.health.needsCount ?? 0
+
+  gates.push({
+    id: "production_runtime_authoritative",
+    status: configuration.authority === "deployed_runtime" ? "pass" : "inconclusive",
+    detail:
+      configuration.authority === "deployed_runtime"
+        ? "Deployed Production runtime is authoritative for DataMoon configuration."
+        : configuration.note,
+  })
+
+  gates.push({
+    id: "local_env_not_used_for_datamoon_verdict",
+    status:
+      !isLocalEncryptedProductionSecretsUnreadable(process.env) ||
+      configuration.authority === "deployed_runtime" ||
+      configuration.configurationUnknown
+        ? "pass"
+        : "fail",
+    detail:
+      "Local vercel env run must not produce false Production DataMoon misconfiguration conclusions.",
+  })
+
   gates.push({
     id: "portfolio_deficit",
     status: "pass",
@@ -142,34 +180,35 @@ async function main(): Promise<void> {
         ? "pass"
         : killSwitches.autonomy_enabled === false
           ? "blocked"
-          : "fail",
+          : configuration.configurationUnknown
+            ? "inconclusive"
+            : "fail",
     detail: portfolioBelowTarget
       ? bootstrapReady || authority.discoveryActive
         ? "Below target with active/ready production mission or discovery."
-        : "Portfolio below target but no ready production mission or discovery activity."
+        : configuration.configurationUnknown
+          ? "Portfolio below target; bootstrap state unknown pending deployed DataMoon probe."
+          : "Portfolio below target but no ready production mission or discovery activity."
       : "Portfolio is at/above target — idle is acceptable.",
   })
-
-  const datamoonDiscovery = portfolioManager
-    ? await loadPortfolioDatamoonDiscoveryOperatorState(admin, {
-        organizationId,
-        memory: portfolioManager.memory,
-        nextBatchSize: portfolioManager.replenishment.batchSize,
-        maximumDailyDiscovery: portfolioManager.target.maximumDailyDiscovery,
-      })
-    : null
 
   gates.push({
     id: "datamoon_discovery_state",
     status:
-      datamoonDiscovery?.provider === "datamoon" || datamoonDiscovery?.jobActive || bootstrapReady
-        ? "pass"
-        : portfolioBelowTarget
-          ? "warn"
-          : "pass",
-    detail: datamoonDiscovery
-      ? `DataMoon status=${datamoonDiscovery.statusLabel}; jobActive=${datamoonDiscovery.jobActive}; provider=${datamoonDiscovery.provider}.`
-      : "DataMoon operator state unavailable.",
+      configuration.configurationUnknown
+        ? "inconclusive"
+        : deployedDatamoonStatusLabel !== "needs_configuration" ||
+            deployedDatamoonJobEligible ||
+            bootstrapReady
+          ? "pass"
+          : portfolioBelowTarget
+            ? configuration.productionMisconfigured
+              ? "blocked"
+              : "fail"
+            : "pass",
+    detail: configuration.configurationUnknown
+      ? configuration.note
+      : `deployed.statusLabel=${deployedDatamoonStatusLabel ?? "unknown"}; display=${configuration.statusDisplay ?? "unknown"}; eligible=${deployedDatamoonJobEligible}.`,
   })
 
   gates.push({
@@ -204,12 +243,21 @@ async function main(): Promise<void> {
   console.log("\n--- Validation Gates ---")
   for (const gate of gates) {
     const prefix =
-      gate.status === "pass" ? "✓" : gate.status === "warn" ? "!" : gate.status === "blocked" ? "○" : "✗"
+      gate.status === "pass"
+        ? "✓"
+        : gate.status === "warn"
+          ? "!"
+          : gate.status === "blocked"
+            ? "○"
+            : gate.status === "inconclusive"
+              ? "?"
+              : "✗"
     console.log(`  ${prefix} [${gate.id}] ${gate.detail}`)
   }
 
   const failures = gates.filter((gate) => gate.status === "fail")
   const blockers = gates.filter((gate) => gate.status === "blocked")
+  const inconclusive = gates.filter((gate) => gate.status === "inconclusive")
 
   console.log("\n--- Summary ---")
   console.log(
@@ -224,7 +272,8 @@ async function main(): Promise<void> {
         portfolioDeficit,
         discoveryActive: authority.discoveryActive,
         killSwitches,
-        datamoon: datamoonDiscovery,
+        deployedDatamoon: configuration,
+        missionDiscovery,
       },
       null,
       2,
@@ -232,6 +281,10 @@ async function main(): Promise<void> {
   )
 
   console.log("\n--- Verdict ---")
+  if (configuration.configurationUnknown && inconclusive.length > 0 && failures.length === 0) {
+    console.log(`[${PHASE}] INCONCLUSIVE — deployed DataMoon health unavailable; local env not authoritative`)
+    process.exit(3)
+  }
   if (blockers.length > 0) {
     console.log(`[${PHASE}] BLOCKED — external policy prevents bootstrap (${blockers.map((g) => g.id).join(", ")})`)
     process.exit(2)

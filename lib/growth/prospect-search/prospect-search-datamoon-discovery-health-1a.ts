@@ -11,6 +11,10 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
 import type { DatamoonAutonomousDiscoveryHealthSnapshot } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
+import {
+  buildDatamoonProductionConfigurationAudit,
+  extendDatamoonHealthSnapshotWithConfigurationAudit,
+} from "@/lib/growth/prospect-search/prospect-search-datamoon-production-configuration-audit-2b"
 
 export async function buildDatamoonAutonomousDiscoveryHealthSnapshot(
   admin: SupabaseClient,
@@ -30,6 +34,11 @@ export async function buildDatamoonAutonomousDiscoveryHealthSnapshot(
     env,
   })
 
+  const configurationAudit = buildDatamoonProductionConfigurationAudit({
+    env,
+    approvedBusinessProfilePresent: approvedBusinessProfilePresent,
+  })
+
   const datamoonEligibleForAutonomousDiscovery =
     policy.datamoonEnabled &&
     policy.datamoonConfigured &&
@@ -37,7 +46,7 @@ export async function buildDatamoonAutonomousDiscoveryHealthSnapshot(
     approvedBusinessProfilePresent &&
     policy.stopReason !== "datamoon_dry_run_only"
 
-  return {
+  const base: DatamoonAutonomousDiscoveryHealthSnapshot = {
     ok:
       datamoonEligibleForAutonomousDiscovery &&
       policy.fixtureFallbackBlockedInProduction &&
@@ -55,4 +64,9 @@ export async function buildDatamoonAutonomousDiscoveryHealthSnapshot(
       policy.fixtureFallbackBlockedInProduction && isProductionRuntime(env),
     otherAutonomousProvidersDisabled: policy.otherAutonomousProvidersDisabled,
   }
+
+  return extendDatamoonHealthSnapshotWithConfigurationAudit({
+    base,
+    audit: configurationAudit,
+  })
 }

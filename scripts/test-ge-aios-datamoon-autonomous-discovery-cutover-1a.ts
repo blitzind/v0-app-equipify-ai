@@ -311,6 +311,7 @@ const DATAMOON_CUTOVER_MODULES = [
   "prospect-search-datamoon-discovery-1a",
   "prospect-search-datamoon-discovery-health-1a",
   "prospect-search-datamoon-discovery-state-loader-1a",
+  "prospect-search-datamoon-production-configuration-audit-2b",
 ] as const
 
 const cutoverImporters = [
@@ -318,6 +319,7 @@ const cutoverImporters = [
   "lib/growth/prospect-search/prospect-search-datamoon-discovery-1a.ts",
   "lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a.ts",
   "lib/growth/prospect-search/prospect-search-datamoon-discovery-health-1a.ts",
+  "lib/growth/mission-purpose/growth-autonomous-production-mission-bootstrap-2a-service.ts",
   "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a.ts",
   "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-operator-1a.ts",
   "lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a.ts",

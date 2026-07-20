@@ -17,9 +17,12 @@ import { LIVE_1B_EQUIPIFY_MISSION_TITLE } from "@/lib/growth/live-operations/ge-
 import {
   evaluateProductionMissionBootstrapRequirement,
   findActiveProductionBootstrapMission,
+  isProductionAcquisitionObjective,
   isProductionBootstrapMissionReady,
   selectCanonicalProductionBootstrapObjective,
 } from "@/lib/growth/mission-purpose/growth-autonomous-production-mission-bootstrap-2a"
+import { ensureCanonicalObjectiveMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-migration-1b"
+import { readCanonicalObjectiveMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-canonical-1b"
 import {
   GROWTH_AUTONOMOUS_PRODUCTION_MISSION_BOOTSTRAP_2A_QA_MARKER,
   type ProductionMissionBootstrapResult,
@@ -36,8 +39,10 @@ import {
   startGrowthObjectiveRuntime,
 } from "@/lib/growth/objectives/growth-objective-runtime-service"
 import { GROWTH_AVA_LAUNCH_MISSION_DEFAULT_OBJECTIVE_TYPE } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-1a"
+import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/specialists/execution/growth-autonomous-portfolio-work-snapshot"
 import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "@/lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a"
+import { buildDatamoonProductionConfigurationAudit } from "@/lib/growth/prospect-search/prospect-search-datamoon-production-configuration-audit-2b"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { GROWTH_OBJECTIVE_SCHEDULER_ORG_FETCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import { mapWithBoundedConcurrency } from "@/lib/growth/runtime-guardrails/growth-bounded-concurrency"
@@ -128,12 +133,52 @@ async function bindProductionMissionDiscoverySearch(
   return { ok: true }
 }
 
+async function ensureProductionBootstrapObjectiveMissionPurpose(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    objective: GrowthObjective
+    generatedAt: string
+  },
+): Promise<GrowthObjective> {
+  if (!isProductionAcquisitionObjective(input.objective)) {
+    return input.objective
+  }
+
+  if (readCanonicalObjectiveMissionPurpose(input.objective.executionContext) === "production") {
+    return input.objective
+  }
+
+  const ensured = await ensureCanonicalObjectiveMissionPurpose(admin, {
+    organizationId: input.organizationId,
+    objective: input.objective,
+    generatedAt: input.generatedAt,
+  })
+
+  return ensured.objective
+}
+
 function buildBootstrapResult(
-  partial: Omit<ProductionMissionBootstrapResult, "qaMarker">,
+  partial: Omit<
+    ProductionMissionBootstrapResult,
+    "qaMarker" | "datamoonStopReason" | "datamoonStatusLabel" | "datamoonStatusDisplay" | "datamoonDiscoveryEligible"
+  > & {
+    datamoonAudit?: ReturnType<typeof buildDatamoonProductionConfigurationAudit>
+  },
 ): ProductionMissionBootstrapResult {
   return {
     qaMarker: GROWTH_AUTONOMOUS_PRODUCTION_MISSION_BOOTSTRAP_2A_QA_MARKER,
-    ...partial,
+    datamoonStopReason: partial.datamoonAudit?.stopReason ?? null,
+    datamoonStatusLabel: partial.datamoonAudit?.statusLabel ?? null,
+    datamoonStatusDisplay: partial.datamoonAudit?.statusDisplay ?? null,
+    datamoonDiscoveryEligible: partial.datamoonAudit?.eligibleForAutonomousDiscovery ?? null,
+    organizationId: partial.organizationId,
+    action: partial.action,
+    objectiveId: partial.objectiveId,
+    missionPurpose: partial.missionPurpose,
+    portfolioDeficit: partial.portfolioDeficit,
+    reason: partial.reason,
+    discoveryProvider: partial.discoveryProvider,
   }
 }
 
@@ -163,6 +208,14 @@ export async function ensureAutonomousProductionMissionBootstrap(
 
   const portfolioManager = portfolioSnapshot?.portfolioManager ?? null
   const portfolioHealth = portfolioManager?.health ?? null
+  const datamoonAudit = buildDatamoonProductionConfigurationAudit({
+    discoveriesToday:
+      portfolioManager?.memory.discoveriesTodayDate?.slice(0, 10) === generatedAt.slice(0, 10)
+        ? portfolioManager.memory.discoveriesToday
+        : 0,
+    maximumDailyDiscovery: portfolioManager?.target.maximumDailyDiscovery,
+    approvedBusinessProfilePresent: Boolean(approvedProfile),
+  })
   const activeProductionMission = findActiveProductionBootstrapMission(objectives)
   const bootstrapMissionReady = Boolean(
     activeProductionMission && isProductionBootstrapMissionReady(activeProductionMission),
@@ -186,6 +239,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
       portfolioDeficit: requirement.portfolioDeficit,
       reason: requirement.reason,
       discoveryProvider: null,
+      datamoonAudit,
     })
   }
 
@@ -198,6 +252,20 @@ export async function ensureAutonomousProductionMissionBootstrap(
       portfolioDeficit: requirement.portfolioDeficit,
       reason: "approved_profile_missing",
       discoveryProvider: null,
+      datamoonAudit,
+    })
+  }
+
+  if (!datamoonAudit.configurationCompleteForProduction) {
+    return buildBootstrapResult({
+      organizationId,
+      action: "blocked",
+      objectiveId: activeProductionMission?.id ?? null,
+      missionPurpose: "production",
+      portfolioDeficit: requirement.portfolioDeficit,
+      reason: datamoonAudit.stopReason ?? "datamoon_not_configured",
+      discoveryProvider: null,
+      datamoonAudit,
     })
   }
 
@@ -212,6 +280,14 @@ export async function ensureAutonomousProductionMissionBootstrap(
     activeProductionMission ??
     selectCanonicalProductionBootstrapObjective(objectives, missionTitle)
 
+  if (objective) {
+    objective = await ensureProductionBootstrapObjectiveMissionPurpose(admin, {
+      organizationId,
+      objective,
+      generatedAt,
+    })
+  }
+
   let action: ProductionMissionBootstrapResult["action"] = "already_active"
 
   if (objective && isProductionBootstrapMissionReady(objective)) {
@@ -223,6 +299,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
       portfolioDeficit: requirement.portfolioDeficit,
       reason: "production_mission_ready",
       discoveryProvider: "datamoon",
+      datamoonAudit,
     })
   }
 
@@ -238,6 +315,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
         portfolioDeficit: requirement.portfolioDeficit,
         reason: "missing_objective_owner_user",
         discoveryProvider: null,
+        datamoonAudit,
       })
     }
 
@@ -272,6 +350,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
         portfolioDeficit: requirement.portfolioDeficit,
         reason: "missing_objective_owner_user",
         discoveryProvider: null,
+        datamoonAudit,
       })
     }
 
@@ -295,6 +374,12 @@ export async function ensureAutonomousProductionMissionBootstrap(
     action = "created"
   }
 
+  objective = await ensureProductionBootstrapObjectiveMissionPurpose(admin, {
+    organizationId,
+    objective,
+    generatedAt,
+  })
+
   if (!isMissionRuntimeOrchestrationReady(objective)) {
     const bound = await bindProductionMissionDiscoverySearch(admin, {
       organizationId,
@@ -313,6 +398,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
         portfolioDeficit: requirement.portfolioDeficit,
         reason: bound.reason,
         discoveryProvider: null,
+        datamoonAudit,
       })
     }
 
@@ -338,6 +424,7 @@ export async function ensureAutonomousProductionMissionBootstrap(
     portfolioDeficit: requirement.portfolioDeficit,
     reason: null,
     discoveryProvider: "datamoon",
+    datamoonAudit,
   })
 }
 

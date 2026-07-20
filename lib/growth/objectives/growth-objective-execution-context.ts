@@ -8,6 +8,7 @@ import {
   type GrowthObjectiveRuntimeState,
   type GrowthObjectiveStageId,
 } from "@/lib/growth/objectives/growth-objective-types"
+import { normalizeGrowthMissionPurpose } from "@/lib/growth/mission-purpose/growth-mission-purpose-inference-1a"
 
 export const OBJECTIVE_MATERIALIZATION_STAGE_IDS = [
   "discover",
@@ -45,11 +46,14 @@ export function normalizeObjectiveExecutionContext(
       blockers: Array.isArray(stage.blockers) ? stage.blockers : [],
     }
   }
+  const missionPurpose = normalizeGrowthMissionPurpose(raw.missionPurpose)
+
   return {
     qa_marker: GROWTH_OBJECTIVE_EXECUTION_CONTEXT_QA_MARKER,
     version: 1,
     stages,
     recoveredAt: raw.recoveredAt ?? null,
+    ...(missionPurpose ? { missionPurpose } : {}),
     missionRuntime: raw.missionRuntime ?? null,
   }
 }

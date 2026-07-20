@@ -25,6 +25,10 @@ export type ProductionMissionBootstrapResult = {
   portfolioDeficit: number
   reason: string | null
   discoveryProvider: "datamoon" | null
+  datamoonStopReason?: import("@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a").DatamoonAutonomousDiscoveryStopReason | null
+  datamoonStatusLabel?: import("@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a").DatamoonAutonomousDiscoveryStatusLabel | null
+  datamoonStatusDisplay?: string | null
+  datamoonDiscoveryEligible?: boolean
 }
 
 export type ProductionMissionBootstrapSchedulerTickResult = {
