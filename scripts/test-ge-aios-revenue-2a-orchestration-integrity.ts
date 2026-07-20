@@ -14,6 +14,7 @@ import {
   GROWTH_PIPELINE_PROMOTION_INTEGRITY_2A_QA_MARKER,
   resolveDraftFactoryAdmittedFromLeadMetadata,
 } from "../lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
+import { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG } from "../lib/growth/draft-factory/draft-factory-wake-event-types"
 
 const ROOT = process.cwd()
 const PHASE = "GE-AIOS-REVENUE-2A" as const
@@ -121,6 +122,9 @@ assert.equal(
   "cheap_validation",
 )
 console.log("  ✓ paused portfolio-deferred leads map to cheap_validation capacity class")
+
+assert.equal(REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG, 50)
+console.log("  ✓ admission reconcile limit per org is 50")
 
 const liveSource = readSource("lib/growth/draft-factory/draft-factory-durable-live.ts")
 assert.match(liveSource, /resolveDraftFactoryAdmittedFromLeadMetadata/)

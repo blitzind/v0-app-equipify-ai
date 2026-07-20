@@ -45,3 +45,8 @@ export const GROWTH_DRAFT_FACTORY_CAPACITY_SLOTS_PER_ORG = 5
 export const GROWTH_DRAFT_FACTORY_DUE_POOL_LIMIT = 100
 /** FIFO candidates evaluated per capacity class before SV1-2 ranks. */
 export const GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP = 20
+/**
+ * GE-AIOS-REVENUE-2A-HOTFIX-1 — Legacy admission downstream reconcile cap per org per due tick.
+ * Terminals rejected/review rows stuck in DM/package durable states via advanceDraftFactoryForLeadLive only.
+ */
+export const REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG = 50

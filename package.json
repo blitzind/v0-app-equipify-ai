@@ -846,6 +846,7 @@
     "test:ge-aios-21a-deep-autonomous-company-research": "tsx scripts/test-ge-aios-21a-deep-autonomous-company-research.ts",
     "test:ge-aios-21c-lead-admission-gate": "tsx scripts/test-ge-aios-21c-lead-admission-gate.ts",
     "test:ge-aios-revenue-2a-orchestration-integrity": "tsx scripts/test-ge-aios-revenue-2a-orchestration-integrity.ts",
+    "test:ge-aios-revenue-2a-hotfix-1-admission-reconcile": "tsx scripts/test-ge-aios-revenue-2a-hotfix-1-admission-reconcile.ts",
     "test:ge-aios-21c-production-cleanup": "tsx scripts/test-ge-aios-21c-production-cleanup.ts",
     "test:ge-aios-22-company-evidence": "tsx scripts/test-ge-aios-22-company-evidence.ts",
     "test:ge-aios-23-runtime-canonicalization": "tsx scripts/test-ge-aios-23-runtime-canonicalization.ts",

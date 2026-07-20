@@ -10,6 +10,7 @@ import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifi
 import { GROWTH_PIPELINE_PROMOTION_INTEGRITY_2A_QA_MARKER } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import { evaluateGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import { GROWTH_CERT_DEFAULT_AI_ORG_ID } from "@/lib/growth/qa/verified-channels-cert-env-bootstrap"
+import { REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 
 export const GE_AIOS_REVENUE_2A_PRODUCTION_VALIDATION_QA_MARKER =
@@ -190,6 +191,18 @@ async function main(): Promise<void> {
   }
   console.log(`Buying Committee jobs (7d): ${bcRecentCount ?? 0}`)
 
+  const blockingViolations = dmViolations.length + packageViolations.length
+  const ticksToClearBacklog =
+    blockingViolations > 0
+      ? Math.ceil(blockingViolations / REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG)
+      : 0
+  console.log("\n--- Reconciliation Throughput (HOTFIX-1) ---")
+  console.log(`Reconcile limit per org per scheduler tick: ${REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG}`)
+  console.log(`Current integrity violations: ${blockingViolations}`)
+  console.log(
+    `Expected scheduler ticks to clear backlog (if all remain eligible): ${ticksToClearBacklog}`,
+  )
+
   console.log("\n--- Pipeline Flow (canonical gates) ---")
   console.log("Admission → Research → Qualification → Portfolio → Decision Maker → Package → Approval")
   console.log("- Qualification: admitted === accepted only (review/rejected terminal)")
@@ -197,15 +210,13 @@ async function main(): Promise<void> {
   console.log("- Decision Maker: BC enqueue wired from research CI promotion + Datamoon after portfolio")
   console.log("- Package/Outbound: integrity assertions block non-accepted admission")
 
-  const blockingViolations = dmViolations.length + packageViolations.length
-
   console.log("\n--- Certification Verdict ---")
   if (blockingViolations > 0) {
     console.log(
       `FAIL — ${blockingViolations} canonical promotion integrity violation(s) in production durable state.`,
     )
     console.log(
-      "Historical rows may remain until the next scheduler reconcile tick; new advances must not add violations.",
+      `Historical rows may remain until scheduler reconcile clears them (~${ticksToClearBacklog} tick(s) at limit ${REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG}/org); new advances must not add violations.`,
     )
     process.exit(1)
   }
