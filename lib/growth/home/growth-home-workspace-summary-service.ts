@@ -986,7 +986,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
             missionDiscovery: productionMissionDiscovery,
           })
           if (value.activated) {
-            await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId).catch(() => undefined)
+            await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId)
           }
           stageTimings.push({
             label: "ava_activation",

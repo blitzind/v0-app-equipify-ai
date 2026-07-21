@@ -43,7 +43,7 @@ export const GE_AIOS_LIVE_7A_QA_MARKER = "ge-aios-live-7a-autonomous-research-ce
 export const CONFIRM_GE_AIOS_LIVE_7A_ACTIVATE_RESEARCH = "CONFIRM_GE_AIOS_LIVE_7A_ACTIVATE_RESEARCH" as const
 
 const ORG_ID = EQUIPIFY_PRODUCTION_ORG_ID
-const ACTIVATION_RESEARCH_DAILY_BUDGET = 20 as const
+const ACTIVATION_RESEARCH_DAILY_BUDGET = 500 as const
 
 type LeadSnapshot = {
   id: string
@@ -230,6 +230,7 @@ async function main(): Promise<void> {
 
   if (activate) {
     const current = await fetchGrowthAutonomySettings(admin, ORG_ID)
+    const existingCap = current.dailyBudgetLimits.autonomous_research_runs ?? 0
     await upsertGrowthAutonomySettings(admin, ORG_ID, {
       masterMode: "objective",
       capabilityToggles: {
@@ -238,7 +239,7 @@ async function main(): Promise<void> {
       },
       dailyBudgetLimits: {
         ...current.dailyBudgetLimits,
-        autonomous_research_runs: ACTIVATION_RESEARCH_DAILY_BUDGET,
+        autonomous_research_runs: Math.max(existingCap, ACTIVATION_RESEARCH_DAILY_BUDGET),
       },
     })
     activationApplied = true

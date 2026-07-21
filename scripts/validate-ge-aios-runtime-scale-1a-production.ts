@@ -196,16 +196,46 @@ async function main(): Promise<void> {
 
   const failCount = gates.filter((row) => row.status === "fail").length
   const passCount = gates.filter((row) => row.status === "pass").length
-  const recommendation =
-    projectedPerDay != null && projectedPerDay >= GROWTH_ORG_RESEARCH_TARGET_PER_DAY && researchCap >= 500
-      ? "Ready for 500/day"
-      : projectedPerDay != null && projectedPerDay >= 250
-        ? "Ready with constraints"
-        : "Not ready"
+  const codeDeployed =
+    loopSource.includes("mapWithBoundedConcurrency") && loopSource.includes("parallel_batch_size")
+  const policyMigrated = researchCap >= GROWTH_ORG_RESEARCH_TARGET_PER_DAY
 
+  const blockers: string[] = []
+  if (!codeDeployed) blockers.push("Deploy SCALE-1A bounded parallel ASL code")
+  if (codeDeployed && !policyMigrated) {
+    blockers.push(`Org research cap=${researchCap} — run SCALE-1B policy migration (not Home-dependent)`)
+  }
+  if (codeDeployed && policyMigrated) {
+    blockers.push("Run SCALE-1B live cycle for concurrency overlap proof (this script is dry-run only)")
+  }
+  if (killSwitches.autonomy_outbound_enabled !== false) blockers.push("Outbound must remain disabled")
+
+  const deploymentState = !codeDeployed
+    ? "code_not_deployed"
+    : !policyMigrated
+      ? "code_deployed_policy_not_migrated"
+      : "policy_migrated_concurrency_not_proven"
+
+  const recommendation =
+    deploymentState === "fully_proven" && projectedPerDay != null && projectedPerDay >= GROWTH_ORG_RESEARCH_TARGET_PER_DAY
+      ? "Ready for 500/day"
+      : policyMigrated && projectedPerDay != null && projectedPerDay >= 250
+        ? "Ready with constraints"
+        : policyMigrated
+          ? "Ready with constraints"
+          : codeDeployed
+            ? "Ready with constraints"
+            : "Not ready"
+
+  console.log(`\n[${PHASE}] Deployment state: ${deploymentState}`)
   console.log(`\n[${PHASE}] Validation: ${Math.round((passCount / gates.length) * 100)}/100`)
   console.log(`[${PHASE}] Recommendation: ${recommendation}`)
-  console.log(`[${PHASE}] Remaining blockers: org research cap upgrade (if ${researchCap}<500), deploy scale code, live parallel batch observation`)
+  console.log(
+    `[${PHASE}] Current blockers: ${blockers.length > 0 ? blockers.join("; ") : "none — use validate:ge-aios-runtime-scale-1b-production for live proof"}`,
+  )
+  console.log(
+    `[${PHASE}] Note: projected ${projectedPerDay ?? "—"}/day is modeled from historical durations; measured throughput requires SCALE-1B live cycle`,
+  )
 
   if (failCount > 0) process.exit(1)
 }

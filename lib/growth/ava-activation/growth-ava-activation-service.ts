@@ -10,7 +10,7 @@ import {
   type GrowthAvaActivationState,
 } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import { fetchGrowthAutonomySettings, upsertGrowthAutonomySettings } from "@/lib/growth/autonomy/growth-autonomy-settings-repository"
-import { GROWTH_ORG_RESEARCH_TARGET_PER_DAY } from "@/lib/growth/specialists/execution/growth-runtime-scale-1a"
+import { applyScaleResearchBudgetForProductionOrg } from "@/lib/growth/ava-activation/growth-scale-research-budget-1b"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -36,44 +36,14 @@ export async function ensureScaleResearchBudgetForActivatedOrg(
   admin: SupabaseClient,
   organizationId: string,
 ): Promise<void> {
-  const settings = await fetchGrowthAutonomySettings(admin, organizationId)
-  const currentCap = settings.dailyBudgetLimits.autonomous_research_runs ?? 0
-  if (currentCap >= GROWTH_ORG_RESEARCH_TARGET_PER_DAY) return
-  if (currentCap <= 0) return
-
-  await upsertGrowthAutonomySettings(admin, organizationId, {
-    dailyBudgetLimits: {
-      ...settings.dailyBudgetLimits,
-      autonomous_research_runs: GROWTH_ORG_RESEARCH_TARGET_PER_DAY,
-    },
-    capabilityToggles: {
-      ...settings.capabilityToggles,
-      research: true,
-    },
-  })
+  await applyScaleResearchBudgetForProductionOrg(admin, organizationId)
 }
 
 async function ensureActivationResearchBudgetEnabled(
   admin: SupabaseClient,
   organizationId: string,
 ): Promise<void> {
-  const settings = await fetchGrowthAutonomySettings(admin, organizationId)
-  const currentCap = settings.dailyBudgetLimits.autonomous_research_runs ?? 0
-  const researchEnabled = settings.capabilityToggles.research === true
-
-  if (currentCap > 0 && researchEnabled) return
-
-  await upsertGrowthAutonomySettings(admin, organizationId, {
-    dailyBudgetLimits: {
-      ...settings.dailyBudgetLimits,
-      autonomous_research_runs:
-        currentCap > 0 ? currentCap : GROWTH_AVA_ACTIVATION_RESEARCH_DAILY_BUDGET_LAUNCH_1D,
-    },
-    capabilityToggles: {
-      ...settings.capabilityToggles,
-      research: true,
-    },
-  })
+  await applyScaleResearchBudgetForProductionOrg(admin, organizationId)
 }
 
 export async function loadGrowthAvaActivationState(input: {
