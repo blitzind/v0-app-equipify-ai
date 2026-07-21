@@ -22,6 +22,46 @@ import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/researc
 
 export const PROSPECT_RESEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
+export const GE_AIOS_HOTFIX_LIVE_8B_2_STALE_RESEARCH_RUN_RECOVERY_QA_MARKER =
+  "ge-aios-hotfix-live-8b-2-stale-research-run-recovery-v1" as const
+
+export const STALE_ACTIVE_QUEUED_THRESHOLD_MS = 60 * 60 * 1000
+export const STALE_ACTIVE_RUNNING_THRESHOLD_MS = 2 * 60 * 60 * 1000
+export const STALE_ABANDONED_EXECUTION_FAILED_REASON = "stale_abandoned_execution" as const
+
+export type StaleActiveProspectResearchRunRecovery = {
+  qaMarker: typeof GE_AIOS_HOTFIX_LIVE_8B_2_STALE_RESEARCH_RUN_RECOVERY_QA_MARKER
+  leadId: string
+  recoveredCount: number
+  recovered: Array<{
+    runId: string
+    priorStatus: "queued" | "running"
+    ageMinutes: number
+    staleThresholdMinutes: number
+  }>
+}
+
+export function staleActiveRunThresholdMs(status: string): number | null {
+  if (status === "queued") return STALE_ACTIVE_QUEUED_THRESHOLD_MS
+  if (status === "running") return STALE_ACTIVE_RUNNING_THRESHOLD_MS
+  return null
+}
+
+export function isStaleActiveProspectResearchRun(
+  row: Pick<ResearchRunRow, "status" | "created_at">,
+  nowMs: number = Date.now(),
+): boolean {
+  const thresholdMs = staleActiveRunThresholdMs(row.status)
+  if (thresholdMs == null) return false
+  return nowMs - Date.parse(row.created_at) > thresholdMs
+}
+
+export function staleActiveRunCutoffIso(status: string, nowMs: number = Date.now()): string | null {
+  const thresholdMs = staleActiveRunThresholdMs(status)
+  if (thresholdMs == null) return null
+  return new Date(nowMs - thresholdMs).toISOString()
+}
+
 const RUN_SELECT =
   "id, organization_id, lead_id, status, website_url, company_name, industry_guess, employee_size_guess, revenue_size_guess, website_maturity_score, social_presence_score, reputation_score, technology_score, detected_technologies, signals, competitors, research_summary, suggested_pitch_angle, suggested_sequence, suggested_call_opening, recommended_next_action, research_confidence, input_hash, completed_at, failed_reason, created_at"
 
@@ -171,10 +211,86 @@ export async function loadProspectIntelligenceBundle(
   return { leadId, latestRun, runs }
 }
 
+export async function reconcileStaleActiveProspectResearchRuns(
+  admin: SupabaseClient,
+  leadId: string,
+  options?: { nowMs?: number },
+): Promise<StaleActiveProspectResearchRunRecovery> {
+  const nowMs = options?.nowMs ?? Date.now()
+  const nowIso = new Date(nowMs).toISOString()
+
+  const { data, error } = await researchRunsTable(admin)
+    .select("id, organization_id, lead_id, status, created_at")
+    .eq("lead_id", leadId)
+    .in("status", ["queued", "running"])
+
+  if (error) throw new Error(error.message)
+
+  const recovered: StaleActiveProspectResearchRunRecovery["recovered"] = []
+
+  for (const row of (data ?? []) as Pick<
+    ResearchRunRow,
+    "id" | "organization_id" | "lead_id" | "status" | "created_at"
+  >[]) {
+    if (!isStaleActiveProspectResearchRun(row, nowMs)) continue
+
+    const priorStatus = row.status as "queued" | "running"
+    const cutoffIso = staleActiveRunCutoffIso(priorStatus, nowMs)
+    if (!cutoffIso) continue
+
+    const ageMinutes = Math.round((nowMs - Date.parse(row.created_at)) / (60 * 1000))
+    const staleThresholdMinutes = Math.round(
+      (staleActiveRunThresholdMs(priorStatus) ?? 0) / (60 * 1000),
+    )
+
+    const { data: updated, error: updateError } = await researchRunsTable(admin)
+      .update({
+        status: "failed",
+        failed_reason: STALE_ABANDONED_EXECUTION_FAILED_REASON,
+        completed_at: nowIso,
+      })
+      .eq("id", row.id)
+      .eq("status", priorStatus)
+      .lt("created_at", cutoffIso)
+      .select("id")
+      .maybeSingle()
+
+    if (updateError) throw new Error(updateError.message)
+    if (!updated) continue
+
+    recovered.push({
+      runId: row.id,
+      priorStatus,
+      ageMinutes,
+      staleThresholdMinutes,
+    })
+
+    logProspectResearch("stale_recovered", {
+      qa_marker: GE_AIOS_HOTFIX_LIVE_8B_2_STALE_RESEARCH_RUN_RECOVERY_QA_MARKER,
+      organization_id: row.organization_id,
+      lead_id: leadId,
+      run_id: row.id,
+      prior_status: priorStatus,
+      age_minutes: ageMinutes,
+      stale_threshold_minutes: staleThresholdMinutes,
+      failed_reason: STALE_ABANDONED_EXECUTION_FAILED_REASON,
+    })
+  }
+
+  return {
+    qaMarker: GE_AIOS_HOTFIX_LIVE_8B_2_STALE_RESEARCH_RUN_RECOVERY_QA_MARKER,
+    leadId,
+    recoveredCount: recovered.length,
+    recovered,
+  }
+}
+
 export async function fetchActiveProspectResearchRun(
   admin: SupabaseClient,
   leadId: string,
 ): Promise<GrowthResearchRunPublicView | null> {
+  await reconcileStaleActiveProspectResearchRuns(admin, leadId)
+
   const { data, error } = await researchRunsTable(admin)
     .select(RUN_SELECT)
     .eq("lead_id", leadId)
