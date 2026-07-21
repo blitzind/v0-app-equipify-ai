@@ -14,6 +14,9 @@ import {
   HOME_LIVING_WAITING_EMPTY_MESSAGE,
 } from "@/lib/growth/home/growth-home-living-experience-18e"
 import {
+  GROWTH_HOME_OPERATOR_CLOSURE_NO_ACTION_MESSAGE,
+} from "@/lib/growth/home/growth-home-operator-closure-1a"
+import {
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { Button } from "@/components/ui/button"
@@ -25,18 +28,22 @@ type Props = {
   aiOsUx: GrowthHomeAiOsUxViewModel
   relationshipSnapshotsById?: RelationshipLeadSnapshotMap
   waitingCompanyByLeadId?: Record<string, string | null>
+  /** GE-AIOS-HOME-UX-CLOSURE-1A — one primary operator action above the fold */
+  operatorClosureMode?: boolean
 }
 
 export function GrowthHomeAiOsWaitingOnYouSection({
   aiOsUx,
   relationshipSnapshotsById,
   waitingCompanyByLeadId,
+  operatorClosureMode = false,
 }: Props) {
   const waitingOnYou = enrichGrowthHomeWaitingOnYouItems(
     aiOsUx.waitingOnYou,
     relationshipSnapshotsById,
     waitingCompanyByLeadId,
   )
+  const visibleWaitingOnYou = operatorClosureMode ? waitingOnYou.slice(0, 1) : waitingOnYou
   const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
   const replyCount = waitingOnYou.filter((item) => /reply/i.test(item.label)).length
   const hasItems = approveItemsCount > 0 || replyCount > 0
@@ -44,6 +51,11 @@ export function GrowthHomeAiOsWaitingOnYouSection({
     approvalCount: approveItemsCount,
     replyCount,
   })
+
+  const emptyMessage =
+    operatorClosureMode && !hasItems
+      ? GROWTH_HOME_OPERATOR_CLOSURE_NO_ACTION_MESSAGE
+      : HOME_LIVING_WAITING_EMPTY_MESSAGE
 
   return (
     <section
@@ -57,7 +69,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{AVA_HOME_WAITING_ON_YOU_TITLE}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {hasItems ? waitingSummary : HOME_LIVING_WAITING_EMPTY_MESSAGE}
+            {hasItems ? waitingSummary : emptyMessage}
           </p>
         </div>
         {approveItemsHref && approveItemsCount > 0 ? (
@@ -73,11 +85,11 @@ export function GrowthHomeAiOsWaitingOnYouSection({
       {!hasItems ? (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-          <p className="text-sm font-medium text-foreground">{HOME_LIVING_WAITING_EMPTY_MESSAGE}</p>
+          <p className="text-sm font-medium text-foreground">{emptyMessage}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {waitingOnYou.map((item) => (
+          {visibleWaitingOnYou.map((item) => (
             <article
               key={item.id}
               className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20"
@@ -104,7 +116,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
         </div>
       )}
 
-      {waitingOnYouOverflow > 0 ? (
+      {waitingOnYouOverflow > 0 && !operatorClosureMode ? (
         <p className="text-xs text-muted-foreground">
           {waitingOnYouOverflow} more in additional tools below.
         </p>

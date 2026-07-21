@@ -146,6 +146,8 @@ export function GrowthWorkspaceDashboardBody() {
 
   useGrowthWorkspaceQuickActionShortcuts(Boolean(dashboard))
 
+  const employeeMode = workspaceSummary?.avaActivation?.activated === true
+
   if (loading && !dashboard) {
     return (
       <div
@@ -162,7 +164,8 @@ export function GrowthWorkspaceDashboardBody() {
 
   if (!dashboard) return null
 
-  if (isGrowthWorkspacePriorityFeedActive()) {
+  // GE-AIOS-HOME-UX-CLOSURE-1A — activated Ava uses the operator briefing surface, not UX-1A priority feed.
+  if (isGrowthWorkspacePriorityFeedActive() && !employeeMode) {
     return (
       <div data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER} data-growth-workspace-first-ux-1a="true">
         <GrowthWorkspacePriorityFeedDashboard dashboard={dashboard} workspaceSummary={workspaceSummary} />

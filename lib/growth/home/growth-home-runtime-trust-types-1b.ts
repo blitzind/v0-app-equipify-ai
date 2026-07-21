@@ -88,4 +88,8 @@ export type GrowthHomeRuntimeTrustViewModel = {
   employment: GrowthAvaEmploymentStats | null
   employeePresenceLine: string | null
   nextMilestoneLabel: string | null
+  /** GE-AIOS-HOME-UX-CLOSURE-1A — single primary assignment company */
+  primaryCompanyName: string | null
+  whatHappensNextLines: string[]
+  canCloseBrowserLine: string | null
 }

@@ -79,6 +79,11 @@ import { GrowthHomeAvaRuntimeTrustSection } from "@/components/growth/workspace/
 import { GROWTH_AVA_ACTIVATION_1C_QA_MARKER } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import { buildGrowthHomeRuntimeTrustViewModel } from "@/lib/growth/home/growth-home-runtime-trust-presenter-1b"
 import { GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
+import {
+  GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER,
+  GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_SUBTITLE,
+  GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_TITLE,
+} from "@/lib/growth/home/growth-home-operator-closure-1a"
 import { GrowthHomeMissionCenterSection } from "@/components/growth/workspace/executive-briefing/growth-home-mission-center-section"
 import { GrowthHomeMarketingMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-marketing-missions-section"
 import { GrowthHomeThroughputSection } from "@/components/growth/workspace/executive-briefing/growth-home-throughput-section"
@@ -213,6 +218,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
   const canonicalPendingApprovals = aiOsUx.approveItemsCount ?? 0
   const employeeMode = workspaceSummary?.avaActivation?.activated === true
+  const operatorClosureMode = employeeMode
 
   const previousSnapshot = useMemo(() => readAvaNarrativeMetricsSnapshot(), [dashboard.generatedAt, homeRefreshVersion])
   const persistedMemoryStore = useMemo(
@@ -407,6 +413,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       missionDiscovery,
       activation: workspaceSummary?.avaActivation ?? null,
       generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
+      canonicalFocusCompanyName: workspaceSummary?.canonicalOperatorFocus?.companyName ?? null,
     })
     const workingNow = buildHomeWorkingNowPresentation({
       dailyActivityNarrative: avaHero.dailyActivityNarrative,
@@ -508,7 +515,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-live-3c={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER}
       data-qa-marker-launch-1b={GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER}
       data-qa-marker-launch-1c={GROWTH_AVA_ACTIVATION_1C_QA_MARKER}
+      data-qa-marker-closure-1a={GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER}
       data-employee-mode={employeeMode ? "true" : "false"}
+      data-operator-closure-mode={operatorClosureMode ? "true" : "false"}
       data-home-narrative-overlap={operatorExperience.narrativeOverlap.join(",") || "none"}
     >
       <div data-qa-section="home-canonical-surface" className="space-y-6">
@@ -521,6 +530,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           missionDiscovery={workspaceSummary?.missionDiscovery ?? null}
           organizationId={sessionIdentity?.authUserId ?? null}
           onBriefingAcknowledged={() => setBriefingCursorVersion((value) => value + 1)}
+          compact={operatorClosureMode}
         />
 
         {workspaceSummary?.avaActivation ? (
@@ -535,13 +545,21 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
         <GrowthHomeAvaRuntimeTrustSection
           runtimeTrust={operatorExperience.runtimeTrust}
+          operatorClosureMode={operatorClosureMode}
           onActivated={() => {
             setHomeRefreshVersion((value) => value + 1)
             onResearchLoopCompleted?.()
           }}
         />
 
-        {avaHero.recommendationExperience ? (
+        <GrowthHomeAiOsWaitingOnYouSection
+          aiOsUx={aiOsUx}
+          relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+          waitingCompanyByLeadId={waitingCompanyByLeadId}
+          operatorClosureMode={operatorClosureMode}
+        />
+
+        {!operatorClosureMode && avaHero.recommendationExperience ? (
           <GrowthHomeAvaRecommendationExperienceSection
             experience={avaHero.recommendationExperience}
             organizationId={sessionIdentity?.authUserId ?? null}
@@ -553,34 +571,82 @@ export function GrowthHomeExecutiveBriefingDashboard({
           />
         ) : null}
 
-        {avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
+        {!operatorClosureMode && avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
           <GrowthHomeAvaStrategicInsightSection leadership={avaHero.strategicLeadership} />
         ) : null}
 
-        <GrowthHomeAiOsWaitingOnYouSection
-          aiOsUx={aiOsUx}
-          relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
-          waitingCompanyByLeadId={waitingCompanyByLeadId}
-        />
+        {!operatorClosureMode ? (
+          <GrowthHomeAvaWorkingNowSection presentation={operatorExperience.workingNow} />
+        ) : null}
 
-        <GrowthHomeAvaWorkingNowSection presentation={operatorExperience.workingNow} />
-
-        {avaHero.businessObjectiveLeadership ? (
+        {!operatorClosureMode && avaHero.businessObjectiveLeadership ? (
           <GrowthHomeAvaBusinessObjectiveSection leadership={avaHero.businessObjectiveLeadership} />
         ) : null}
 
-        <GrowthHomeAvaWorkSection
-          progress={operatorExperience.measurableProgress}
-          eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
-        />
+        {!operatorClosureMode ? (
+          <>
+            <GrowthHomeAvaWorkSection
+              progress={operatorExperience.measurableProgress}
+              eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
+            />
 
-        <GrowthHomePortfolioManagerSection
-          portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
-        />
+            <GrowthHomePortfolioManagerSection
+              portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
+            />
 
-        <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
+            <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
 
-        <GrowthHomeWorkspaceHealthSection presentation={operatorExperience.workspaceHealth} />
+            <GrowthHomeWorkspaceHealthSection presentation={operatorExperience.workspaceHealth} />
+
+            <GrowthHomeCanonicalMissionsSection
+              missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
+              overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
+              totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
+            />
+
+            <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
+          </>
+        ) : (
+          <GrowthHomeCollapsibleSection
+            sectionId="operator-work-details"
+            title={GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_TITLE}
+            subtitle={GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_SUBTITLE}
+          >
+            <div className="space-y-5">
+              <GrowthHomeAvaWorkSection
+                progress={operatorExperience.measurableProgress}
+                eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
+              />
+              <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
+              <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
+              <GrowthHomePortfolioManagerSection
+                portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
+              />
+              {avaHero.recommendationExperience ? (
+                <GrowthHomeAvaRecommendationExperienceSection
+                  experience={avaHero.recommendationExperience}
+                  organizationId={sessionIdentity?.authUserId ?? null}
+                  companyCandidates={companyCandidates}
+                  activeMissionLabel={workspaceSummary?.missionDiscovery?.audienceName ?? workspaceSummary?.missionDiscovery?.activityLabel ?? null}
+                  strategicAdvisorContext={workspaceSummary?.strategicAdvisorContext ?? null}
+                  executiveReasoning={null}
+                  suppressPrimaryHeadline={operatorExperience.suppressRecommendationHeadline}
+                />
+              ) : null}
+              {avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
+                <GrowthHomeAvaStrategicInsightSection leadership={avaHero.strategicLeadership} />
+              ) : null}
+              {avaHero.businessObjectiveLeadership ? (
+                <GrowthHomeAvaBusinessObjectiveSection leadership={avaHero.businessObjectiveLeadership} />
+              ) : null}
+              <GrowthHomeCanonicalMissionsSection
+                missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
+                overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
+                totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
+              />
+            </div>
+          </GrowthHomeCollapsibleSection>
+        )}
 
         {!employeeMode ? (
           <GrowthHomeTrainingSetupCta setupIncomplete={setupIncomplete} setupMessage={setupMessage} />
@@ -588,9 +654,11 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
         {!employeeMode ? <GrowthHomeLaunchCompleteBanner setupIncomplete={setupIncomplete} /> : null}
 
-        <GrowthHomeBriefingCrossLinks
-          pendingApprovals={canonicalPendingApprovals}
-        />
+        {!operatorClosureMode ? (
+          <GrowthHomeBriefingCrossLinks
+            pendingApprovals={canonicalPendingApprovals}
+          />
+        ) : null}
 
         {!employeeMode ? (
           <GrowthHomeFirstWeekGuide
@@ -607,14 +675,6 @@ export function GrowthHomeExecutiveBriefingDashboard({
             learnedTodayCount={avaHero.dailyActivityNarrative?.learned_today.length ?? 0}
           />
         ) : null}
-
-        <GrowthHomeCanonicalMissionsSection
-          missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
-          overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
-          totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
-        />
-
-        <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
       </div>
 
       <GrowthHomeCollapsibleSection

@@ -8,6 +8,10 @@ import {
   GROWTH_AVA_ACTIVATION_1C_QA_MARKER,
 } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import {
+  GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER,
+  GROWTH_HOME_OPERATOR_CLOSURE_WHAT_HAPPENS_NEXT_TITLE,
+} from "@/lib/growth/home/growth-home-operator-closure-1a"
+import {
   GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
   type GrowthHomeRuntimeTrustViewModel,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
@@ -15,9 +19,15 @@ import {
 type Props = {
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
   onActivated?: () => void
+  /** GE-AIOS-HOME-UX-CLOSURE-1A — compact operator surface above the fold */
+  operatorClosureMode?: boolean
 }
 
-export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: Props) {
+export function GrowthHomeAvaRuntimeTrustSection({
+  runtimeTrust,
+  onActivated,
+  operatorClosureMode = false,
+}: Props) {
   const [activateBusy, setActivateBusy] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
 
@@ -42,6 +52,7 @@ export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: 
   if (runtimeTrust.showActivationScreen) return null
 
   const { startStatus, currentActivity, activityFeed, heartbeat, employment, employeeMode } = runtimeTrust
+  const closureMode = operatorClosureMode && employeeMode
   const showEmployeeBanner =
     employeeMode && (startStatus.mode === "employee_active" || startStatus.mode === "autonomous_active")
   const showLinkAction = startStatus.primaryActionKind === "link" && startStatus.primaryActionHref
@@ -52,9 +63,20 @@ export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: 
       data-qa-section="home-ava-runtime-trust"
       data-qa-marker-launch-1b={GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER}
       data-qa-marker-launch-1c={GROWTH_AVA_ACTIVATION_1C_QA_MARKER}
+      data-qa-marker-closure-1a={GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER}
+      data-operator-closure-mode={closureMode ? "true" : "false"}
       data-employee-mode={employeeMode ? "true" : "false"}
       className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm space-y-5"
     >
+      {closureMode && runtimeTrust.primaryCompanyName ? (
+        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+            Primary assignment
+          </p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{runtimeTrust.primaryCompanyName}</p>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <p className="text-lg font-semibold tracking-tight">
@@ -128,7 +150,7 @@ export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: 
         </Link>
       ) : null}
 
-      {employment && employeeMode ? (
+      {employment && employeeMode && !closureMode ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">My work with you</p>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -215,7 +237,28 @@ export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: 
         </div>
       ) : null}
 
-      {heartbeat.length > 0 ? (
+      {closureMode && runtimeTrust.whatHappensNextLines.length > 0 ? (
+        <div className="rounded-xl border border-border/60 bg-muted/10 px-4 py-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {GROWTH_HOME_OPERATOR_CLOSURE_WHAT_HAPPENS_NEXT_TITLE}
+          </p>
+          <ol className="space-y-1.5">
+            {runtimeTrust.whatHappensNextLines.map((line) => (
+              <li key={line} className="text-sm text-foreground">
+                {line}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
+      {closureMode && runtimeTrust.canCloseBrowserLine ? (
+        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/40 px-4 py-3 text-sm text-foreground dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <span className="font-medium">Can I close the browser?</span> {runtimeTrust.canCloseBrowserLine}
+        </div>
+      ) : null}
+
+      {heartbeat.length > 0 && !closureMode ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             {employeeMode ? "Status" : "Runtime heartbeat"}
@@ -231,7 +274,18 @@ export function GrowthHomeAvaRuntimeTrustSection({ runtimeTrust, onActivated }: 
         </div>
       ) : null}
 
-      {activityFeed.length > 0 ? (
+      {closureMode && heartbeat.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2 text-sm">
+          {heartbeat.slice(0, 2).map((line) => (
+            <div key={line.id} className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
+              <p className="text-xs text-muted-foreground">{line.label}</p>
+              <p className="text-sm font-medium text-foreground">{line.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {activityFeed.length > 0 && !closureMode ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             {employeeMode ? "What I've accomplished" : "Live activity feed"}

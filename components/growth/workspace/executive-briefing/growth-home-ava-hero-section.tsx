@@ -39,6 +39,8 @@ type Props = {
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   organizationId?: string | null
   onBriefingAcknowledged?: () => void
+  /** GE-AIOS-HOME-UX-CLOSURE-1A — greeting + status only; reasoning moved below fold */
+  compact?: boolean
 }
 
 function statusTone(kind: GrowthHomeAvaHeroViewModel["statusKind"]): string {
@@ -60,6 +62,7 @@ export function GrowthHomeAvaHeroSection({
   missionDiscovery = null,
   organizationId = null,
   onBriefingAcknowledged,
+  compact = false,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
   const handleBriefingAcknowledge = useCallback(() => {
@@ -123,20 +126,23 @@ export function GrowthHomeAvaHeroSection({
       </div>
 
       <div className="space-y-2" data-qa-field="home-hero-executive-briefing">
-        {executiveBriefing.paragraphs.map((paragraph, index) => (
-          <p key={`hero-briefing:${index}`} className="text-sm leading-relaxed text-foreground">
-            {paragraph}
-          </p>
-        ))}
+        {!compact
+          ? executiveBriefing.paragraphs.map((paragraph, index) => (
+              <p key={`hero-briefing:${index}`} className="text-sm leading-relaxed text-foreground">
+                {paragraph}
+              </p>
+            ))
+          : null}
       </div>
 
-      {hero.continuousExecutiveBriefing ? (
+      {!compact && hero.continuousExecutiveBriefing ? (
         <GrowthHomeAvaSinceYouWereLastHereSection
           briefing={hero.continuousExecutiveBriefing}
           onAcknowledge={handleBriefingAcknowledge}
         />
       ) : null}
 
+      {!compact ? (
       <p className="text-xs text-muted-foreground">
         <Link href={GROWTH_SALES_OPERATIONS_CENTER_ROUTE} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
           Open Operations
@@ -157,6 +163,7 @@ export function GrowthHomeAvaHeroSection({
           </>
         ) : null}
       </p>
+      ) : null}
     </section>
   )
 }

@@ -12,6 +12,11 @@ import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-ca
 import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
+import {
+  buildOperatorCanCloseBrowserLine,
+  buildOperatorWhatHappensNextLines,
+  resolvePrimaryOperatorCompanyName,
+} from "@/lib/growth/home/growth-home-operator-closure-1a"
 import { humanizeOperatorFacingCopy } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 import {
   GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
@@ -372,6 +377,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   activation?: GrowthAvaActivationState | null
   generatedAt?: string
+  canonicalFocusCompanyName?: string | null
 }): GrowthHomeRuntimeTrustViewModel {
   const nowMs = Date.parse(input.generatedAt ?? input.server?.generatedAt ?? new Date().toISOString())
   const killSwitches = input.server?.killSwitches ?? {}
@@ -508,6 +514,31 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     statusExplanation = employeePresenceLine
   }
 
+  const primaryCompanyName = resolvePrimaryOperatorCompanyName({
+    canonicalFocusCompanyName: input.canonicalFocusCompanyName,
+    activeWorkCompanyName: input.activeWork?.company_name,
+  })
+
+  const nextSchedulerLabel =
+    input.server?.nextSchedulerEstimateAt && autonomyEnabled
+      ? formatRelativeUntil(input.server.nextSchedulerEstimateAt, nowMs)
+      : null
+
+  const whatHappensNextLines = buildOperatorWhatHappensNextLines({
+    operatorState,
+    pendingApprovals: input.pendingApprovals,
+    nextMilestoneLabel,
+    nextSchedulerLabel,
+    autonomyEnabled,
+  })
+
+  const canCloseBrowserLine = buildOperatorCanCloseBrowserLine({
+    operatorState,
+    pendingApprovals: input.pendingApprovals,
+    autonomyEnabled,
+    setupIncomplete: input.setupIncomplete,
+  })
+
   return {
     qaMarker: GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
     operatorState,
@@ -535,5 +566,8 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     employment,
     employeePresenceLine,
     nextMilestoneLabel,
+    primaryCompanyName,
+    whatHappensNextLines,
+    canCloseBrowserLine,
   }
 }
