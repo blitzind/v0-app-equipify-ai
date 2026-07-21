@@ -355,7 +355,13 @@ export async function advanceDraftFactoryForLeadLive(
     wakeType === "datamoon_person_failed" ||
     wakeType === "provider_capacity_available"
 
-  if (wouldDiscoverDecisionMaker && !dmIntegrity.ok) {
+  const shouldDiscoverDecisionMaker =
+    evidence.admitted &&
+    dmIntegrity.ok &&
+    wouldDiscoverDecisionMaker &&
+    !evidence.stopInvestment
+
+  if (evidence.admitted && wouldDiscoverDecisionMaker && !dmIntegrity.ok) {
     logGrowthEngine("growth_pipeline_promotion_integrity_violation", {
       qa_marker: dmIntegrity.qaMarker,
       organization_id: input.organizationId,
@@ -366,12 +372,6 @@ export async function advanceDraftFactoryForLeadLive(
       diagnostic: dmIntegrity.diagnostic,
     })
   }
-
-  const shouldDiscoverDecisionMaker =
-    evidence.admitted &&
-    !dmIntegrity.blocked &&
-    wouldDiscoverDecisionMaker &&
-    !evidence.stopInvestment
 
   if (shouldDiscoverDecisionMaker) {
     try {

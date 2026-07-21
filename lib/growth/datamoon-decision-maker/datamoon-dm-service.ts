@@ -176,6 +176,32 @@ export async function evaluateAndEnrichDecisionMakerForLead(
     return decision
   }
 
+  const admissionState = (lead.metadata?.admission_state as string | undefined) ?? "unknown"
+  if (admissionState === "rejected" || admissionState === "invalid") {
+    const requirement = projectDecisionMakerRequirement({ admissionState })
+    const authorization = authorizeDatamoonPersonEnrichment({
+      requirement,
+      investmentState: "stop_investment",
+      portfolioSelected: input.portfolioSelected === true,
+      providerEnabled: isDatamoonProviderEnabled(),
+      providerConfigured: isDatamoonProviderConfigured(),
+      budgetAvailable: input.budgetAvailable !== false,
+      killSwitchActive: input.killSwitchActive === true,
+      leadStatus: lead.status,
+      researchComplete: false,
+      companyIdentityConfident: false,
+    })
+    const decision = decideDatamoonDecisionMakerEnrichment({
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      requirement,
+      authorization,
+      now: generatedAt,
+    })
+    await persistDecisionLedger(admin, decision)
+    return decision
+  }
+
   const existingRows = await listGrowthLeadDecisionMakers(admin, lead.id).catch(() => [])
   const existing: ExistingDecisionMakerSnapshot[] = existingRows.map((row) => ({
     fullName: row.fullName,

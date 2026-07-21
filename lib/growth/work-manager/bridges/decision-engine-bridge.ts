@@ -23,8 +23,13 @@ export function mapDecisionKindToWorkItemType(kind: DecisionActionKind): AvaWork
 export function nextBestActionToWorkItem(action: NextBestAction, timestamp: string): AvaWorkItem {
   const blocked = action.blocked_by.length > 0
   const requiresOperator = action.requires_operator || action.kind === "review_approval"
+  const requiresLeadTarget = action.kind === "research_company" && !action.href?.trim()
   const canExecuteAutonomously =
-    !requiresOperator && !blocked && action.kind !== "wait" && action.kind !== "review_reply"
+    !requiresOperator &&
+    !blocked &&
+    !requiresLeadTarget &&
+    action.kind !== "wait" &&
+    action.kind !== "review_reply"
 
   return {
     id: `work:${action.id}`,

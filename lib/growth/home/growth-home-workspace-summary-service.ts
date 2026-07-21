@@ -7,6 +7,8 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
 import {
+  GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS,
+  GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS,
   GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS,
   logGrowthHomePipelineTimings,
   withGrowthHomeLoaderBudget,
@@ -196,6 +198,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const organizationId = getGrowthEngineAiOrgId()
   const stageTimings: GrowthHomeLoaderTiming[] = []
   const loaderBudgetMs = GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS
+  const runtimeCriticalLoaderBudgetMs = GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS
 
   const leadPoolStart = Date.now()
   const leadPoolPage = await fetchGrowthHomeLeadPoolPage(input.admin, {
@@ -446,7 +449,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const salesOutcomes = organizationId
     ? await withGrowthHomeLoaderBudget({
         label: "sales_outcomes",
-        budgetMs: loaderBudgetMs,
+        budgetMs: GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS,
         fn: () =>
           buildGrowthHomeSalesOutcomes({
             admin: input.admin,
@@ -846,7 +849,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     organizationId && heroLeadId
       ? await withGrowthHomeLoaderBudget({
           label: "canonical_hero_decision",
-          budgetMs: loaderBudgetMs,
+          budgetMs: runtimeCriticalLoaderBudgetMs,
           fn: () => {
             const heroContext = createGrowthAiOsRuntimeContext(input.admin, {
               organizationId,

@@ -83,6 +83,12 @@ function humanizeStopReason(code: string | null | undefined): string | null {
       return "I'm waiting for your approval before I can continue."
     case "daily_budget_exhausted":
       return "I've reached today's autonomous work budget and will resume on the next scheduled cycle."
+    case "autonomy_daily_budget_exceeded":
+    case "autonomy_daily_budget_disabled":
+      return "Today's research budget is full — I'll continue on the next scheduled cycle."
+    case "hard_terminal_invalid":
+    case "execution_authority_blocked:hard_terminal_invalid":
+      return "This company didn't pass qualification — Ava won't advance it further."
     case "portfolio_healthy":
       return "Your pipeline is at target capacity — I'm monitoring for new opportunities."
     case "datamoon_dry_run_only":

@@ -1,6 +1,7 @@
 /** GE-AIOS-14A — Deterministic work-item routing to specialists. */
 
 import { AVA_SPECIALIST_REGISTRY } from "@/lib/growth/specialists/registry/specialist-registry"
+import { isSalesRoutedWorkItem } from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-work-items-launch-1d"
 import type { AvaSpecialistId, AvaSpecialistRouteResult } from "@/lib/growth/specialists/types"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
@@ -62,6 +63,18 @@ function buildRoutingReason(item: AvaWorkItem, specialistId: AvaSpecialistId): s
 }
 
 export function routeWorkItem(item: AvaWorkItem): AvaSpecialistRouteResult {
+  // Sales-owned work (including discovery missions) must not match marketing keyword stubs
+  // e.g. "Refresh audience" or "Begin research — {audience name}".
+  if (isSalesRoutedWorkItem(item)) {
+    const salesHandler =
+      AVA_SPECIALIST_REGISTRY.find((row) => row.definition.id === "sales") ?? AVA_SPECIALIST_REGISTRY[0]
+    return {
+      specialist_id: "sales",
+      confidence: salesHandler.estimateConfidence(item),
+      reason: buildRoutingReason(item, "sales"),
+    }
+  }
+
   const keywordMatch = routeByKeywords(item)
   const specialistId = keywordMatch ?? routeByWorkType(item)
   const handler = AVA_SPECIALIST_REGISTRY.find((row) => row.definition.id === specialistId) ?? AVA_SPECIALIST_REGISTRY[0]

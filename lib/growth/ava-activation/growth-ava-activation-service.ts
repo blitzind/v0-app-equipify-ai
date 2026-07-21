@@ -9,7 +9,7 @@ import {
   GROWTH_AVA_ACTIVATION_1C_QA_MARKER,
   type GrowthAvaActivationState,
 } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
-import { fetchGrowthAutonomySettings } from "@/lib/growth/autonomy/growth-autonomy-settings-repository"
+import { fetchGrowthAutonomySettings, upsertGrowthAutonomySettings } from "@/lib/growth/autonomy/growth-autonomy-settings-repository"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -27,6 +27,32 @@ import {
 } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { runGrowthAvaActivationImmediateProductionTick } from "@/lib/growth/ava-activation/growth-ava-activation-immediate-tick-burn-in-1a"
 import type { GrowthAvaActivationImmediateTick } from "@/lib/growth/ava-activation/growth-ava-activation-immediate-tick-burn-in-1a"
+
+/** Minimum daily research runs enabled on activation when budget was disabled (0 = off). */
+export const GROWTH_AVA_ACTIVATION_RESEARCH_DAILY_BUDGET_LAUNCH_1D = 20 as const
+
+async function ensureActivationResearchBudgetEnabled(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const settings = await fetchGrowthAutonomySettings(admin, organizationId)
+  const currentCap = settings.dailyBudgetLimits.autonomous_research_runs ?? 0
+  const researchEnabled = settings.capabilityToggles.research === true
+
+  if (currentCap > 0 && researchEnabled) return
+
+  await upsertGrowthAutonomySettings(admin, organizationId, {
+    dailyBudgetLimits: {
+      ...settings.dailyBudgetLimits,
+      autonomous_research_runs:
+        currentCap > 0 ? currentCap : GROWTH_AVA_ACTIVATION_RESEARCH_DAILY_BUDGET_LAUNCH_1D,
+    },
+    capabilityToggles: {
+      ...settings.capabilityToggles,
+      research: true,
+    },
+  })
+}
 
 export async function loadGrowthAvaActivationState(input: {
   admin: SupabaseClient
@@ -142,6 +168,10 @@ export async function activateGrowthAvaAutonomousMode(input: {
       activatedByUserId: input.actorUserId,
       activatedAt: input.generatedAt,
     })
+  }
+
+  if (shouldRunImmediateTick) {
+    await ensureActivationResearchBudgetEnabled(input.admin, input.organizationId)
   }
 
   const activation = await loadGrowthAvaActivationState(input)

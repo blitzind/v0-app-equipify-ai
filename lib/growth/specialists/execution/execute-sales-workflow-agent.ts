@@ -23,6 +23,10 @@ import {
 } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
 import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import { mapAslWorkflowAgentToActionKind } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-action-policy-1a"
+import {
+  executeDiscoveryMissionWorkItem,
+} from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-execution-launch-1d"
+import { isDiscoveryMissionWorkItem } from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-work-items-launch-1d"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { assertGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
@@ -62,6 +66,14 @@ export async function executeSalesWorkflowAgent(
   const { workItem, delegation } = input
   const { workflow_agent: workflowAgent } = delegation
   const leadId = extractLeadIdFromWorkItem(workItem)
+
+  if (isDiscoveryMissionWorkItem(workItem)) {
+    return executeDiscoveryMissionWorkItem(input.admin, {
+      organizationId: input.organizationId,
+      workItem,
+      generatedAt: input.generatedAt,
+    })
+  }
 
   if (
     leadId &&

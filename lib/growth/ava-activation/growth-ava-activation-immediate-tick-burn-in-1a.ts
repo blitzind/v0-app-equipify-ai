@@ -76,6 +76,9 @@ function humanizeStopReason(code: string): string {
       return "I'm waiting for your approval before I can continue."
     case "daily_budget_exhausted":
       return "I've reached today's autonomous work budget and will resume on the next cycle."
+    case "autonomy_daily_budget_exceeded":
+    case "autonomy_daily_budget_disabled":
+      return "Today's research budget is full — I'll continue on the next scheduled cycle."
     default:
       return `I'm waiting: ${code.replace(/_/g, " ")}.`
   }

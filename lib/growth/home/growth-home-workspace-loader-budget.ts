@@ -7,6 +7,12 @@ import { logGrowthEngine } from "@/lib/growth/access"
 /** Max wait for optional Home loaders (schema probes, engagement, sequences). */
 export const GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS = 2_500
 
+/** Runtime-critical Home loaders (sales outcomes, hero decision, runtime trust). */
+export const GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS = 6_000
+
+/** Sales outcomes fan-in can exceed generic critical budget under production load. */
+export const GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS = 8_000
+
 export type GrowthHomeLoaderTiming = {
   label: string
   durationMs: number

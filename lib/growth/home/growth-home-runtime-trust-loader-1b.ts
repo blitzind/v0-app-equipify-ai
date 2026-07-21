@@ -14,7 +14,7 @@ import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 
 const SCHEDULER_INTERVAL_MS = 20 * 60 * 1000
-const STEP_BUDGET_MS = 1_200
+const STEP_BUDGET_MS = 3_000
 
 export async function loadGrowthHomeRuntimeTrustPayload(input: {
   admin: SupabaseClient
