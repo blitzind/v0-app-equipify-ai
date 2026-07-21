@@ -4,6 +4,7 @@ import type { GrowthAutonomousMeetingRunRecord } from "@/lib/growth/aios/growth/
 import type { GrowthAutonomousOutreachPreparationRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { GrowthAutonomousQualificationRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
+import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { RunGrowthLeadResearchResult } from "@/lib/growth/research/growth-lead-research-execution-service"
 import type { GrowthAvaResearchLoopLeadResult } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import type { SalesOutcome, SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -37,17 +38,17 @@ export function mapResearchRunToSalesOutcome(run: GrowthAutonomousResearchRunRec
   })
 }
 
-export function mapProspectResearchExecutionToSalesOutcome(
-  execution: RunGrowthLeadResearchResult,
-  input: { workItemId: string; leadId: string },
-): SalesOutcome | null {
-  if (!execution.ok) return null
-  if (execution.outcome === "active") return null
-  if (execution.run.status !== "completed") return null
+export function mapCompletedProspectResearchRunToSalesOutcome(input: {
+  run: GrowthResearchRunPublicView
+  workItemId: string
+  leadId: string
+  qualificationRan?: boolean
+}): SalesOutcome | null {
+  if (input.run.status !== "completed") return null
 
   const summary =
-    execution.run.researchSummary?.trim() ||
-    execution.run.suggestedPitchAngle?.trim() ||
+    input.run.researchSummary?.trim() ||
+    input.run.suggestedPitchAngle?.trim() ||
     `Researched company using public website evidence.`
 
   return baseOutcome({
@@ -56,13 +57,29 @@ export function mapProspectResearchExecutionToSalesOutcome(
     person_id: null,
     relationship_stage: null,
     outcome_type: "research_completed",
-    confidence: execution.run.researchConfidence ?? 70,
+    confidence: input.run.researchConfidence ?? 70,
     completed_by: "research_agent",
-    completed_at: execution.run.completedAt ?? new Date().toISOString(),
+    completed_at: input.run.completedAt ?? new Date().toISOString(),
     summary,
-    generated_artifacts: execution.run.signals?.painSignals?.slice(0, 3) ?? [],
+    generated_artifacts: input.run.signals?.painSignals?.slice(0, 3) ?? [],
     approval_required: false,
-    recommended_next_action: execution.qualificationRan ? "Prepare outreach" : "Continue qualification",
+    recommended_next_action: input.qualificationRan ? "Prepare outreach" : "Continue qualification",
+  })
+}
+
+export function mapProspectResearchExecutionToSalesOutcome(
+  execution: RunGrowthLeadResearchResult,
+  input: { workItemId: string; leadId: string },
+): SalesOutcome | null {
+  if (!execution.ok) return null
+  if (execution.outcome === "active") return null
+  if (execution.run.status !== "completed") return null
+
+  return mapCompletedProspectResearchRunToSalesOutcome({
+    run: execution.run,
+    workItemId: input.workItemId,
+    leadId: input.leadId,
+    qualificationRan: execution.qualificationRan,
   })
 }
 

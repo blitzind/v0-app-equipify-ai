@@ -16,6 +16,7 @@ export const AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS = {
   AGENT_EXECUTED: "autonomous_sales_loop_agent_executed",
   AGENT_SKIPPED: "autonomous_sales_loop_agent_skipped",
   OUTCOME_FINALIZED: "autonomous_sales_loop_outcome_finalized",
+  OUTCOME_RECONCILED: "autonomous_sales_loop_outcome_reconciled",
   MEMORY_PERSISTED: "autonomous_sales_loop_memory_persisted",
   KNOWLEDGE_UPDATED: "autonomous_sales_loop_knowledge_updated",
   BUDGET_EXHAUSTED: "autonomous_sales_loop_budget_exhausted",

@@ -26,6 +26,10 @@ import { runProspectResearch } from "@/lib/growth/research/research-orchestrator
 import { fetchActiveProspectResearchRun } from "@/lib/growth/research/research-repository"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import {
+  scheduleAslProspectResearchOutcomeReconciliation,
+  scheduleAslProspectResearchOutcomeReconciliationForActiveRun,
+} from "@/lib/growth/specialists/execution/reconcile-asl-prospect-research-outcome-8b4"
 
 export {
   GROWTH_LEAD_RESEARCH_READINESS_21A_QA_MARKER,
@@ -51,6 +55,8 @@ export type RunGrowthLeadResearchInput = {
   rebuild?: boolean
   runQualification?: boolean
   force?: boolean
+  /** HOTFIX-LIVE-8B-4 — ASL work item for async outcome reconciliation. */
+  aslWorkItemId?: string | null
 }
 
 export type RunGrowthLeadResearchResult =
@@ -267,6 +273,16 @@ export async function executeGrowthLeadProspectResearch(
       runId: active.id,
       trigger: input.trigger,
     })
+    if (input.trigger === "sales_loop") {
+      scheduleAslProspectResearchOutcomeReconciliationForActiveRun(input.admin, {
+        organizationId,
+        leadId: lead.id,
+        runId: active.id,
+        trigger: input.trigger,
+        workItemId: input.aslWorkItemId,
+        generatedAt,
+      })
+    }
     return {
       ok: true,
       outcome: "active",
@@ -379,6 +395,18 @@ export async function executeGrowthLeadProspectResearch(
     cached: research.cached,
     qualificationRan,
   })
+
+  if (input.trigger === "sales_loop" && research.run.status === "completed") {
+    scheduleAslProspectResearchOutcomeReconciliation(input.admin, {
+      organizationId,
+      leadId: lead.id,
+      run: research.run,
+      trigger: input.trigger,
+      workItemId: input.aslWorkItemId,
+      qualificationRan,
+      generatedAt,
+    })
+  }
 
   // GE-AIOS-AUTONOMY-1B — research completion wakes Draft Factory via AI OS Event Bus
   // (growth.workflow.status_changed → draft_factory_wake_observer). No parallel direct wake.

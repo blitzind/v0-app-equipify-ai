@@ -55,6 +55,7 @@ export type AutonomousSalesSchedulerTickResult = {
   organizations_attempted: number
   organizations_executed: number
   total_outcomes_completed: number
+  total_outcomes_reconciled: number
   total_iterations: number
   skipped_reason: string | null
   dry_run?: boolean
@@ -62,6 +63,7 @@ export type AutonomousSalesSchedulerTickResult = {
     organizationId: string
     executed: boolean
     outcomes_completed: number
+    outcomes_reconciled: number
     stop_reason: AutonomousSalesLoopStopReason | null
     selected_work_count?: number
   }>

@@ -43,6 +43,9 @@ import {
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import { withSchedulerWorkTimeout } from "@/lib/growth/runtime-guardrails/growth-scheduler-runtime-budget-1a"
 import { continueCurrentPhase } from "@/lib/growth/operating-rhythm/engine/run-operating-rhythm"
+import {
+  countReconciledAslResearchOutcomesSince,
+} from "@/lib/growth/specialists/execution/reconcile-asl-prospect-research-outcome-8b4"
 
 export type RunAutonomousSalesLoopInput = {
   admin: SupabaseClient
@@ -367,10 +370,16 @@ export async function runAutonomousSalesLoop(
       salesOutcomes = [...salesOutcomes, ...validatedOutcomes]
       outcomesCompleted += validatedOutcomes.length
 
-      const persistResult = await persistValidatedSalesOutcomeMemoryEvents(input.admin, {
-        organizationId: input.organizationId,
-        outcomes: validatedOutcomes,
-      }).catch(() => ({ inserted: 0, skipped: validatedOutcomes.length, persistedEventIds: [] }))
+      const researchOutcomePersistedByReconciliationAuthority =
+        execution.workflow_agent === "research_agent" &&
+        execution.outcome.outcome_type === "research_completed"
+
+      const persistResult = researchOutcomePersistedByReconciliationAuthority
+        ? { inserted: 0, skipped: validatedOutcomes.length, persistedEventIds: [] as string[] }
+        : await persistValidatedSalesOutcomeMemoryEvents(input.admin, {
+            organizationId: input.organizationId,
+            outcomes: validatedOutcomes,
+          }).catch(() => ({ inserted: 0, skipped: validatedOutcomes.length, persistedEventIds: [] }))
       memoryEventsPersisted += persistResult.inserted
 
       logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.MEMORY_PERSISTED, {
@@ -527,6 +536,7 @@ export async function tickAutonomousSalesLoopForScheduler(
       organizations_attempted: 0,
       organizations_executed: 0,
       total_outcomes_completed: 0,
+      total_outcomes_reconciled: 0,
       total_iterations: 0,
       skipped_reason: "autonomy_disabled",
       dry_run: input.dryRun,
@@ -547,8 +557,10 @@ export async function tickAutonomousSalesLoopForScheduler(
 
   const organizationResults: AutonomousSalesSchedulerTickResult["organization_results"] = []
   let totalOutcomesCompleted = 0
+  let totalOutcomesReconciled = 0
   let totalIterations = 0
   let organizationsExecuted = 0
+  const tickStartedAtIso = new Date(startedAt).toISOString()
 
   for (const organizationId of organizationIds) {
     if (Date.now() - startedAt >= maxRuntimeMs) break
@@ -559,6 +571,7 @@ export async function tickAutonomousSalesLoopForScheduler(
         organizationId,
         executed: false,
         outcomes_completed: 0,
+        outcomes_reconciled: 0,
         stop_reason: "context_unavailable",
       })
       continue
@@ -578,25 +591,39 @@ export async function tickAutonomousSalesLoopForScheduler(
         "autonomous_sales_loop_org",
       )
     } catch {
+      const reconciled = await countReconciledAslResearchOutcomesSince(admin, {
+        organizationId,
+        sinceIso: tickStartedAtIso,
+      }).catch(() => ({ count: 0, runIds: [] }))
+
       organizationResults.push({
         organizationId,
         executed: false,
         outcomes_completed: 0,
+        outcomes_reconciled: reconciled.count,
         stop_reason: "org_work_timeout",
       })
+      totalOutcomesReconciled += reconciled.count
       continue
     }
+
+    const reconciled = await countReconciledAslResearchOutcomesSince(admin, {
+      organizationId,
+      sinceIso: tickStartedAtIso,
+    }).catch(() => ({ count: 0, runIds: [] }))
 
     organizationResults.push({
       organizationId,
       executed: loopResult.executed,
       outcomes_completed: loopResult.outcomes_completed,
+      outcomes_reconciled: reconciled.count,
       stop_reason: loopResult.stop_reason,
       selected_work_count: loopResult.selected_work?.length ?? 0,
     })
 
     if (loopResult.executed) organizationsExecuted += 1
     totalOutcomesCompleted += loopResult.outcomes_completed
+    totalOutcomesReconciled += reconciled.count
     totalIterations += loopResult.iterations
   }
 
@@ -605,6 +632,7 @@ export async function tickAutonomousSalesLoopForScheduler(
     organizations_attempted: organizationIds.length,
     organizations_executed: organizationsExecuted,
     total_outcomes_completed: totalOutcomesCompleted,
+    total_outcomes_reconciled: totalOutcomesReconciled,
     total_iterations: totalIterations,
     skipped_reason: null,
     dry_run: input.dryRun,

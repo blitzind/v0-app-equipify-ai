@@ -98,6 +98,7 @@ export async function executeSalesWorkflowAgent(
         trigger: "sales_loop",
         generatedAt: input.generatedAt,
         runQualification: true,
+        aslWorkItemId: workItem.id,
       })
       const outcome = mapProspectResearchExecutionToSalesOutcome(execution, {
         workItemId: workItem.id,

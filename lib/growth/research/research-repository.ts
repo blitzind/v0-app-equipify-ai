@@ -301,6 +301,19 @@ export async function fetchActiveProspectResearchRun(
   return data ? mapProspectResearchRunRow(data as ResearchRunRow) : null
 }
 
+export async function fetchProspectResearchRunById(
+  admin: SupabaseClient,
+  runId: string,
+): Promise<GrowthResearchRunPublicView | null> {
+  const { data, error } = await researchRunsTable(admin)
+    .select(RUN_SELECT)
+    .eq("id", runId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? mapProspectResearchRunRow(data as ResearchRunRow) : null
+}
+
 export async function fetchCachedProspectResearchRun(
   admin: SupabaseClient,
   leadId: string,
