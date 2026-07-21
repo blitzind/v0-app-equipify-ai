@@ -11,6 +11,7 @@ import {
   type GrowthPortfolioEligibilityLeadRecord,
   type GrowthPortfolioEligibilityResult,
 } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
+import { buildReviewResearchProjectionLeadIds } from "@/lib/growth/research/growth-revenue-queue-research-selection"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
@@ -172,12 +173,17 @@ export function buildPortfolioEligibilityContext(
   leads: Array<GrowthLead | GrowthPortfolioEligibilityLeadRecord>,
 ): GrowthPortfolioEligibilityContext {
   const eligible = filterPortfolioEligibleLeads(leads, organizationId)
+  const reviewResearchProjectionLeadIds = buildReviewResearchProjectionLeadIds(
+    leads.filter((lead): lead is GrowthLead => "website" in lead),
+  )
   return {
     qaMarker: GROWTH_PORTFOLIO_ELIGIBILITY_1A_QA_MARKER,
     organizationId,
     eligibleLeadIds: new Set(eligible.map((lead) => lead.id)),
     eligibleCount: eligible.length,
     excludedCount: Math.max(0, leads.length - eligible.length),
+    reviewResearchProjectionLeadIds,
+    reviewResearchProjectionCount: reviewResearchProjectionLeadIds.size,
   }
 }
 
@@ -216,6 +222,9 @@ export function isPortfolioEligibleWorkItem(
 
   const leadId = extractLeadIdFromWorkItem(item)
   if (!leadId) return false
+  if (item.type === "research" && eligibility.reviewResearchProjectionLeadIds.has(leadId)) {
+    return true
+  }
   return eligibility.eligibleLeadIds.has(leadId)
 }
 

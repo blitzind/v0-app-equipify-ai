@@ -44,6 +44,9 @@ function findLatestRunForLead<T extends { leadId: string; completedAt: string }>
   )
 }
 
+export const GE_AIOS_LIVE_7C_ASL_DELEGATION_REPAIR_QA_MARKER =
+  "ge-aios-live-7c-asl-delegation-research-execution-repair-v1" as const
+
 export async function executeSalesWorkflowAgent(
   admin: SupabaseClient,
   input: {
@@ -53,7 +56,8 @@ export async function executeSalesWorkflowAgent(
     generatedAt: string
   },
 ): Promise<ExecuteSalesWorkflowAgentResult> {
-  const { workflow_agent: workflowAgent, workItem } = input
+  const { workItem, delegation } = input
+  const { workflow_agent: workflowAgent } = delegation
   const leadId = extractLeadIdFromWorkItem(workItem)
 
   if (

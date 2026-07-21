@@ -62,6 +62,7 @@ export function runWorkManager(input: RunWorkManagerInput): AvaWorkManagerResult
     ...input,
     memorySummary: input.memorySummary ?? null,
     portfolioEligibility,
+    portfolioLeads: input.portfolioLeads ?? null,
   })
   const workItems = filterPortfolioEligibleWorkItems(
     nextBestActionsToWorkItems(decisionResult.next_best_actions, timestamp),

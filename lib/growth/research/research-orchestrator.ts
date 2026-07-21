@@ -53,12 +53,18 @@ import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/researc
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import { detectWebsiteTechnologies } from "@/lib/growth/research/technology-detector"
 import { detectWebsiteFeatureFlags, scoreWebsiteMaturity } from "@/lib/growth/research/website-maturity-score"
+import type { GrowthCompanyEvidenceBundle } from "@/lib/growth/research/company-evidence/company-evidence-types"
+import type { GrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import type { GrowthLead } from "@/lib/growth/types"
+
+export const GROWTH_RESEARCH_CACHE_HIT_POST_RECONCILE_7B_QA_MARKER =
+  "ge-aios-live-7b-cache-hit-post-research-reconcile-v1" as const
 
 export type RunProspectResearchInput = {
   admin: SupabaseClient
   leadId: string
   rebuild?: boolean
+  createdBy?: string | null
 }
 
 export type RunProspectResearchResult =
@@ -77,6 +83,74 @@ function buildCompanyEvidenceCollectionRecord(input: {
     warnings: input.warnings?.length ? input.warnings.slice(0, 4) : undefined,
     collectedAt: new Date().toISOString(),
   }
+}
+
+function resolvePostResearchEvidenceFromRun(run: GrowthResearchRunPublicView): {
+  evidenceBundle: GrowthCompanyEvidenceBundle | null
+  websiteCrawlText: string | null
+} {
+  return {
+    evidenceBundle: run.signals?.companyEvidence_v22 ?? null,
+    websiteCrawlText: run.researchSummary?.trim() ? run.researchSummary : null,
+  }
+}
+
+async function finalizeProspectResearchCompletion(input: {
+  admin: SupabaseClient
+  lead: GrowthLead
+  run: GrowthResearchRunPublicView
+  admissionContext: GrowthLeadAdmissionContext
+  evidenceBundle?: GrowthCompanyEvidenceBundle | null
+  websiteCrawlText?: string | null
+  createdBy?: string | null
+  cached: boolean
+}): Promise<GrowthLead | null> {
+  const resolvedFromRun = resolvePostResearchEvidenceFromRun(input.run)
+
+  await markLeadProspectResearchCompleted(input.admin, input.lead.id, input.run)
+  await recomputeGrowthLeadWorkflowSignals(input.admin, input.lead.id)
+
+  const postResearchAdmission = await reconcileExternalDiscoveryPostResearchAdmission({
+    admin: input.admin,
+    lead: input.lead,
+    admissionContext: input.admissionContext,
+    evidenceBundle: input.evidenceBundle ?? resolvedFromRun.evidenceBundle,
+    websiteCrawlText: input.websiteCrawlText ?? resolvedFromRun.websiteCrawlText,
+  })
+  if (postResearchAdmission.applied) {
+    logProspectResearch("external_discovery_post_research_admission", {
+      leadId: input.lead.id,
+      runId: input.run.id,
+      admissionState: postResearchAdmission.admissionState,
+      keywordValidationPass: postResearchAdmission.keywordValidationPass,
+      industryGatePassed: postResearchAdmission.industryGatePassed,
+      cached: input.cached,
+      qa_marker: GROWTH_RESEARCH_CACHE_HIT_POST_RECONCILE_7B_QA_MARKER,
+    })
+  }
+
+  void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+    admin: input.admin,
+    leadId: input.lead.id,
+    event: "website_analysis_completed",
+    actor: { userId: input.createdBy ?? null, email: null },
+  })
+  void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+    admin: input.admin,
+    leadId: input.lead.id,
+    event: "operator_rerun_research",
+    actor: { userId: input.createdBy ?? null, email: null },
+  })
+
+  logGrowthEngine("prospect_research_completed", {
+    leadId: input.lead.id,
+    runId: input.run.id,
+    maturityScore: input.run.websiteMaturityScore,
+    recommendedNextAction: input.run.recommendedNextAction,
+    cached: input.cached,
+  })
+
+  return fetchGrowthLeadById(input.admin, input.lead.id)
 }
 
 export async function runProspectResearch(input: RunProspectResearchInput): Promise<RunProspectResearchResult> {
@@ -105,6 +179,18 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     const cached = await fetchCachedProspectResearchRun(input.admin, lead.id, inputHash)
     if (cached) {
       logProspectResearch("cache_hit", { leadId: lead.id, runId: cached.id, inputHash })
+      if (cached.status === "completed") {
+        const admissionContext = await loadGrowthLeadAdmissionContext(input.admin, organizationId)
+        const refreshedLead = await finalizeProspectResearchCompletion({
+          admin: input.admin,
+          lead,
+          run: cached,
+          admissionContext,
+          createdBy: input.createdBy ?? null,
+          cached: true,
+        })
+        return { ok: true, run: cached, cached: true, lead: refreshedLead ?? lead }
+      }
       return { ok: true, run: cached, cached: true, lead }
     }
   }
@@ -400,47 +486,16 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
       researchConfidence,
     })
 
-    await markLeadProspectResearchCompleted(input.admin, lead.id, run)
-    await recomputeGrowthLeadWorkflowSignals(input.admin, lead.id)
-
-    const postResearchAdmission = await reconcileExternalDiscoveryPostResearchAdmission({
+    const refreshedLead = await finalizeProspectResearchCompletion({
       admin: input.admin,
       lead,
+      run,
       admissionContext,
       evidenceBundle: companyEvidenceBundle,
       websiteCrawlText: scrape.plainText,
+      createdBy: input.createdBy ?? null,
+      cached: false,
     })
-    if (postResearchAdmission.applied) {
-      logProspectResearch("external_discovery_post_research_admission", {
-        leadId: lead.id,
-        runId: run.id,
-        admissionState: postResearchAdmission.admissionState,
-        keywordValidationPass: postResearchAdmission.keywordValidationPass,
-        industryGatePassed: postResearchAdmission.industryGatePassed,
-      })
-    }
-
-    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
-      admin: input.admin,
-      leadId: lead.id,
-      event: "website_analysis_completed",
-      actor: { userId: input.createdBy ?? null, email: null },
-    })
-    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
-      admin: input.admin,
-      leadId: lead.id,
-      event: "operator_rerun_research",
-      actor: { userId: input.createdBy ?? null, email: null },
-    })
-
-    logGrowthEngine("prospect_research_completed", {
-      leadId: lead.id,
-      runId: run.id,
-      maturityScore: run.websiteMaturityScore,
-      recommendedNextAction: run.recommendedNextAction,
-    })
-
-    const refreshedLead = await fetchGrowthLeadById(input.admin, lead.id)
     return { ok: true, run, cached: false, lead: refreshedLead }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

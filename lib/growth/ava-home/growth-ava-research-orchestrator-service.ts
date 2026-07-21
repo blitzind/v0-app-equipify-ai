@@ -26,17 +26,15 @@ import {
   GROWTH_AVA_RESEARCH_LOOP_COMPLETED_EVENT,
   GROWTH_AVA_RESEARCH_ORCHESTRATOR_QA_MARKER,
   GROWTH_AVA_RESEARCH_QUEUE_DEFAULT_MAX_LEADS,
-  GROWTH_AVA_RESEARCH_QUEUE_SECTIONS,
   GROWTH_AVA_QUALIFICATION_WAITING_MESSAGE,
   type GrowthAvaQualificationOrchestratorStatus,
   type GrowthAvaResearchLoopLeadResult,
   type GrowthAvaResearchLoopSummary,
   type GrowthAvaResearchQueueRunResult,
 } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
+import { selectRevenueQueueResearchCandidates } from "@/lib/growth/research/growth-revenue-queue-research-selection"
 import { fetchGrowthLeadById, listGrowthLeads } from "@/lib/growth/lead-repository"
-import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
-import { buildRevenueQueueDashboardSectionsFromLeads } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
 import { executeGrowthLeadProspectResearch } from "@/lib/growth/research/growth-lead-research-execution-service"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -233,27 +231,7 @@ async function runQualificationSpecialistForLead(
   })
 }
 
-export function selectRevenueQueueResearchCandidates(
-  leads: GrowthLead[],
-  maxLeads: number = GROWTH_AVA_RESEARCH_QUEUE_DEFAULT_MAX_LEADS,
-): RevenueQueueCardView[] {
-  const sections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
-  const selected: RevenueQueueCardView[] = []
-  const seen = new Set<string>()
-
-  for (const sectionId of GROWTH_AVA_RESEARCH_QUEUE_SECTIONS) {
-    const section = sections.find((row) => row.id === sectionId)
-    if (!section) continue
-    for (const card of section.items) {
-      if (seen.has(card.id)) continue
-      seen.add(card.id)
-      selected.push(card)
-      if (selected.length >= maxLeads) return selected
-    }
-  }
-
-  return selected
-}
+export { selectRevenueQueueResearchCandidates } from "@/lib/growth/research/growth-revenue-queue-research-selection"
 
 function buildEvidenceFromProspectRun(run: GrowthResearchRunPublicView): GrowthLeadResearchEvidenceSummary {
   const verifiedEvidence = [

@@ -42,6 +42,9 @@ export type GrowthPortfolioEligibilityContext = {
   eligibleLeadIds: ReadonlySet<string>
   eligibleCount: number
   excludedCount: number
+  /** LIVE-8B — review + research-ready leads projected into Work Manager without changing eligibleLeadIds. */
+  reviewResearchProjectionLeadIds: ReadonlySet<string>
+  reviewResearchProjectionCount: number
 }
 
 export type GrowthPortfolioEligibilityLeadRecord = Pick<

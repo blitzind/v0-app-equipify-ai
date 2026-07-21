@@ -24,6 +24,11 @@ import {
   discoveryActionLabel,
 } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import {
+  GE_AIOS_LIVE_8B_WORK_MANAGER_RESEARCH_PROJECTION_QA_MARKER,
+  selectRevenueQueueReviewResearchCandidates,
+} from "@/lib/growth/research/growth-revenue-queue-research-selection"
+import type { GrowthLead } from "@/lib/growth/types"
 
 export type BuildDecisionContextInput = {
   workspaceSummary: Pick<
@@ -38,6 +43,7 @@ export type BuildDecisionContextInput = {
   memorySummary?: import("@/lib/growth/memory/types").AvaMemorySummary | null
   leadSnapshotsById?: RelationshipLeadSnapshotMap
   portfolioEligibility?: GrowthPortfolioEligibilityContext | null
+  portfolioLeads?: GrowthLead[] | null
 }
 
 function inferActionKind(actionLabel: string): DecisionCandidate["kind"] {
@@ -139,6 +145,26 @@ function buildResearchCandidates(input: BuildDecisionContextInput): DecisionCand
         requiresHumanApproval: ready,
       }
     })
+}
+
+function buildReviewResearchProjectionCandidates(
+  portfolioLeads: GrowthLead[] | null | undefined,
+): DecisionCandidate[] {
+  if (!portfolioLeads?.length) return []
+
+  return selectRevenueQueueReviewResearchCandidates(portfolioLeads).map((card) => ({
+    id: `research:queue:${card.id}`,
+    kind: "research_company" as const,
+    title: `Research company — ${card.company_name}`,
+    detail: "Admission review — pending operational keyword validation.",
+    href: `/growth/leads/${card.id}`,
+    companyName: card.company_name,
+    source: "revenue_queue" as const,
+    queuePriority:
+      card.candidate_priority === "urgent" || card.candidate_priority === "high"
+        ? ("high" as const)
+        : ("medium" as const),
+  }))
 }
 
 function buildScaleAwarenessCandidates(input: BuildDecisionContextInput): DecisionCandidate[] {
@@ -361,6 +387,8 @@ function buildBusinessClarificationCandidate(
   ]
 }
 
+export { GE_AIOS_LIVE_8B_WORK_MANAGER_RESEARCH_PROJECTION_QA_MARKER } from "@/lib/growth/research/growth-revenue-queue-research-selection"
+
 export function buildDecisionContext(input: BuildDecisionContextInput): DecisionContext {
   const narrativeInput: BuildAvaNarrativeContextInput = {
     workspaceSummary: input.workspaceSummary,
@@ -376,6 +404,7 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     .map((item) => candidateFromQueueItem(item, input.portfolioEligibility))
     .filter((row): row is DecisionCandidate => row != null)
   const research = buildResearchCandidates(input)
+  const reviewResearchProjection = buildReviewResearchProjectionCandidates(input.portfolioLeads)
   const missions = [
     ...buildMissionCandidates(input),
     ...buildScaleAwarenessCandidates(input),
@@ -400,7 +429,11 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     approvals,
     missions: [...missions, ...businessCandidates.filter((row) => row.kind === "continue_mission")],
     inbox: [...inbox, ...approvals.filter((row) => row.kind === "review_reply")],
-    research: [...research, ...businessCandidates.filter((row) => row.kind !== "continue_mission")],
+    research: [
+      ...reviewResearchProjection,
+      ...research,
+      ...businessCandidates.filter((row) => row.kind !== "continue_mission"),
+    ],
     meetings,
     businessUnderstanding: narrative.businessUnderstanding,
     evidenceConfidence:

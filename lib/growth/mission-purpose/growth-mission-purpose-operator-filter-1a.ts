@@ -34,6 +34,7 @@ import {
   sanitizeResearchLoopSummaryForPortfolio,
 } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import { GROWTH_PORTFOLIO_ELIGIBILITY_1A_QA_MARKER } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
+import { buildReviewResearchProjectionLeadIds } from "@/lib/growth/research/growth-revenue-queue-research-selection"
 import type { GrowthPortfolioEligibilityContext } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a-types"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import { buildRevenueQueueDashboardSectionsFromLeads } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
@@ -128,12 +129,15 @@ export function buildProductionPortfolioEligibilityContext(
 ): GrowthPortfolioEligibilityContext {
   const productionLeads = filterLeadsForMissionPurposeScope(leads, purposeByLeadId, "operations")
   const portfolioEligible = filterPortfolioEligibleLeads(productionLeads, organizationId)
+  const reviewResearchProjectionLeadIds = buildReviewResearchProjectionLeadIds(productionLeads)
   return {
     qaMarker: GROWTH_PORTFOLIO_ELIGIBILITY_1A_QA_MARKER,
     organizationId,
     eligibleLeadIds: new Set(portfolioEligible.map((lead) => lead.id)),
     eligibleCount: portfolioEligible.length,
     excludedCount: Math.max(0, leads.length - portfolioEligible.length),
+    reviewResearchProjectionLeadIds,
+    reviewResearchProjectionCount: reviewResearchProjectionLeadIds.size,
   }
 }
 
