@@ -12,12 +12,14 @@ import {
 import { listRecentGrowthCronExecutionRuns } from "@/lib/growth/runtime/cron-telemetry-repository"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { loadGrowthHomeCanonicalRuntimeActivity } from "@/lib/growth/home/growth-home-canonical-runtime-activity-loader-1a"
 
 const SCHEDULER_INTERVAL_MS = 20 * 60 * 1000
 const STEP_BUDGET_MS = 3_000
 
 export async function loadGrowthHomeRuntimeTrustPayload(input: {
   admin: SupabaseClient
+  organizationId: string
   generatedAt: string
   budgetMs?: number
 }): Promise<GrowthHomeRuntimeTrustServerPayload> {
@@ -55,6 +57,14 @@ export async function loadGrowthHomeRuntimeTrustPayload(input: {
       ? new Date(Date.parse(lastSchedulerRunAt) + SCHEDULER_INTERVAL_MS).toISOString()
       : null
 
+  const canonicalActivity = await loadGrowthHomeCanonicalRuntimeActivity({
+    admin: input.admin,
+    organizationId: input.organizationId,
+    generatedAt: input.generatedAt,
+    lastSchedulerRunAt,
+    budgetMs: STEP_BUDGET_MS,
+  })
+
   return {
     qaMarker: GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
     generatedAt: input.generatedAt,
@@ -63,5 +73,6 @@ export async function loadGrowthHomeRuntimeTrustPayload(input: {
     lastSchedulerRunAt,
     lastSchedulerOk: lastScheduler?.ok ?? null,
     nextSchedulerEstimateAt,
+    canonicalActivity,
   }
 }

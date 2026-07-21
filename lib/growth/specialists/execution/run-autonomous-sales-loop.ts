@@ -42,6 +42,12 @@ import {
 } from "@/lib/growth/work-manager/manager/run-work-manager"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import { withSchedulerWorkTimeout } from "@/lib/growth/runtime-guardrails/growth-scheduler-runtime-budget-1a"
+import {
+  AUTONOMOUS_SALES_LOOP_PER_WORK_ITEM_TIMEOUT_MS,
+  AUTONOMOUS_SALES_LOOP_SCHEDULER_MAX_ITERATIONS,
+  GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER,
+  resolveAutonomousSalesLoopSchedulerOrgTimeoutMs,
+} from "@/lib/growth/specialists/execution/growth-runtime-throughput-1a"
 import { continueCurrentPhase } from "@/lib/growth/operating-rhythm/engine/run-operating-rhythm"
 import {
   countReconciledAslResearchOutcomesSince,
@@ -57,6 +63,8 @@ export type RunAutonomousSalesLoopInput = {
   salesOutcomes?: SalesOutcome[]
   /** GE-AIOS-18B — Inspect selected work without agent execution or persistence. */
   dryRun?: boolean
+  /** GE-AIOS-RUNTIME-THROUGHPUT-1A — per work-item timeout; slow leads yield to the next candidate. */
+  perWorkItemTimeoutMs?: number
 }
 
 function estimateWorkItemMinutes(item: import("@/lib/growth/work-manager/types").AvaWorkItem): number {
@@ -180,6 +188,9 @@ export async function runAutonomousSalesLoop(
   const maxIterations = input.maxIterations ?? AUTONOMOUS_SALES_LOOP_DEFAULT_MAX_ITERATIONS
   const dailyBudgetMinutes = input.dailyBudgetMinutes ?? AUTONOMOUS_SALES_LOOP_DEFAULT_DAILY_BUDGET_MINUTES
   const dryRun = input.dryRun === true
+  const perWorkItemTimeoutMs =
+    input.perWorkItemTimeoutMs ?? AUTONOMOUS_SALES_LOOP_PER_WORK_ITEM_TIMEOUT_MS
+  const skippedWorkItemIds = new Set<string>()
 
   logAutonomousSalesLoopEvent(
     dryRun
@@ -246,25 +257,25 @@ export async function runAutonomousSalesLoop(
 
   try {
     while (iterations < maxIterations && minutesSpent < dailyBudgetMinutes) {
-      const nextItem = selectNextExecutableWorkItem(workResult)
+      const nextItem = selectNextExecutableWorkItem(workResult, { excludeWorkItemIds: skippedWorkItemIds })
       if (!nextItem) {
         stopReason = "no_executable_work"
         logAutonomousSalesLoopEvent(
           AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.NO_EXECUTABLE_WORK,
-          { organization_id: input.organizationId, dry_run: dryRun },
+          { organization_id: input.organizationId, dry_run: dryRun, skipped_count: skippedWorkItemIds.size },
         )
         break
       }
 
       const delegation = delegateWorkItem(nextItem)
       if (!delegation.delegated) {
+        skippedWorkItemIds.add(nextItem.id)
         iterationLog.push({
           work_item_id: nextItem.id,
           workflow_agent: "none",
           completed: false,
           skip_reason: delegation.reason,
         })
-        stopReason = "no_executable_work"
         logAutonomousSalesLoopEvent(
           AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.NO_EXECUTABLE_WORK,
           {
@@ -272,9 +283,10 @@ export async function runAutonomousSalesLoop(
             work_item_id: nextItem.id,
             skip_reason: delegation.reason,
             dry_run: dryRun,
+            continue_after_skip: true,
           },
         )
-        break
+        continue
       }
 
       logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.WORK_ITEM_SELECTED, {
@@ -306,28 +318,53 @@ export async function runAutonomousSalesLoop(
         break
       }
 
-      const execution = await executeSalesWorkflowAgent(input.admin, {
-        organizationId: input.organizationId,
-        workItem: nextItem,
-        delegation,
-        generatedAt,
-      })
+      let execution: Awaited<ReturnType<typeof executeSalesWorkflowAgent>>
+      try {
+        execution = await withSchedulerWorkTimeout(
+          executeSalesWorkflowAgent(input.admin, {
+            organizationId: input.organizationId,
+            workItem: nextItem,
+            delegation,
+            generatedAt,
+          }),
+          perWorkItemTimeoutMs,
+          "autonomous_sales_loop_work_item",
+        )
+      } catch (error) {
+        skippedWorkItemIds.add(nextItem.id)
+        const skipReason = error instanceof Error ? error.message : "work_item_timeout"
+        iterationLog.push({
+          work_item_id: nextItem.id,
+          workflow_agent: delegation.workflow_agent,
+          completed: false,
+          skip_reason: skipReason,
+        })
+        logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.AGENT_SKIPPED, {
+          organization_id: input.organizationId,
+          work_item_id: nextItem.id,
+          workflow_agent: delegation.workflow_agent,
+          skip_reason: skipReason,
+          throughput_qa_marker: GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER,
+        })
+        continue
+      }
 
       if (!execution.executed) {
+        skippedWorkItemIds.add(nextItem.id)
         iterationLog.push({
           work_item_id: nextItem.id,
           workflow_agent: execution.workflow_agent,
           completed: false,
           skip_reason: execution.skip_reason,
         })
-        stopReason = "no_executable_work"
         logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.AGENT_SKIPPED, {
           organization_id: input.organizationId,
           work_item_id: nextItem.id,
           workflow_agent: execution.workflow_agent,
           skip_reason: execution.skip_reason,
+          throughput_qa_marker: GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER,
         })
-        break
+        continue
       }
 
       logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.AGENT_EXECUTED, {
@@ -345,19 +382,19 @@ export async function runAutonomousSalesLoop(
       })
 
       if (validatedOutcomes.length === 0) {
+        skippedWorkItemIds.add(nextItem.id)
         iterationLog.push({
           work_item_id: nextItem.id,
           workflow_agent: execution.workflow_agent,
           completed: false,
           skip_reason: "validation_failed",
         })
-        stopReason = "no_executable_work"
         logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.LOOP_ERROR, {
           organization_id: input.organizationId,
           error_reason: "validation_failed",
           work_item_id: nextItem.id,
         })
-        break
+        continue
       }
 
       logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.OUTCOME_FINALIZED, {
@@ -522,8 +559,13 @@ export async function tickAutonomousSalesLoopForScheduler(
 ): Promise<AutonomousSalesSchedulerTickResult> {
   const startedAt = input.startedAt ?? Date.now()
   const maxRuntimeMs = input.maxRuntimeMs ?? 20_000
-  const perOrganizationTimeoutMs = input.perOrganizationTimeoutMs ?? 8_000
   const organizationIds = [...new Set(input.organizationIds)].slice(0, input.maxOrganizations ?? 5)
+  const perOrganizationTimeoutMs =
+    input.perOrganizationTimeoutMs ??
+    resolveAutonomousSalesLoopSchedulerOrgTimeoutMs({
+      salesLoopBudgetMs: maxRuntimeMs,
+      organizationCount: Math.max(1, organizationIds.length),
+    })
 
   const killSwitches = await getRuntimeKillSwitchStates(admin)
   if (!input.dryRun && !killSwitches.autonomy_enabled) {
@@ -583,9 +625,10 @@ export async function tickAutonomousSalesLoopForScheduler(
         runAutonomousSalesLoop({
           admin,
           organizationId,
-          maxIterations: input.dryRun ? 1 : 2,
+          maxIterations: input.dryRun ? 1 : AUTONOMOUS_SALES_LOOP_SCHEDULER_MAX_ITERATIONS,
           dailyBudgetMinutes: 30,
           dryRun: input.dryRun,
+          perWorkItemTimeoutMs: AUTONOMOUS_SALES_LOOP_PER_WORK_ITEM_TIMEOUT_MS,
         }),
         perOrganizationTimeoutMs,
         "autonomous_sales_loop_org",

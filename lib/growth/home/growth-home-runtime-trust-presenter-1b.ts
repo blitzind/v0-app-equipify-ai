@@ -17,9 +17,14 @@ import {
   buildOperatorWhatHappensNextLines,
   resolvePrimaryOperatorCompanyName,
 } from "@/lib/growth/home/growth-home-operator-closure-1a"
+import {
+  GROWTH_HOME_RECENT_AUTONOMOUS_ACTIVITY_MS,
+  GROWTH_HOME_STALE_AUTONOMOUS_ACTIVITY_MS,
+} from "@/lib/growth/specialists/execution/growth-runtime-throughput-1a"
 import { humanizeOperatorFacingCopy } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 import {
   GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
+  type GrowthHomeCanonicalRuntimeActivitySource,
   type GrowthHomeRuntimeTrustActivityEntry,
   type GrowthHomeRuntimeTrustCurrentActivity,
   type GrowthHomeRuntimeTrustHeartbeatLine,
@@ -36,6 +41,7 @@ const STATE_LABELS: Record<GrowthHomeRuntimeTrustOperatorState, string> = {
   scheduled: "Scheduled",
   idle: "Idle",
   blocked: "Blocked",
+  stale: "Stale telemetry",
 }
 
 const STATE_EMOJI: Record<GrowthHomeRuntimeTrustOperatorState, string> = {
@@ -44,6 +50,7 @@ const STATE_EMOJI: Record<GrowthHomeRuntimeTrustOperatorState, string> = {
   scheduled: "🔵",
   idle: "⚪",
   blocked: "🔴",
+  stale: "🟠",
 }
 
 function formatClockTime(iso: string): string {
@@ -173,21 +180,81 @@ function describeCurrentStep(activeWork: AvaWorkItem | null): string | null {
   }
 }
 
-function buildCurrentActivity(activeWork: AvaWorkItem | null): GrowthHomeRuntimeTrustCurrentActivity | null {
-  if (!activeWork) return null
-  const startedAt = activeWork.updated_at || activeWork.created_at
+function buildCurrentActivity(
+  activeWork: AvaWorkItem | null,
+  canonicalClaim: {
+    companyName: string | null
+    claimedAt: string
+  } | null,
+): GrowthHomeRuntimeTrustCurrentActivity | null {
+  if (!activeWork && !canonicalClaim) return null
+
+  const startedAt =
+    canonicalClaim?.claimedAt ?? activeWork?.updated_at ?? activeWork?.created_at ?? null
+  const companyName = canonicalClaim?.companyName ?? activeWork?.company_name?.trim() ?? null
+
   return {
-    companyName: activeWork.company_name?.trim() ?? null,
-    taskLabel: describeCurrentStep(activeWork),
-    currentStepLabel: describeCurrentStep(activeWork),
+    companyName,
+    taskLabel: activeWork ? describeCurrentStep(activeWork) : companyName ? `Researching ${companyName}` : null,
+    currentStepLabel: activeWork ? describeCurrentStep(activeWork) : companyName ? `Researching ${companyName}` : null,
     startedAt,
     startedLabel: startedAt ? formatClockTime(startedAt) : null,
-    expectedCompletionMinutes: activeWork.estimated_minutes ?? null,
+    expectedCompletionMinutes: activeWork?.estimated_minutes ?? null,
     expectedCompletionLabel:
-      activeWork.estimated_minutes != null && activeWork.estimated_minutes > 0
+      activeWork?.estimated_minutes != null && activeWork.estimated_minutes > 0
         ? `~${activeWork.estimated_minutes} minute${activeWork.estimated_minutes === 1 ? "" : "s"}`
         : null,
     pipelineSteps: buildPipelineSteps(activeWork),
+  }
+}
+
+function resolveLastAutonomousActivity(input: {
+  salesOutcomes: GrowthHomeSalesOutcomesPayload | null | undefined
+  server: GrowthHomeRuntimeTrustServerPayload | null | undefined
+}): {
+  occurredAt: string | null
+  label: string | null
+  source: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback" | null
+} {
+  const feed = buildActivityFeed(input.salesOutcomes)
+  const feedLatest = feed[0]
+  const canonical = input.server?.canonicalActivity?.lastMeaningfulActivity ?? null
+
+  const candidates: Array<{
+    occurredAt: string
+    label: string
+    source: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback"
+  }> = []
+
+  if (canonical) {
+    candidates.push({
+      occurredAt: canonical.occurredAt,
+      label: canonical.label,
+      source: canonical.source,
+    })
+  }
+  if (feedLatest) {
+    candidates.push({
+      occurredAt: feedLatest.occurredAt,
+      label: feedLatest.summary,
+      source: "sales_outcome",
+    })
+  }
+  if (input.server?.lastSchedulerRunAt) {
+    candidates.push({
+      occurredAt: input.server.lastSchedulerRunAt,
+      label: "Scheduler cycle completed",
+      source: "scheduler_fallback",
+    })
+  }
+
+  const winner =
+    candidates.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null
+
+  return {
+    occurredAt: winner?.occurredAt ?? null,
+    label: winner?.label ?? null,
+    source: winner?.source ?? null,
   }
 }
 
@@ -216,6 +283,8 @@ function resolveOperatorState(input: {
   stopReason: string | null
   setupIncomplete: boolean
   nowMs: number
+  hasActiveCanonicalClaim: boolean
+  lastActivitySource: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback" | null
 }): GrowthHomeRuntimeTrustOperatorState {
   if (!input.autonomyEnabled && input.setupIncomplete) return "blocked"
   if (!input.autonomyEnabled) return "idle"
@@ -223,15 +292,40 @@ function resolveOperatorState(input: {
   if (input.stopReason === "operator_required" || input.stopReason === "operator_approval_required") {
     return "waiting"
   }
-  if (input.activeWork?.status === "working") return "working"
-  if (input.recentActivityAt && input.nowMs - Date.parse(input.recentActivityAt) < 5 * 60 * 1000) {
+
+  const activityAgeMs = input.recentActivityAt
+    ? input.nowMs - Date.parse(input.recentActivityAt)
+    : Number.POSITIVE_INFINITY
+  const hasRecentActivity = activityAgeMs < GROWTH_HOME_RECENT_AUTONOMOUS_ACTIVITY_MS
+  const hasStaleActivity =
+    Number.isFinite(activityAgeMs) && activityAgeMs >= GROWTH_HOME_STALE_AUTONOMOUS_ACTIVITY_MS
+
+  if (input.hasActiveCanonicalClaim && activityAgeMs < GROWTH_HOME_STALE_AUTONOMOUS_ACTIVITY_MS) {
     return "working"
   }
+
+  if (input.activeWork?.status === "working" && hasRecentActivity) {
+    return "working"
+  }
+
+  if (
+    (input.activeWork?.status === "working" || input.hasActiveCanonicalClaim) &&
+    hasStaleActivity &&
+    input.lastActivitySource !== "scheduler_fallback"
+  ) {
+    return "stale"
+  }
+
+  if (hasRecentActivity && input.lastActivitySource !== "scheduler_fallback") {
+    return "working"
+  }
+
   if (input.stopReason && input.stopReason !== "no_executable_work" && input.stopReason !== "portfolio_healthy") {
     return "blocked"
   }
   if (input.autonomyEnabled && !input.activeWork && !input.recentActivityAt) return "scheduled"
-  if (input.activeWork) return "working"
+  if (input.autonomyEnabled && hasStaleActivity) return "scheduled"
+  if (input.activeWork && hasRecentActivity) return "working"
   return "idle"
 }
 
@@ -387,8 +481,23 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   const stopReason = tick?.stopReason ?? null
 
   const activityFeed = buildActivityFeed(input.salesOutcomes)
-  const lastAutonomousActionAt = activityFeed[0]?.occurredAt ?? input.server?.lastSchedulerRunAt ?? null
-  const lastAutonomousActionLabel = activityFeed[0]?.summary ?? null
+  const lastActivity = resolveLastAutonomousActivity({
+    salesOutcomes: input.salesOutcomes,
+    server: input.server,
+  })
+  const lastAutonomousActionAt = lastActivity.occurredAt
+  const lastAutonomousActionLabel = lastActivity.label
+  const lastAutonomousActivitySource = lastActivity.source
+  const canonicalClaim = input.server?.canonicalActivity?.activeClaim ?? null
+  const hasActiveCanonicalClaim = canonicalClaim != null
+
+  const activityAgeMs = lastAutonomousActionAt
+    ? nowMs - Date.parse(lastAutonomousActionAt)
+    : Number.POSITIVE_INFINITY
+  const telemetryStale =
+    Boolean(input.activeWork?.status === "working" || hasActiveCanonicalClaim) &&
+    activityAgeMs >= GROWTH_HOME_STALE_AUTONOMOUS_ACTIVITY_MS &&
+    lastAutonomousActivitySource !== "scheduler_fallback"
 
   const operatorState = resolveOperatorState({
     autonomyEnabled,
@@ -398,6 +507,8 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     stopReason,
     setupIncomplete: input.setupIncomplete,
     nowMs,
+    hasActiveCanonicalClaim,
+    lastActivitySource: lastAutonomousActivitySource,
   })
 
   const heartbeat: GrowthHomeRuntimeTrustHeartbeatLine[] = []
@@ -410,11 +521,12 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     })
   }
 
-  if (input.activeWork?.status === "working") {
-    const started = input.activeWork.updated_at || input.activeWork.created_at
+  if (input.activeWork?.status === "working" || hasActiveCanonicalClaim) {
+    const started =
+      canonicalClaim?.claimedAt ?? input.activeWork?.updated_at ?? input.activeWork?.created_at ?? null
     heartbeat.push({
       id: "current-work-started",
-      label: "Current work started",
+      label: hasActiveCanonicalClaim ? "Current assignment claimed" : "Current work started",
       value: started ? formatRelativeAgo(started, nowMs) : "Just now",
     })
   }
@@ -468,6 +580,11 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
         : "I'm idle — nothing is queued for autonomous work right now.")
   }
 
+  if (operatorState === "stale") {
+    idleReason =
+      "I have a projected assignment, but no recent autonomous progress was recorded. I'll retry on the next scheduled cycle."
+  }
+
   if (operatorState === "blocked") {
     blockedReason =
       humanizeStopReason(stopReason) ??
@@ -494,6 +611,9 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
       break
     case "scheduled":
       statusExplanation = "Autonomous mode is on — I'll pick up the next cycle on schedule."
+      break
+    case "stale":
+      statusExplanation = idleReason ?? "Assignment telemetry is stale — waiting for the next scheduler cycle."
       break
     case "blocked":
       statusExplanation = blockedReason ?? "I'm blocked from continuing."
@@ -547,7 +667,12 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     idleReason,
     blockedReason,
     heartbeat,
-    currentActivity: buildCurrentActivity(input.activeWork),
+    currentActivity: buildCurrentActivity(
+      input.activeWork,
+      canonicalClaim
+        ? { companyName: canonicalClaim.companyName, claimedAt: canonicalClaim.claimedAt }
+        : null,
+    ),
     activityFeed,
     startStatus: buildStartStatus({
       autonomyEnabled,
@@ -569,5 +694,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     primaryCompanyName,
     whatHappensNextLines,
     canCloseBrowserLine,
+    telemetryStale,
+    lastAutonomousActivitySource: lastAutonomousActivitySource,
   }
 }

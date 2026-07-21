@@ -12,6 +12,7 @@ import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/ex
 import { GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import {
   buildSalesOutcomeDailySummary,
+  mapCompletedProspectResearchRunToSalesOutcome,
   mapMeetingRunToSalesOutcome,
   mapOutreachRunToSalesOutcome,
   mapQualificationRunToSalesOutcome,
@@ -46,7 +47,55 @@ export async function buildGrowthHomeSalesOutcomes(input: {
     }).catch(() => null),
   ])
 
+  const since24h = new Date(Date.parse(input.generatedAt) - 24 * 60 * 60 * 1000).toISOString()
+  const canonicalResearchRuns = await input.admin
+    .schema("growth")
+    .from("research_runs")
+    .select("id, lead_id, status, company_name, research_summary, research_confidence, completed_at, created_at")
+    .eq("organization_id", input.organizationId)
+    .eq("status", "completed")
+    .gte("completed_at", since24h)
+    .order("completed_at", { ascending: false })
+    .limit(24)
+    .then((result) => result.data ?? [])
+    .catch(() => [])
+
   const rawOutcomes = [
+    ...canonicalResearchRuns
+      .map((row) =>
+        mapCompletedProspectResearchRunToSalesOutcome({
+          run: {
+            id: String(row.id),
+            leadId: String(row.lead_id),
+            status: "completed",
+            websiteUrl: null,
+            companyName: typeof row.company_name === "string" ? row.company_name : null,
+            industryGuess: null,
+            employeeSizeGuess: null,
+            revenueSizeGuess: null,
+            websiteMaturityScore: null,
+            socialPresenceScore: null,
+            reputationScore: null,
+            technologyScore: null,
+            detectedTechnologies: [],
+            signals: { painSignals: [] },
+            competitors: [],
+            researchSummary: typeof row.research_summary === "string" ? row.research_summary : null,
+            suggestedPitchAngle: null,
+            suggestedSequence: null,
+            suggestedCallOpening: null,
+            recommendedNextAction: null,
+            researchConfidence:
+              typeof row.research_confidence === "number" ? row.research_confidence : null,
+            completedAt: typeof row.completed_at === "string" ? row.completed_at : null,
+            failedReason: null,
+            createdAt: typeof row.created_at === "string" ? row.created_at : input.generatedAt,
+          },
+          workItemId: `research:canonical:${row.id}`,
+          leadId: String(row.lead_id),
+        }),
+      )
+      .filter((row): row is NonNullable<typeof row> => row != null),
     ...(researchPilot?.recentRuns ?? [])
       .map(mapResearchRunToSalesOutcome)
       .filter((row): row is NonNullable<typeof row> => row != null),

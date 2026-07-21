@@ -11,6 +11,7 @@ export type GrowthHomeRuntimeTrustOperatorState =
   | "scheduled"
   | "idle"
   | "blocked"
+  | "stale"
 
 export type GrowthHomeRuntimeTrustServerPayload = {
   qaMarker: typeof GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER
@@ -20,6 +21,33 @@ export type GrowthHomeRuntimeTrustServerPayload = {
   lastSchedulerRunAt: string | null
   lastSchedulerOk: boolean | null
   nextSchedulerEstimateAt: string | null
+  /** GE-AIOS-RUNTIME-THROUGHPUT-1A — canonical DB-backed activity authority */
+  canonicalActivity?: GrowthHomeCanonicalRuntimeActivityPayload | null
+}
+
+export type GrowthHomeCanonicalRuntimeActivitySource =
+  | "research_run_completed"
+  | "research_run_claimed"
+  | "organization_memory_event"
+  | "scheduler_cycle"
+
+export type GrowthHomeCanonicalRuntimeActivity = {
+  occurredAt: string
+  label: string
+  source: GrowthHomeCanonicalRuntimeActivitySource
+}
+
+export type GrowthHomeCanonicalRuntimeActivityPayload = {
+  qaMarker: string
+  lastMeaningfulActivity: GrowthHomeCanonicalRuntimeActivity | null
+  activeClaim: {
+    runId: string
+    leadId: string
+    companyName: string | null
+    claimedAt: string
+    status: "queued" | "running"
+  } | null
+  recentCompletedResearchCount24h: number
 }
 
 export type GrowthHomeRuntimeTrustHeartbeatLine = {
@@ -92,4 +120,7 @@ export type GrowthHomeRuntimeTrustViewModel = {
   primaryCompanyName: string | null
   whatHappensNextLines: string[]
   canCloseBrowserLine: string | null
+  /** GE-AIOS-RUNTIME-THROUGHPUT-1A */
+  telemetryStale: boolean
+  lastAutonomousActivitySource: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback" | null
 }

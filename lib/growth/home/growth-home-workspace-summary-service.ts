@@ -959,7 +959,11 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const runtimeTrust = organizationId
     ? await (async () => {
         const startedAt = Date.now()
-        const value = await loadGrowthHomeRuntimeTrustPayload({ admin: input.admin, generatedAt })
+        const value = await loadGrowthHomeRuntimeTrustPayload({
+          admin: input.admin,
+          organizationId,
+          generatedAt,
+        })
         stageTimings.push({
           label: "runtime_trust",
           durationMs: Date.now() - startedAt,
