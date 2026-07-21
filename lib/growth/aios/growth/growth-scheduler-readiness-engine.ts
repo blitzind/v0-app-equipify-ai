@@ -30,7 +30,7 @@ import {
 
 const DEFAULT_BUDGET_LIMITS: GrowthSchedulerBudgetLimits = {
   maxAgentPreviewsPerHour: 12,
-  maxInternalRuntimeCandidatesPerDay: 4,
+  maxInternalRuntimeCandidatesPerDay: 500,
   maxOutboundCandidatesPerDay: 0,
   maxEstimatedSpendPerDay: 50,
   maxFailedAttemptsPerMission: 3,

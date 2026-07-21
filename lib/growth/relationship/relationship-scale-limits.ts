@@ -73,11 +73,11 @@ export const GROWTH_OBJECTIVE_SCHEDULER_OBJECTIVE_CONCURRENCY_LIMIT = 2 as const
 /** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — Per-objective tick timeout (slow-account isolation). */
 export const GROWTH_OBJECTIVE_SCHEDULER_OBJECTIVE_TIMEOUT_MS = 10_000 as const
 
-/** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — Per-organization portfolio snapshot timeout. */
-export const GROWTH_OBJECTIVE_SCHEDULER_ORG_WORK_TIMEOUT_MS = 8_000 as const
+/** GE-AIOS-RUNTIME-SCALE-1A — Per-organization ASL timeout (parallel research batches). */
+export const GROWTH_OBJECTIVE_SCHEDULER_ORG_WORK_TIMEOUT_MS = 85_000 as const
 
-/** GE-AIOS-SCHEDULER-RUNTIME-OPTIMIZATION-1A — Outer scheduler wall-clock budget. */
-export const GROWTH_OBJECTIVE_SCHEDULER_MAX_RUNTIME_MS = 45_000 as const
+/** GE-AIOS-RUNTIME-SCALE-1A — Outer scheduler wall-clock budget. */
+export const GROWTH_OBJECTIVE_SCHEDULER_MAX_RUNTIME_MS = 120_000 as const
 
 /** Centralized cap registry for certification and ops documentation. */
 export const GROWTH_SALES_WORKLOAD_CAP_REGISTRY = {

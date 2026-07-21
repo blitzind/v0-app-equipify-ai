@@ -103,7 +103,7 @@ import { projectCanonicalActiveMissionsForHome } from "@/lib/growth/aios/mission
 import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a"
 import { loadGrowthOrganizationalEvidenceCompletenessFromProduction } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-production-loader-next-3b"
 import { loadGrowthHomeRuntimeTrustPayload } from "@/lib/growth/home/growth-home-runtime-trust-loader-1b"
-import { loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
+import { ensureScaleResearchBudgetForActivatedOrg, loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -985,6 +985,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
             salesOutcomes,
             missionDiscovery: productionMissionDiscovery,
           })
+          if (value.activated) {
+            await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId).catch(() => undefined)
+          }
           stageTimings.push({
             label: "ava_activation",
             durationMs: Date.now() - startedAt,

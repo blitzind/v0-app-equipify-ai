@@ -130,7 +130,7 @@ export function buildSchedulerBudgetLimitsFromPolicy(
     policy.dailyBudgets.find((row) => row.resourceKey === "autonomous_research_runs")?.dailyCap ?? 100
   return {
     maxAgentPreviewsPerHour: policy.hourlyBudgets.researchRunsPerHour,
-    maxInternalRuntimeCandidatesPerDay: Math.max(1, Math.min(researchDaily, 4)),
+    maxInternalRuntimeCandidatesPerDay: Math.max(1, researchDaily),
     maxOutboundCandidatesPerDay: policy.outboundEnabled ? 0 : 0,
     maxEstimatedSpendPerDay: 50,
     maxFailedAttemptsPerMission: 3,

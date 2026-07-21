@@ -360,9 +360,27 @@ export async function insertProspectResearchRun(
   return mapProspectResearchRunRow(data as ResearchRunRow)
 }
 
-export async function markProspectResearchRunRunning(admin: SupabaseClient, runId: string): Promise<void> {
-  const { error } = await researchRunsTable(admin).update({ status: "running" }).eq("id", runId)
+export async function markProspectResearchRunRunning(admin: SupabaseClient, runId: string): Promise<boolean> {
+  const { data, error } = await researchRunsTable(admin)
+    .update({ status: "running" })
+    .eq("id", runId)
+    .eq("status", "queued")
+    .select("id")
+    .maybeSingle()
   if (error) throw new Error(error.message)
+  return data != null
+}
+
+export async function countOrganizationActiveProspectResearchRuns(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<number> {
+  const { count, error } = await researchRunsTable(admin)
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .in("status", ["queued", "running"])
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export async function finishProspectResearchRun(

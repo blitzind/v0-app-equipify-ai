@@ -48,6 +48,14 @@ import {
   GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER,
   resolveAutonomousSalesLoopSchedulerOrgTimeoutMs,
 } from "@/lib/growth/specialists/execution/growth-runtime-throughput-1a"
+import {
+  AUTONOMOUS_SALES_LOOP_RESEARCH_WORK_ITEM_TIMEOUT_MS,
+  AUTONOMOUS_SALES_LOOP_SCHEDULER_MAX_ITERATIONS_SCALE_1A,
+  AUTONOMOUS_SALES_LOOP_SCHEDULER_MIN_ORG_TIMEOUT_MS_SCALE_1A,
+  GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS,
+  GROWTH_RUNTIME_SCALE_1A_QA_MARKER,
+} from "@/lib/growth/specialists/execution/growth-runtime-scale-1a"
+import { mapWithBoundedConcurrency } from "@/lib/growth/runtime-guardrails/growth-bounded-concurrency"
 import { continueCurrentPhase } from "@/lib/growth/operating-rhythm/engine/run-operating-rhythm"
 import {
   countReconciledAslResearchOutcomesSince,
@@ -180,6 +188,35 @@ function buildWorkManagerState(input: {
   return { workResult, salesOutcomes: input.salesOutcomes }
 }
 
+type ResearchWorkBatchEntry = {
+  workItem: import("@/lib/growth/work-manager/types").AvaWorkItem
+  delegation: ReturnType<typeof delegateWorkItem> & { delegated: true }
+}
+
+function collectResearchWorkBatch(input: {
+  workResult: AvaWorkManagerResult
+  skippedWorkItemIds: Set<string>
+  maxItems: number
+}): ResearchWorkBatchEntry[] {
+  const batch: ResearchWorkBatchEntry[] = []
+  const reserved = new Set(input.skippedWorkItemIds)
+
+  while (batch.length < input.maxItems) {
+    const workItem = selectNextExecutableWorkItem(input.workResult, { excludeWorkItemIds: reserved })
+    if (!workItem) break
+    const delegation = delegateWorkItem(workItem)
+    if (!delegation.delegated) {
+      reserved.add(workItem.id)
+      continue
+    }
+    if (delegation.workflow_agent !== "research_agent") break
+    batch.push({ workItem, delegation })
+    reserved.add(workItem.id)
+  }
+
+  return batch
+}
+
 export async function runAutonomousSalesLoop(
   input: RunAutonomousSalesLoopInput,
 ): Promise<AutonomousSalesLoopResult> {
@@ -257,6 +294,125 @@ export async function runAutonomousSalesLoop(
 
   try {
     while (iterations < maxIterations && minutesSpent < dailyBudgetMinutes) {
+      const remainingIterations = maxIterations - iterations
+      const researchBatch = collectResearchWorkBatch({
+        workResult,
+        skippedWorkItemIds,
+        maxItems: Math.min(remainingIterations, GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS),
+      })
+
+      if (researchBatch.length >= 2) {
+        for (const entry of researchBatch) {
+          selectedWork.push(
+            buildSelectedWorkSnapshot({
+              workItem: entry.workItem,
+              workflowAgent: entry.delegation.workflow_agent,
+              routingReason: entry.delegation.routing_reason,
+            }),
+          )
+          iterations += 1
+          minutesSpent += estimateWorkItemMinutes(entry.workItem)
+        }
+
+        if (dryRun) {
+          for (const entry of researchBatch) {
+            iterationLog.push({
+              work_item_id: entry.workItem.id,
+              workflow_agent: entry.delegation.workflow_agent,
+              completed: false,
+              skip_reason: "dry_run",
+            })
+          }
+          break
+        }
+
+        logAutonomousSalesLoopEvent(AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.WORK_ITEM_SELECTED, {
+          organization_id: input.organizationId,
+          dry_run: dryRun,
+          parallel_batch_size: researchBatch.length,
+          scale_qa_marker: GROWTH_RUNTIME_SCALE_1A_QA_MARKER,
+        })
+
+        const batchResults = await mapWithBoundedConcurrency(
+          researchBatch,
+          GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS,
+          async (entry) => {
+            try {
+              const execution = await withSchedulerWorkTimeout(
+                executeSalesWorkflowAgent(input.admin, {
+                  organizationId: input.organizationId,
+                  workItem: entry.workItem,
+                  delegation: entry.delegation,
+                  generatedAt,
+                }),
+                AUTONOMOUS_SALES_LOOP_RESEARCH_WORK_ITEM_TIMEOUT_MS,
+                "autonomous_sales_loop_research_batch_item",
+              )
+              return { entry, execution, error: null as string | null }
+            } catch (error) {
+              return {
+                entry,
+                execution: null,
+                error: error instanceof Error ? error.message : "work_item_timeout",
+              }
+            }
+          },
+        )
+
+        for (const result of batchResults) {
+          const { entry, execution, error } = result
+          if (error || !execution?.executed) {
+            skippedWorkItemIds.add(entry.workItem.id)
+            iterationLog.push({
+              work_item_id: entry.workItem.id,
+              workflow_agent: entry.delegation.workflow_agent,
+              completed: false,
+              skip_reason: error ?? execution?.skip_reason ?? "agent_skipped",
+            })
+            continue
+          }
+
+          const validatedOutcomes = finalizeSalesSpecialistOutcomes({
+            organizationId: input.organizationId,
+            generatedAt,
+            outcomes: [execution.outcome],
+          })
+          if (validatedOutcomes.length === 0) {
+            skippedWorkItemIds.add(entry.workItem.id)
+            continue
+          }
+
+          salesOutcomes = [...salesOutcomes, ...validatedOutcomes]
+          outcomesCompleted += validatedOutcomes.length
+          iterationLog.push({
+            work_item_id: entry.workItem.id,
+            workflow_agent: execution.workflow_agent,
+            completed: true,
+            outcome_type: execution.outcome.outcome_type,
+          })
+        }
+
+        const nextState = buildWorkManagerState({
+          workManagerInput: loadedContext.workManagerInput,
+          salesOutcomes,
+          organizationalKnowledge: loadedContext.organizationalKnowledge,
+          persistedMemoryStore: loadedContext.persistedMemoryStore,
+          organizationId: input.organizationId,
+          generatedAt,
+        })
+        workResult = nextState.workResult
+
+        if (minutesSpent >= dailyBudgetMinutes) {
+          stopReason = "daily_budget_exhausted"
+          break
+        }
+        if (iterations >= maxIterations) {
+          stopReason = "max_iterations_reached"
+          break
+        }
+        continue
+      }
+
       const nextItem = selectNextExecutableWorkItem(workResult, { excludeWorkItemIds: skippedWorkItemIds })
       if (!nextItem) {
         stopReason = "no_executable_work"
@@ -327,7 +483,9 @@ export async function runAutonomousSalesLoop(
             delegation,
             generatedAt,
           }),
-          perWorkItemTimeoutMs,
+          delegation.workflow_agent === "research_agent"
+            ? AUTONOMOUS_SALES_LOOP_RESEARCH_WORK_ITEM_TIMEOUT_MS
+            : perWorkItemTimeoutMs,
           "autonomous_sales_loop_work_item",
         )
       } catch (error) {
@@ -567,6 +725,9 @@ export async function tickAutonomousSalesLoopForScheduler(
       organizationCount: Math.max(1, organizationIds.length),
     })
 
+  // Scale floor overrides throughput-1a when scheduler passes legacy 8s cap.
+  const orgTimeoutMs = Math.max(perOrganizationTimeoutMs, AUTONOMOUS_SALES_LOOP_SCHEDULER_MIN_ORG_TIMEOUT_MS_SCALE_1A)
+
   const killSwitches = await getRuntimeKillSwitchStates(admin)
   if (!input.dryRun && !killSwitches.autonomy_enabled) {
     logAutonomousSalesLoopEvent(
@@ -625,12 +786,12 @@ export async function tickAutonomousSalesLoopForScheduler(
         runAutonomousSalesLoop({
           admin,
           organizationId,
-          maxIterations: input.dryRun ? 1 : AUTONOMOUS_SALES_LOOP_SCHEDULER_MAX_ITERATIONS,
+          maxIterations: input.dryRun ? 1 : AUTONOMOUS_SALES_LOOP_SCHEDULER_MAX_ITERATIONS_SCALE_1A,
           dailyBudgetMinutes: 30,
           dryRun: input.dryRun,
-          perWorkItemTimeoutMs: AUTONOMOUS_SALES_LOOP_PER_WORK_ITEM_TIMEOUT_MS,
+          perWorkItemTimeoutMs: AUTONOMOUS_SALES_LOOP_RESEARCH_WORK_ITEM_TIMEOUT_MS,
         }),
-        perOrganizationTimeoutMs,
+        orgTimeoutMs,
         "autonomous_sales_loop_org",
       )
     } catch {

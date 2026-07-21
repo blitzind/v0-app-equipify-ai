@@ -9,6 +9,14 @@ import type {
   GrowthHomeCanonicalRuntimeActivityPayload,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import { GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER } from "@/lib/growth/specialists/execution/growth-runtime-throughput-1a"
+import {
+  GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS,
+  GROWTH_ORG_RESEARCH_TARGET_PER_DAY,
+  GROWTH_RUNTIME_SCALE_1A_QA_MARKER,
+  projectEndOfDayTotal,
+} from "@/lib/growth/specialists/execution/growth-runtime-scale-1a"
+import { getAutonomyBudgetSnapshot } from "@/lib/growth/autonomy/growth-autonomy-budget-service"
+import type { GrowthHomeRuntimeResearchPaceSnapshot } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import { mapProspectResearchRunRow } from "@/lib/growth/research/research-repository"
 
 const RUN_SELECT =
@@ -32,13 +40,18 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
   budgetMs?: number
 }): Promise<GrowthHomeCanonicalRuntimeActivityPayload> {
   const since24h = new Date(Date.parse(input.generatedAt) - 24 * 60 * 60 * 1000).toISOString()
+  const since1h = new Date(Date.parse(input.generatedAt) - 60 * 60 * 1000).toISOString()
+  const startOfDay = new Date(input.generatedAt)
+  startOfDay.setUTCHours(0, 0, 0, 0)
+  const startOfDayIso = startOfDay.toISOString()
   const budgetMs = input.budgetMs ?? 2_500
 
   const step = await withGrowthHomeLoaderBudget({
     label: "canonical_runtime_activity",
     budgetMs,
     fn: async () => {
-      const [completedRuns, activeRuns, memoryEvents, completedCountResult] = await Promise.all([
+      const [completedRuns, activeRuns, memoryEvents, completedCountResult, completedTodayResult, completedLastHourResult, activeCountResult, researchBudget] =
+        await Promise.all([
         input.admin
           .schema("growth")
           .from("research_runs")
@@ -71,6 +84,30 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
           .eq("organization_id", input.organizationId)
           .eq("status", "completed")
           .gte("completed_at", since24h),
+        input.admin
+          .schema("growth")
+          .from("research_runs")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", input.organizationId)
+          .eq("status", "completed")
+          .gte("completed_at", startOfDayIso),
+        input.admin
+          .schema("growth")
+          .from("research_runs")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", input.organizationId)
+          .eq("status", "completed")
+          .gte("completed_at", since1h),
+        input.admin
+          .schema("growth")
+          .from("research_runs")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", input.organizationId)
+          .in("status", ["queued", "running"]),
+        getAutonomyBudgetSnapshot(input.admin, {
+          organizationId: input.organizationId,
+          capability: "research",
+        }).catch(() => null),
       ])
 
       return {
@@ -78,6 +115,10 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
         activeRuns: activeRuns.data ?? [],
         memoryEvents: memoryEvents.data ?? [],
         completedCount24h: completedCountResult.count ?? 0,
+        completedToday: completedTodayResult.count ?? 0,
+        completedLastHour: completedLastHourResult.count ?? 0,
+        activeConcurrent: activeCountResult.count ?? 0,
+        researchBudget,
       }
     },
     fallback: {
@@ -85,6 +126,10 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
       activeRuns: [],
       memoryEvents: [],
       completedCount24h: 0,
+      completedToday: 0,
+      completedLastHour: 0,
+      activeConcurrent: 0,
+      researchBudget: null,
     },
   })
 
@@ -135,8 +180,29 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
     ? mapProspectResearchRunRow(activeRow as Parameters<typeof mapProspectResearchRunRow>[0])
     : null
 
+  const researchedToday = step.value.completedToday
+  const researchedLastHour = step.value.completedLastHour
+  const ratePerHour = researchedLastHour
+  const pace: GrowthHomeRuntimeResearchPaceSnapshot = {
+    researchedToday,
+    researchTargetPerDay: GROWTH_ORG_RESEARCH_TARGET_PER_DAY,
+    researchedLastHour,
+    ratePerHour,
+    projectedEndOfDay: projectEndOfDayTotal({
+      researchedToday,
+      researchedLastHour,
+      generatedAtIso: input.generatedAt,
+    }),
+    activeConcurrentJobs: step.value.activeConcurrent,
+    maxConcurrentJobs: GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS,
+    queueDepth: Math.max(0, GROWTH_ORG_RESEARCH_TARGET_PER_DAY - researchedToday),
+    budgetConsumed: step.value.researchBudget?.consumed ?? null,
+    budgetCap: step.value.researchBudget?.cap ?? null,
+    budgetBlocked: step.value.researchBudget?.exceeded === true,
+  }
+
   return {
-    qaMarker: GROWTH_RUNTIME_THROUGHPUT_1A_QA_MARKER,
+    qaMarker: GROWTH_RUNTIME_SCALE_1A_QA_MARKER,
     lastMeaningfulActivity: pickLatestActivity(
       activities.filter((row) => row.source !== "scheduler_cycle"),
     ),
@@ -151,5 +217,6 @@ export async function loadGrowthHomeCanonicalRuntimeActivity(input: {
           }
         : null,
     recentCompletedResearchCount24h: step.value.completedCount24h,
+    pace,
   }
 }

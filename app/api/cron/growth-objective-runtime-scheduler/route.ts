@@ -5,6 +5,7 @@ import { runGrowthCronJob } from "@/lib/growth/runtime/growth-cron-runner"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 
 export const runtime = "nodejs"
+export const maxDuration = 300
 
 const CRON_ROUTE = growthCronApiPath("growth-objective-runtime-scheduler")
 

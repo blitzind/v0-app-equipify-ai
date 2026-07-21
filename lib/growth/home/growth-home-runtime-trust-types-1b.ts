@@ -48,6 +48,22 @@ export type GrowthHomeCanonicalRuntimeActivityPayload = {
     status: "queued" | "running"
   } | null
   recentCompletedResearchCount24h: number
+  /** GE-AIOS-RUNTIME-SCALE-1A — operator pace telemetry */
+  pace?: GrowthHomeRuntimeResearchPaceSnapshot | null
+}
+
+export type GrowthHomeRuntimeResearchPaceSnapshot = {
+  researchedToday: number
+  researchTargetPerDay: number
+  researchedLastHour: number
+  ratePerHour: number
+  projectedEndOfDay: number
+  activeConcurrentJobs: number
+  maxConcurrentJobs: number
+  queueDepth: number
+  budgetConsumed: number | null
+  budgetCap: number | null
+  budgetBlocked: boolean
 }
 
 export type GrowthHomeRuntimeTrustHeartbeatLine = {
@@ -123,4 +139,6 @@ export type GrowthHomeRuntimeTrustViewModel = {
   /** GE-AIOS-RUNTIME-THROUGHPUT-1A */
   telemetryStale: boolean
   lastAutonomousActivitySource: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback" | null
+  /** GE-AIOS-RUNTIME-SCALE-1A */
+  researchPace: GrowthHomeRuntimeResearchPaceSnapshot | null
 }

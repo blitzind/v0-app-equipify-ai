@@ -23,7 +23,9 @@ import {
 } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
 import { isCanonicalExecutionAllowed } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-1a"
 import { runProspectResearch } from "@/lib/growth/research/research-orchestrator"
-import { fetchActiveProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { fetchActiveProspectResearchRun, countOrganizationActiveProspectResearchRuns } from "@/lib/growth/research/research-repository"
+import { GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS } from "@/lib/growth/specialists/execution/growth-runtime-scale-1a"
+import { getAutonomyBudgetSnapshot, consumeAutonomyBudget } from "@/lib/growth/autonomy/growth-autonomy-budget-service"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import {
@@ -166,6 +168,32 @@ export async function executeGrowthLeadProspectResearch(
   const lead = await fetchGrowthLeadById(input.admin, input.leadId)
   if (!lead) {
     return { ok: false, outcome: "not_found", code: "not_found", message: "Lead not found." }
+  }
+
+  if (input.trigger === "sales_loop" || input.trigger === "ava_queue") {
+    const researchBudget = await getAutonomyBudgetSnapshot(input.admin, {
+      organizationId,
+      capability: "research",
+    }).catch(() => null)
+    if (researchBudget?.exceeded) {
+      return {
+        ok: false,
+        outcome: "skipped",
+        code: "daily_research_budget_exceeded",
+        message: "Daily research budget reached for this organization.",
+      }
+    }
+    const activeCount = await countOrganizationActiveProspectResearchRuns(input.admin, organizationId).catch(
+      () => 0,
+    )
+    if (activeCount >= GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS) {
+      return {
+        ok: false,
+        outcome: "skipped",
+        code: "concurrent_research_limit",
+        message: "Organization concurrent research limit reached.",
+      }
+    }
   }
 
   // SV1-1 / ARCH-1A — Resource Allocation Facade in shadow mode only.
@@ -345,6 +373,18 @@ export async function executeGrowthLeadProspectResearch(
     run: research.run,
     trigger: input.trigger,
   })
+
+  if (
+    !research.cached &&
+    research.run.status === "completed" &&
+    (input.trigger === "sales_loop" || input.trigger === "ava_queue")
+  ) {
+    await consumeAutonomyBudget(input.admin, {
+      organizationId,
+      capability: "research",
+      volume: 1,
+    }).catch(() => undefined)
+  }
 
   await recomputeGrowthLeadWorkflowSignals(input.admin, lead.id).catch(() => undefined)
 

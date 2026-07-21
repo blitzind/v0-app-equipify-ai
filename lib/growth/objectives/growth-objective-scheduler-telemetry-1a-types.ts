@@ -22,12 +22,12 @@ export const GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A = {
     "telemetry_emit",
   ],
   budgets: {
-    outerWallClockMs: 45_000,
-    salesLoopMs: 20_000,
-    portfolioManagerMs: 25_000,
+    outerWallClockMs: 120_000,
+    salesLoopMs: 90_000,
+    portfolioManagerMs: 20_000,
     draftFactoryMs: 15_000,
     objectiveTimeoutMs: 10_000,
-    orgWorkTimeoutMs: 8_000,
+    orgWorkTimeoutMs: 85_000,
     minSafeWindowMs: 2_000,
   },
   caps: {

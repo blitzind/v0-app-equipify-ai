@@ -217,7 +217,14 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
   logProspectResearch("started", { leadId: lead.id, runId: run.id, inputHash, rebuild })
 
   try {
-    await markProspectResearchRunRunning(input.admin, run.id)
+    const claimed = await markProspectResearchRunRunning(input.admin, run.id)
+    if (!claimed) {
+      const active = await fetchActiveProspectResearchRun(input.admin, lead.id)
+      if (active) {
+        return { ok: true, run: active, cached: true, lead }
+      }
+      throw new Error("research_run_claim_lost_race")
+    }
 
     const scrape = await scrapeProspectWebsite(lead.website)
 

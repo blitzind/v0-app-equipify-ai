@@ -36,8 +36,8 @@ export type GrowthAutonomousResearchPilotControlState =
   (typeof GROWTH_AUTONOMOUS_RESEARCH_PILOT_CONTROL_STATES)[number]
 
 export const GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET = {
-  maxRunsPerHour: 10,
-  maxRunsPerDay: 100,
+  maxRunsPerHour: 40,
+  maxRunsPerDay: 750,
 } as const
 
 export type GrowthAutonomousResearchRunOutcome = "completed" | "failed" | "skipped"

@@ -10,6 +10,7 @@ import {
   type GrowthAvaActivationState,
 } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import { fetchGrowthAutonomySettings, upsertGrowthAutonomySettings } from "@/lib/growth/autonomy/growth-autonomy-settings-repository"
+import { GROWTH_ORG_RESEARCH_TARGET_PER_DAY } from "@/lib/growth/specialists/execution/growth-runtime-scale-1a"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -29,7 +30,28 @@ import { runGrowthAvaActivationImmediateProductionTick } from "@/lib/growth/ava-
 import type { GrowthAvaActivationImmediateTick } from "@/lib/growth/ava-activation/growth-ava-activation-immediate-tick-burn-in-1a"
 
 /** Minimum daily research runs enabled on activation when budget was disabled (0 = off). */
-export const GROWTH_AVA_ACTIVATION_RESEARCH_DAILY_BUDGET_LAUNCH_1D = 20 as const
+export const GROWTH_AVA_ACTIVATION_RESEARCH_DAILY_BUDGET_LAUNCH_1D = 500 as const
+
+export async function ensureScaleResearchBudgetForActivatedOrg(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const settings = await fetchGrowthAutonomySettings(admin, organizationId)
+  const currentCap = settings.dailyBudgetLimits.autonomous_research_runs ?? 0
+  if (currentCap >= GROWTH_ORG_RESEARCH_TARGET_PER_DAY) return
+  if (currentCap <= 0) return
+
+  await upsertGrowthAutonomySettings(admin, organizationId, {
+    dailyBudgetLimits: {
+      ...settings.dailyBudgetLimits,
+      autonomous_research_runs: GROWTH_ORG_RESEARCH_TARGET_PER_DAY,
+    },
+    capabilityToggles: {
+      ...settings.capabilityToggles,
+      research: true,
+    },
+  })
+}
 
 async function ensureActivationResearchBudgetEnabled(
   admin: SupabaseClient,
@@ -172,6 +194,7 @@ export async function activateGrowthAvaAutonomousMode(input: {
 
   if (shouldRunImmediateTick) {
     await ensureActivationResearchBudgetEnabled(input.admin, input.organizationId)
+  await ensureScaleResearchBudgetForActivatedOrg(input.admin, input.organizationId)
   }
 
   const activation = await loadGrowthAvaActivationState(input)

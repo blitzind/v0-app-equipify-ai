@@ -33,6 +33,7 @@ import {
   type GrowthHomeRuntimeTrustServerPayload,
   type GrowthHomeRuntimeTrustStartStatus,
   type GrowthHomeRuntimeTrustViewModel,
+  type GrowthHomeRuntimeResearchPaceSnapshot,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 
 const STATE_LABELS: Record<GrowthHomeRuntimeTrustOperatorState, string> = {
@@ -561,6 +562,41 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   const employment = activation?.employment ?? null
   const nextMilestoneLabel = resolveNextMilestoneLabel(input.activeWork)
 
+  const researchPace: GrowthHomeRuntimeResearchPaceSnapshot | null =
+    input.server?.canonicalActivity?.pace ?? null
+
+  if (researchPace) {
+    heartbeat.unshift({
+      id: "research-pace-today",
+      label: "Researched today",
+      value: `${researchPace.researchedToday} / ${researchPace.researchTargetPerDay}`,
+    })
+    heartbeat.splice(1, 0, {
+      id: "research-rate-hour",
+      label: "Current rate",
+      value: `${researchPace.ratePerHour} companies/hour`,
+    })
+    heartbeat.splice(2, 0, {
+      id: "research-projected-eod",
+      label: "Projected today",
+      value: `${researchPace.projectedEndOfDay} companies`,
+    })
+    if (researchPace.activeConcurrentJobs > 0) {
+      heartbeat.splice(3, 0, {
+        id: "research-concurrent",
+        label: "Active research jobs",
+        value: `${researchPace.activeConcurrentJobs} / ${researchPace.maxConcurrentJobs}`,
+      })
+    }
+    if (researchPace.budgetBlocked) {
+      heartbeat.splice(3, 0, {
+        id: "research-budget-blocked",
+        label: "Research budget",
+        value: "Daily limit reached",
+      })
+    }
+  }
+
   if (employeeMode && employment?.activatedLabel) {
     heartbeat.unshift({
       id: "active-since",
@@ -696,5 +732,6 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     canCloseBrowserLine,
     telemetryStale,
     lastAutonomousActivitySource: lastAutonomousActivitySource,
+    researchPace,
   }
 }
