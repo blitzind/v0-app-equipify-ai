@@ -47,6 +47,9 @@ function findLatestRunForLead<T extends { leadId: string; completedAt: string }>
 export const GE_AIOS_LIVE_7C_ASL_DELEGATION_REPAIR_QA_MARKER =
   "ge-aios-live-7c-asl-delegation-research-execution-repair-v1" as const
 
+export const GE_AIOS_HOTFIX_LIVE_8B_1_RESEARCH_ADMIN_REPAIR_QA_MARKER =
+  "ge-aios-hotfix-live-8b-1-research-admin-repair-v1" as const
+
 export async function executeSalesWorkflowAgent(
   admin: SupabaseClient,
   input: {
@@ -89,7 +92,7 @@ export async function executeSalesWorkflowAgent(
         return { executed: false, workflow_agent: workflowAgent, skip_reason: "lead_id_required" }
       }
       const execution = await executeGrowthLeadProspectResearch({
-        admin: input.admin,
+        admin,
         organizationId: input.organizationId,
         leadId,
         trigger: "sales_loop",
