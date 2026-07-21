@@ -23,6 +23,9 @@ import type { GrowthCanonicalActiveMissionsProjection } from "@/lib/growth/aios/
 import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 import type { GrowthHomeAvaBusinessObjectiveLeadershipPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types"
 import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
+import type { GrowthOrganizationalEvidenceCompletenessSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-next-3b-types"
+import type { GrowthHomeRuntimeTrustServerPayload } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
+import type { GrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -156,4 +159,10 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   businessObjectiveLeadership?: GrowthHomeAvaBusinessObjectiveLeadershipPayload | null
   /** GE-AIOS-LIVE-1A — Production mission authority for Home / Operations */
   productionMissionAuthority?: GrowthProductionMissionAuthority | null
+  /** GE-AIOS-LAUNCH-1A — Production evidence completeness for executive reasoning (NEXT-3B) */
+  organizationalEvidenceCompleteness?: GrowthOrganizationalEvidenceCompletenessSnapshot | null
+  /** GE-AIOS-LAUNCH-1B — Production runtime trust signals (kill switches, scheduler, autonomy tick health) */
+  runtimeTrust?: GrowthHomeRuntimeTrustServerPayload | null
+  /** GE-AIOS-LAUNCH-1C — Ava one-time activation + employment history */
+  avaActivation?: GrowthAvaActivationState | null
 }

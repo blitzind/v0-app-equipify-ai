@@ -99,6 +99,9 @@ import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth
 import { buildCanonicalMissionsFromApprovalSnapshot } from "@/lib/growth/aios/missions/growth-canonical-mission-1a"
 import { projectCanonicalActiveMissionsForHome } from "@/lib/growth/aios/missions/growth-canonical-mission-1a-home"
 import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a"
+import { loadGrowthOrganizationalEvidenceCompletenessFromProduction } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-production-loader-next-3b"
+import { loadGrowthHomeRuntimeTrustPayload } from "@/lib/growth/home/growth-home-runtime-trust-loader-1b"
+import { loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -932,6 +935,58 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         })
       : null
 
+  const organizationalEvidenceCompleteness = organizationId
+    ? await withGrowthHomeLoaderBudget({
+        label: "organizational_evidence_completeness",
+        budgetMs: loaderBudgetMs,
+        fn: async () => {
+          const loaded = await loadGrowthOrganizationalEvidenceCompletenessFromProduction({
+            admin: input.admin,
+            organizationId,
+          })
+          return loaded.snapshot
+        },
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
+    : null
+
+  const runtimeTrust = organizationId
+    ? await (async () => {
+        const startedAt = Date.now()
+        const value = await loadGrowthHomeRuntimeTrustPayload({ admin: input.admin, generatedAt })
+        stageTimings.push({
+          label: "runtime_trust",
+          durationMs: Date.now() - startedAt,
+          timedOut: false,
+        })
+        return value
+      })()
+    : null
+
+  const avaActivation =
+    organizationId && input.actorUserId?.trim() && input.actorUserId !== "undefined"
+      ? await (async () => {
+          const startedAt = Date.now()
+          const value = await loadGrowthAvaActivationState({
+            admin: input.admin,
+            organizationId,
+            actorUserId: input.actorUserId,
+            generatedAt,
+            salesOutcomes,
+            missionDiscovery: productionMissionDiscovery,
+          })
+          stageTimings.push({
+            label: "ava_activation",
+            durationMs: Date.now() - startedAt,
+            timedOut: false,
+          })
+          return value
+        })()
+      : null
+
   return {
     ok: true,
     qaMarker: GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER,
@@ -975,6 +1030,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     }),
     businessObjectiveLeadership,
     productionMissionAuthority,
+    organizationalEvidenceCompleteness,
+    runtimeTrust,
+    avaActivation,
   }
 }
 

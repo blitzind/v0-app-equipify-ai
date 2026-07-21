@@ -39,6 +39,7 @@ export const GROWTH_HOME_STARTUP_API_PATHS = {
   aiTeammate: "/api/growth/workspace/settings/ai-teammate",
   autonomy: "/api/growth/workspace/settings/autonomy",
   operatorSetupHealth: "/api/platform/growth/operator-setup-health",
+  avaActivate: "/api/growth/workspace/ava/activate",
 } as const
 
 const STARTUP_GUARDED_OUTBOUND_CAPABILITIES: GrowthAutonomyCapability[] = [

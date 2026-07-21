@@ -27,10 +27,12 @@ import {
   buildHeroExecutiveBriefing,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER,
+  type GrowthHomeHeroExecutiveBriefing,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 
 type Props = {
   hero: GrowthHomeAvaHeroViewModel
+  executiveBriefing?: GrowthHomeHeroExecutiveBriefing | null
   lastUpdateLabel?: string | null
   pendingApprovals?: number
   readyForOutreachReview?: number
@@ -51,6 +53,7 @@ function statusTone(kind: GrowthHomeAvaHeroViewModel["statusKind"]): string {
 
 export function GrowthHomeAvaHeroSection({
   hero,
+  executiveBriefing: executiveBriefingProp = null,
   lastUpdateLabel = null,
   pendingApprovals = 0,
   readyForOutreachReview = 0,
@@ -72,14 +75,16 @@ export function GrowthHomeAvaHeroSection({
   }, [hero.continuousExecutiveBriefing, onBriefingAcknowledged, organizationId])
 
   const dailyActivityNarrative = hero.dailyActivityNarrative
-  const executiveBriefing = buildHeroExecutiveBriefing({
-    statusLabel: hero.statusLabel,
-    dailyActivityNarrative,
-    missionDiscovery,
-    pendingApprovals,
-    readyForOutreachReview,
-    discoveryTarget: hero.discoveryNarrativeTarget ?? missionDiscovery?.audienceName ?? null,
-  })
+  const executiveBriefing =
+    executiveBriefingProp ??
+    buildHeroExecutiveBriefing({
+      statusLabel: hero.statusLabel,
+      dailyActivityNarrative,
+      missionDiscovery,
+      pendingApprovals,
+      readyForOutreachReview,
+      discoveryTarget: hero.discoveryNarrativeTarget ?? missionDiscovery?.audienceName ?? null,
+    })
 
   return (
     <section

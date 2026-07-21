@@ -4,6 +4,7 @@
 
 import type { GrowthCanonicalOperatorProgressProjection } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import type { GrowthHomeRuntimeTrustPipelineStep } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import type { GrowthPortfolioManagerOperatorProjection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import type { SalesOutcome, SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import type { AvaDailyActivityNarrative } from "@/lib/growth/ava-home/narrative/narrative-types"
@@ -97,7 +98,10 @@ export function buildHeroExecutiveBriefing(input: {
   readyForOutreachReview?: number
   discoveryTarget?: string | null
 }): GrowthHomeHeroExecutiveBriefing {
-  const packageCount = Math.max(input.pendingApprovals ?? 0, input.readyForOutreachReview ?? 0)
+  /** Canonical approval queue — sole authority for "ready for your review" language. */
+  const pendingPackages = Math.max(0, input.pendingApprovals ?? 0)
+  /** Research loop in-progress count — not the same as operator review queue. */
+  const preparingOutreach = Math.max(0, input.readyForOutreachReview ?? 0)
   const setupIncomplete = input.dailyActivityNarrative?.focus === "setup"
   const paragraphs: string[] = []
 
@@ -113,19 +117,32 @@ export function buildHeroExecutiveBriefing(input: {
   }
 
   if (discoveryActive(input)) {
-    const lead = packageCount > 0 ? "I'm actively searching for companies that match your Growth Profile" : "I'm searching for companies that match your Growth Profile"
-    if (packageCount > 0) {
+    const lead =
+      pendingPackages > 0 || preparingOutreach > 0
+        ? "I'm actively searching for companies that match your Growth Profile"
+        : "I'm searching for companies that match your Growth Profile"
+    if (pendingPackages > 0) {
       paragraphs.push(
-        `${lead}. ${packageReviewPhrase(packageCount)}, and after that I'll continue building the rest of your pipeline.`,
+        `${lead}. ${packageReviewPhrase(pendingPackages)}, and after that I'll continue building the rest of your pipeline.`,
+      )
+    } else if (preparingOutreach > 0) {
+      paragraphs.push(
+        `${lead}. I'm preparing ${preparingOutreach === 1 ? "one outreach package" : `${preparingOutreach} outreach packages`} and will send ${preparingOutreach === 1 ? "it" : "them"} for your review when ready.`,
       )
     } else {
       paragraphs.push(
         `${lead} and will begin researching the strongest matches as they enter the pipeline.`,
       )
     }
-  } else if (packageCount > 0) {
+  } else if (pendingPackages > 0) {
     paragraphs.push(
-      `${packageReviewPhrase(packageCount)}, and after that I'll continue with the next highest-value work in your pipeline.`,
+      `${packageReviewPhrase(pendingPackages)}, and after that I'll continue with the next highest-value work in your pipeline.`,
+    )
+  } else if (preparingOutreach > 0) {
+    paragraphs.push(
+      preparingOutreach === 1
+        ? "I'm finishing an outreach package and will send it for your review shortly."
+        : `I'm finishing ${preparingOutreach} outreach packages and will send them for your review shortly.`,
     )
   } else if (input.statusLabel === "Researching companies") {
     paragraphs.push(
@@ -146,7 +163,7 @@ export function buildHeroExecutiveBriefing(input: {
   } else {
     const fallback = buildNarrativeIntelligenceOpeningLine({
       focus: input.dailyActivityNarrative?.focus ?? "idle",
-      packageCount,
+      packageCount: pendingPackages,
       waitingCount: input.dailyActivityNarrative?.waiting_on_you.length ?? 0,
       completedCount: input.dailyActivityNarrative?.completed_today.length ?? 0,
       setupIncomplete: false,
@@ -173,6 +190,11 @@ export type GrowthHomeWorkingNowPresentation = {
   currentPhase: string | null
   nextStep: string | null
   blockers: string[]
+  /** GE-AIOS-LAUNCH-1B — real runtime detail from work manager */
+  companyName?: string | null
+  startedLabel?: string | null
+  expectedCompletionLabel?: string | null
+  pipelineSteps?: GrowthHomeRuntimeTrustPipelineStep[]
 }
 
 export type GrowthHomeMeasurableProgressItem = {
@@ -239,10 +261,19 @@ export function buildHomeWorkingNowPresentation(input: {
   workManager?: AvaWorkManagerResult | null
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   statusLabel?: string | null
+  runtimeCurrentActivity?: {
+    companyName?: string | null
+    taskLabel?: string | null
+    startedLabel?: string | null
+    expectedCompletionLabel?: string | null
+    pipelineSteps?: GrowthHomeRuntimeTrustPipelineStep[]
+  } | null
 }): GrowthHomeWorkingNowPresentation {
   const activeWork = input.workManager?.active_work ?? null
+  const runtime = input.runtimeCurrentActivity
   const activeTask = humanizeOperatorFacingCopy(
-    (activeWork ? describeWorkItemTask(activeWork) : null) ??
+    runtime?.taskLabel ??
+      (activeWork ? describeWorkItemTask(activeWork) : null) ??
       input.dailyActivityNarrative?.working_now[0]?.replace(/\.$/, "") ??
       buildLeadDiscoveryWorkingNowLine(input.missionDiscovery)?.replace(/\.$/, "") ??
       null,
@@ -272,6 +303,10 @@ export function buildHomeWorkingNowPresentation(input: {
     currentPhase,
     nextStep,
     blockers,
+    companyName: runtime?.companyName ?? activeWork?.company_name?.trim() ?? null,
+    startedLabel: runtime?.startedLabel ?? null,
+    expectedCompletionLabel: runtime?.expectedCompletionLabel ?? null,
+    pipelineSteps: runtime?.pipelineSteps,
   }
 }
 
@@ -322,11 +357,13 @@ export function buildHomeMeasurableProgressPresentation(input: {
       label: "Packages prepared",
       value: String(summary!.outreach_prepared),
     })
-  } else if ((input.readyForOutreachReview ?? 0) > 0) {
+  }
+
+  if ((input.pendingApprovals ?? 0) > 0) {
     items.push({
-      id: "packages-ready",
-      label: "Packages ready for review",
-      value: String(input.readyForOutreachReview),
+      id: "packages-awaiting-review",
+      label: "Packages awaiting your review",
+      value: String(input.pendingApprovals),
     })
   }
 
@@ -345,14 +382,6 @@ export function buildHomeMeasurableProgressPresentation(input: {
         value: String(goal),
       })
     }
-  }
-
-  if ((input.pendingApprovals ?? 0) > 0) {
-    items.push({
-      id: "pending-approvals",
-      label: "Awaiting your review",
-      value: String(input.pendingApprovals),
-    })
   }
 
   return {
@@ -497,6 +526,42 @@ export function detectHomeSectionNarrativeOverlap(input: {
   }
 
   return overlaps
+}
+
+/** GE-AIOS-LAUNCH-1A — Suppress duplicated narrative when sections repeat the same story. */
+export function applyHomeNarrativeDedup(input: {
+  overlaps: string[]
+  heroBriefing: GrowthHomeHeroExecutiveBriefing
+  workingNow: GrowthHomeWorkingNowPresentation
+  recommendationHeadline: string | null
+}): {
+  heroBriefing: GrowthHomeHeroExecutiveBriefing
+  workingNow: GrowthHomeWorkingNowPresentation
+  suppressRecommendationHeadline: boolean
+} {
+  let workingNow = input.workingNow
+  let suppressRecommendationHeadline = false
+
+  if (input.overlaps.includes("hero_working_now")) {
+    workingNow = {
+      ...workingNow,
+      activeTask: null,
+    }
+  }
+
+  if (input.overlaps.includes("working_now_recommendation")) {
+    suppressRecommendationHeadline = true
+  }
+
+  if (input.overlaps.includes("hero_objective")) {
+    suppressRecommendationHeadline = true
+  }
+
+  return {
+    heroBriefing: input.heroBriefing,
+    workingNow,
+    suppressRecommendationHeadline,
+  }
 }
 
 export function filterCanonicalProgressToMeasurableOnly(

@@ -23,6 +23,8 @@ import {
 import { mirrorGrowthHomeAvaOperatorDecisionToServer } from "@/lib/growth/ava-home/recommendations/growth-home-ava-operator-decision-client-next-3d"
 import { recordGrowthHomeAvaExecutiveBriefingMeaningfulInteraction } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-briefing-cursor-next-2a"
 import type { GrowthHomeAvaStrategicAdvisorContextPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
+import type { GrowthHomeAvaExecutiveReasoningPayload } from "@/lib/growth/ava-home/recommendations/growth-home-ava-executive-reasoning-next-3c-types"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { buildGrowthHomeAvaStrategicEvaluationContext } from "@/lib/growth/ava-home/recommendations/growth-home-ava-strategic-context-next-1c"
 import {
   evaluateGrowthHomeAvaStrategicIntent,
@@ -51,6 +53,8 @@ type Props = {
   activeMissionLabel?: string | null
   companyCandidates?: Array<{ leadId: string; companyName: string }>
   strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
+  executiveReasoning?: GrowthHomeAvaExecutiveReasoningPayload | null
+  suppressPrimaryHeadline?: boolean
 }
 
 function displayHeadline(item: GrowthHomeAvaRecommendationItem, activeIndex: number): string {
@@ -279,6 +283,8 @@ export function GrowthHomeAvaRecommendationExperienceSection({
   activeMissionLabel = null,
   companyCandidates = [],
   strategicAdvisorContext = null,
+  executiveReasoning = null,
+  suppressPrimaryHeadline = false,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
   const [activeIndex, setActiveIndex] = useState(0)
@@ -290,6 +296,7 @@ export function GrowthHomeAvaRecommendationExperienceSection({
   const [overrideAcknowledged, setOverrideAcknowledged] = useState(false)
 
   const activeRecommendation = experience.recommendations[activeIndex] ?? null
+  const alternativeRecommendation = experience.recommendations[activeIndex + 1] ?? null
   const remainingCount = Math.max(0, experience.recommendations.length - activeIndex - 1)
   const outcomeProjection = activeRecommendation?.outcomeProjection ?? null
 
@@ -314,9 +321,12 @@ export function GrowthHomeAvaRecommendationExperienceSection({
 
   const whyBullets = useMemo(() => {
     if (!activeRecommendation) return []
-    if (explanation?.whyChosen.length) return explanation.whyChosen.slice(0, 5)
-    return activeRecommendation.whyReasons.filter(Boolean).slice(0, 4)
-  }, [activeRecommendation, explanation?.whyChosen])
+    const evidence = executiveReasoning?.primary?.evidence ?? []
+    const reasons = explanation?.whyChosen.length
+      ? explanation.whyChosen
+      : activeRecommendation.whyReasons.filter(Boolean)
+    return [...new Set([...evidence.slice(0, 2), ...reasons])].slice(0, 5)
+  }, [activeRecommendation, executiveReasoning?.primary?.evidence, explanation?.whyChosen])
 
   function handleContinue() {
     if (!activeRecommendation) return
@@ -471,9 +481,33 @@ export function GrowthHomeAvaRecommendationExperienceSection({
           <div className="flex items-start gap-3">
             <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
             <div className="min-w-0 space-y-2">
-              <p className="text-base font-semibold leading-snug text-foreground">
-                {displayHeadline(activeRecommendation, activeIndex)}
-              </p>
+              {!suppressPrimaryHeadline ? (
+                <p className="text-base font-semibold leading-snug text-foreground">
+                  {displayHeadline(activeRecommendation, activeIndex)}
+                </p>
+              ) : null}
+              {whyBullets.length > 0 ? (
+                <ul className="space-y-1.5 text-sm text-foreground" data-qa-field="recommendation-supporting-reasons">
+                  {whyBullets.map((line) => (
+                    <li key={line} className="flex gap-2">
+                      <span aria-hidden>•</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {executiveReasoning?.primary?.alternativeExplanations?.[0] ? (
+                <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-alternative">
+                  <span className="font-medium text-foreground">Another explanation · </span>
+                  {executiveReasoning.primary.alternativeExplanations[0]}
+                </p>
+              ) : null}
+              {alternativeRecommendation && activeIndex === 0 ? (
+                <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-next-alternative">
+                  <span className="font-medium text-foreground">Instead, I could · </span>
+                  {(alternativeRecommendation.employeeHeadline ?? alternativeRecommendation.headline).replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "")}
+                </p>
+              ) : null}
               {outcomeProjection ? (
                 <OutcomeDrivenDetails outcome={outcomeProjection} />
               ) : (
@@ -507,6 +541,18 @@ export function GrowthHomeAvaRecommendationExperienceSection({
           </div>
 
           <ExecutionPath steps={activeRecommendation.executionPathSteps ?? []} />
+
+          {activeRecommendation.leadId ? (
+            <p className="text-sm">
+              <Link
+                href={buildGrowthLeadHref(activeRecommendation.leadId, { focus: "intelligence" })}
+                className="font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                data-qa-field="recommendation-lead-intelligence-link"
+              >
+                View what I know about {activeRecommendation.companyName ?? "this account"}
+              </Link>
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-2 pt-1">
             {activeRecommendation.href ? (

@@ -37,6 +37,14 @@ export function GrowthHomeAvaWorkingNowSection({ presentation }: Props) {
               Active task
             </p>
             <p className="mt-1 text-sm font-medium text-foreground">{presentation.activeTask}</p>
+            {(presentation.startedLabel || presentation.expectedCompletionLabel) && (
+              <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                {presentation.startedLabel ? <span>Started: {presentation.startedLabel}</span> : null}
+                {presentation.expectedCompletionLabel ? (
+                  <span>Expected completion: {presentation.expectedCompletionLabel}</span>
+                ) : null}
+              </div>
+            )}
           </div>
         ) : null}
 

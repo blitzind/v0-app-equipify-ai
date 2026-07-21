@@ -101,15 +101,25 @@ function main(): void {
       pendingApprovals: 0,
       readyForOutreachReview: 1,
     })
-    assert.match(withAction.narrative, /outreach package ready for your review/i)
-    assert.match(withAction.narrative, /continue building the rest of your pipeline/i)
+    assert.match(withAction.narrative, /preparing one outreach package/i)
+    assert.match(withAction.narrative, /send it for your review when ready/i)
+
+    const withPendingReview = buildHeroExecutiveBriefing({
+      statusLabel: "Preparing outreach",
+      missionDiscovery: mission(),
+      pendingApprovals: 1,
+      readyForOutreachReview: 0,
+    })
+    assert.match(withPendingReview.narrative, /one outreach package ready for your review/i)
+    assert.match(withPendingReview.narrative, /continue building the rest of your pipeline/i)
   })
 
   runGate("Hero avoids internal architecture terminology", () => {
     const briefing = buildHeroExecutiveBriefing({
       statusLabel: "Finding Leads",
       missionDiscovery: mission(),
-      readyForOutreachReview: 1,
+      pendingApprovals: 1,
+      readyForOutreachReview: 0,
     })
     for (const term of INTERNAL_TERMS) {
       assert.doesNotMatch(briefing.narrative, new RegExp(term, "i"))
