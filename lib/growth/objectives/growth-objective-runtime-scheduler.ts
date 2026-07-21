@@ -45,6 +45,8 @@ import {
 import { mapWithBoundedConcurrency } from "@/lib/growth/runtime-guardrails/growth-bounded-concurrency"
 import {
   createSchedulerRuntimeBudget,
+  resolveSchedulerObjectiveExecutionReservationMs,
+  resolveSchedulerSubTickBudgetMs,
   withSchedulerWorkTimeout,
 } from "@/lib/growth/runtime-guardrails/growth-scheduler-runtime-budget-1a"
 import {
@@ -208,6 +210,14 @@ export async function runGrowthObjectiveRuntimeScheduler(
   telemetry.organizationsConsidered = selection.organizationsConsidered
   telemetry.organizationsSelected = selection.organizationsSelected
 
+  const objectiveExecutionReservedMs =
+    killSwitches.autonomy_enabled &&
+    killSwitches.autonomy_objective_mode_enabled &&
+    selection.selected.length > 0
+      ? resolveSchedulerObjectiveExecutionReservationMs(selection.selected.length)
+      : 0
+  telemetry.objectiveExecutionReservedMs = objectiveExecutionReservedMs
+
   const productionMissionBootstrap =
     killSwitches.autonomy_enabled && killSwitches.autonomy_objective_mode_enabled && budget.mayBeginWork(3_000)
       ? await tickAutonomousProductionMissionBootstrapForScheduler(admin, {
@@ -237,10 +247,11 @@ export async function runGrowthObjectiveRuntimeScheduler(
   }
   telemetry.providerBudgetBlocks = providerBudgetBlocks
 
-  const salesLoopBudgetMs = Math.min(
-    GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A.budgets.salesLoopMs,
-    budget.remainingMs(),
-  )
+  const salesLoopBudgetMs = resolveSchedulerSubTickBudgetMs({
+    subTickCapMs: GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A.budgets.salesLoopMs,
+    remainingMs: budget.remainingMs(),
+    objectiveReservationMs: objectiveExecutionReservedMs,
+  })
   const autonomousSalesLoop = killSwitches.autonomy_enabled && budget.mayBeginWork(3_000)
     ? await tickAutonomousSalesLoopForScheduler(admin, {
         organizationIds: orgsWithBudget,
@@ -265,11 +276,20 @@ export async function runGrowthObjectiveRuntimeScheduler(
     ).length
   }
 
+  const portfolioBudgetMs = resolveSchedulerSubTickBudgetMs({
+    subTickCapMs: GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A.budgets.portfolioManagerMs,
+    remainingMs: budget.remainingMs(),
+    objectiveReservationMs: objectiveExecutionReservedMs,
+  })
+  telemetry.portfolioBudgetMs = portfolioBudgetMs
+
   const autonomousPortfolioManager =
-    killSwitches.autonomy_enabled && budget.mayBeginWork(3_000)
+    killSwitches.autonomy_enabled && budget.mayBeginWork(3_000) && portfolioBudgetMs >= 3_000
       ? await tickAutonomousPortfolioManagerForScheduler(admin, {
           organizationIds: orgsWithBudget,
           maxOrganizations: MAX_ORGS_PER_TICK,
+          startedAt: budget.startedAtMs,
+          maxRuntimeMs: portfolioBudgetMs,
         }).catch(() => null)
       : null
 
@@ -278,10 +298,11 @@ export async function runGrowthObjectiveRuntimeScheduler(
     telemetry.portfolioReplenishmentsCompleted = autonomousPortfolioManager.organizationsReplenished
   }
 
-  const draftFactoryBudgetMs = Math.min(
-    GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A.budgets.draftFactoryMs,
-    budget.remainingMs(),
-  )
+  const draftFactoryBudgetMs = resolveSchedulerSubTickBudgetMs({
+    subTickCapMs: GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A.budgets.draftFactoryMs,
+    remainingMs: budget.remainingMs(),
+    objectiveReservationMs: objectiveExecutionReservedMs,
+  })
   const draftFactoryDue = killSwitches.autonomy_enabled && budget.mayBeginWork(3_000)
     ? await tickDraftFactoryDueStatesForScheduler(admin, {
         organizationIds: orgsWithBudget,
@@ -413,6 +434,8 @@ export async function runGrowthObjectiveRuntimeScheduler(
     mission_orchestrations_attempted: missionOrchestrationsAttempted,
     failures,
     objective_ticks_deferred: telemetry.objectiveTicksDeferred,
+    objective_execution_reserved_ms: telemetry.objectiveExecutionReservedMs,
+    portfolio_budget_ms: telemetry.portfolioBudgetMs,
     objective_results: results.length,
     runtime_ms: telemetry.elapsedMs,
     remaining_ms_at_stop: telemetry.remainingMsAtStop,

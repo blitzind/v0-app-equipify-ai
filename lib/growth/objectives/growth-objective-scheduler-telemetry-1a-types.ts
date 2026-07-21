@@ -14,6 +14,7 @@ export const GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A = {
     "org_fairness_selection",
     "production_mission_bootstrap_tick",
     "autonomous_sales_loop_tick",
+    "autonomous_portfolio_manager_tick",
     "draft_factory_due_tick",
     "objective_runtime_ticks",
     "mission_orchestration",
@@ -23,6 +24,7 @@ export const GROWTH_SCHEDULER_RUNTIME_CALL_GRAPH_1A = {
   budgets: {
     outerWallClockMs: 45_000,
     salesLoopMs: 20_000,
+    portfolioManagerMs: 25_000,
     draftFactoryMs: 15_000,
     objectiveTimeoutMs: 10_000,
     orgWorkTimeoutMs: 8_000,
@@ -59,4 +61,6 @@ export type GrowthObjectiveSchedulerTickTelemetry = {
   remainingMsAtStop: number
   stopReason: string | null
   objectiveTicksDeferred: number
+  objectiveExecutionReservedMs?: number
+  portfolioBudgetMs?: number
 }
