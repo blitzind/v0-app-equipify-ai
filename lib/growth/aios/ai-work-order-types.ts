@@ -1,5 +1,12 @@
 /** GE-AIOS-2A — AI Work Order types (client-safe). Constitutional §16.1. */
 
+import {
+  PLATFORM_ACTOR_AGENTS,
+  isPlatformActorAgent,
+  isPlatformExecutiveBrainAgent,
+  type PlatformActorAgent,
+} from "@fuzor/identity"
+
 export const GROWTH_AIOS_2A_PHASE = "GE-AIOS-2A" as const
 
 export const GROWTH_AI_WORK_ORDER_QA_MARKER = "growth-aios-2a-ai-work-order-v1" as const
@@ -29,27 +36,9 @@ export const AI_WORK_ORDER_TERMINAL_STATUSES = ["completed", "cancelled"] as con
 export const AI_WORK_ORDER_RECOVERABLE_STATUSES = ["failed"] as const satisfies readonly AiWorkOrderStatus[]
 
 /** Sixteen constitutional agents + executive_brain as requester (not executor). */
-export const AI_WORK_ORDER_AGENTS = [
-  "prospecting",
-  "research",
-  "qualification",
-  "strategy",
-  "personalization",
-  "outreach",
-  "conversation",
-  "meeting",
-  "opportunity",
-  "learning",
-  "executive_reporting",
-  "compliance",
-  "budget",
-  "provider",
-  "warmup",
-  "deliverability",
-  "executive_brain",
-] as const
+export const AI_WORK_ORDER_AGENTS = PLATFORM_ACTOR_AGENTS
 
-export type AiWorkOrderAgent = (typeof AI_WORK_ORDER_AGENTS)[number]
+export type AiWorkOrderAgent = PlatformActorAgent
 
 /** Initial catalog — extensible via migration amendment. */
 export const AI_WORK_ORDER_TYPES = [
@@ -203,8 +192,10 @@ export type AiWorkOrderListFilter = {
 }
 
 export function isAiWorkOrderAgent(value: unknown): value is AiWorkOrderAgent {
-  return typeof value === "string" && (AI_WORK_ORDER_AGENTS as readonly string[]).includes(value)
+  return isPlatformActorAgent(value)
 }
+
+export const isExecutiveBrainAgent = isPlatformExecutiveBrainAgent
 
 export function isAiWorkOrderType(value: unknown): value is AiWorkOrderType {
   return typeof value === "string" && (AI_WORK_ORDER_TYPES as readonly string[]).includes(value)

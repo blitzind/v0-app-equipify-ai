@@ -15,6 +15,11 @@ import {
   summarizeDatamoonBuildResponseKeys,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 import {
+  GROWTH_DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATE_1A_QA_MARKER,
+  isDatamoonAudienceProviderPollCompleteStatus,
+  isDatamoonAudienceProviderTerminalStatus,
+  normalizeDatamoonAudienceProviderStatus,
+  resolveDatamoonAudienceProviderTerminalFailureMessage,
   resolveDatamoonFetchPayload,
   summarizeDatamoonFetchResponseKeys,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
@@ -124,11 +129,13 @@ async function failDatamoonAudienceImportRun(
   input: {
     errorMessage: string
     providerMetadata: Record<string, unknown>
+    lastPolledAt?: string | null
   },
 ): Promise<DatamoonAudienceImportRun | null> {
   return updateDatamoonAudienceImportRun(admin, runId, {
     status: "failed",
     errorMessage: input.errorMessage,
+    ...(input.lastPolledAt !== undefined ? { lastPolledAt: input.lastPolledAt } : {}),
     providerMetadata: sanitizeDatamoonProviderMetadata(input.providerMetadata) as Record<string, unknown>,
   })
 }
@@ -385,8 +392,39 @@ export async function pollDatamoonAudienceImportRun(
   const fetchPayload = resolveDatamoonFetchPayload(fetchResult.data)
   const fetchResponseKeys = summarizeDatamoonFetchResponseKeys(fetchResult.data)
   const { providerStatus, records: rawRecords, recordCount } = fetchPayload
+  const normalizedProviderStatus = normalizeDatamoonAudienceProviderStatus(providerStatus)
 
-  if (providerStatus !== "completed" && fetchResult.status !== "dry_run") {
+  if (isDatamoonAudienceProviderTerminalStatus(normalizedProviderStatus)) {
+    const errorMessage = resolveDatamoonAudienceProviderTerminalFailureMessage({
+      providerStatus: normalizedProviderStatus,
+      fetchData: fetchResult.data,
+    })
+    const failed = await failDatamoonAudienceImportRun(admin, runId, {
+      errorMessage,
+      lastPolledAt: now,
+      providerMetadata: {
+        ...existing.providerMetadata,
+        ...sanitizeDatamoonProviderMetadata({
+          poll_status: normalizedProviderStatus,
+          fetch_status: fetchResult.status,
+          fetch_response_keys: fetchResponseKeys,
+          error_category: "provider_terminal_status",
+          provider_terminal_status: normalizedProviderStatus,
+          ge_aios_datamoon_discovery_terminal_state_1a:
+            GROWTH_DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATE_1A_QA_MARKER,
+        }),
+      },
+    })
+    logGrowthEngine("datamoon_audience_import_provider_terminal_failure", {
+      qa_marker: GROWTH_DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATE_1A_QA_MARKER,
+      runId,
+      provider_status: normalizedProviderStatus,
+      datamoon_audience_id: existing.datamoonAudienceId,
+    })
+    return { ok: false, error: errorMessage, ...(failed ? {} : {}) }
+  }
+
+  if (!isDatamoonAudienceProviderPollCompleteStatus(normalizedProviderStatus) && fetchResult.status !== "dry_run") {
     const building = await updateDatamoonAudienceImportRun(admin, runId, {
       status: "building",
       loadingCount: recordCount,
@@ -394,7 +432,7 @@ export async function pollDatamoonAudienceImportRun(
       lastPolledAt: now,
       providerMetadata: sanitizeDatamoonProviderMetadata({
         ...existing.providerMetadata,
-        poll_status: providerStatus,
+        poll_status: normalizedProviderStatus,
         fetch_response_keys: fetchResponseKeys,
       }) as Record<string, unknown>,
     })

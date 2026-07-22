@@ -4,6 +4,40 @@ import { summarizeDatamoonBuildResponseKeys } from "@/lib/growth/lead-sources/da
 
 export { summarizeDatamoonBuildResponseKeys as summarizeDatamoonFetchResponseKeys }
 
+export const GROWTH_DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATE_1A_QA_MARKER =
+  "ge-aios-datamoon-discovery-terminal-state-1a-v1" as const
+
+/** Canonical terminal provider audience job statuses (HTTP fetch succeeded). */
+export const DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATUSES = [
+  "failed",
+  "error",
+  "cancelled",
+  "canceled",
+  "expired",
+  "aborted",
+  "terminated",
+] as const
+
+const DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATUS_SET = new Set<string>(
+  DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATUSES,
+)
+
+export type DatamoonAudienceProviderTerminalStatus =
+  (typeof DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATUSES)[number]
+
+export function normalizeDatamoonAudienceProviderStatus(status: string | null | undefined): string {
+  if (!status?.trim()) return "in_progress"
+  return status.trim().toLowerCase()
+}
+
+export function isDatamoonAudienceProviderTerminalStatus(status: string | null | undefined): boolean {
+  return DATAMOON_AUDIENCE_PROVIDER_TERMINAL_STATUS_SET.has(normalizeDatamoonAudienceProviderStatus(status))
+}
+
+export function isDatamoonAudienceProviderPollCompleteStatus(status: string | null | undefined): boolean {
+  return normalizeDatamoonAudienceProviderStatus(status) === "completed"
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
@@ -95,4 +129,28 @@ export function resolveDatamoonFetchPayload(data: unknown): {
   const recordCount = resolveFetchRecordCount(data, records)
 
   return { providerStatus, records, recordCount }
+}
+
+function readProviderMessage(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+export function resolveDatamoonAudienceProviderTerminalFailureMessage(input: {
+  providerStatus: string
+  fetchData: unknown
+}): string {
+  const normalizedStatus = normalizeDatamoonAudienceProviderStatus(input.providerStatus)
+  if (isPlainObject(input.fetchData)) {
+    const layers = resolveNestedLayers(input.fetchData)
+    const detail =
+      resolveFirstMatchingValue(layers, (layer) => readProviderMessage(layer.message)) ??
+      resolveFirstMatchingValue(layers, (layer) => readProviderMessage(layer.error)) ??
+      resolveFirstMatchingValue(layers, (layer) => readProviderMessage(layer.error_message))
+    if (detail) {
+      return `Datamoon audience provider terminal status (${normalizedStatus}): ${detail}`.slice(0, 200)
+    }
+  }
+  return `Datamoon audience provider terminal status: ${normalizedStatus}`.slice(0, 200)
 }
