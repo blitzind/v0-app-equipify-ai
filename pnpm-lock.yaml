@@ -15,17 +15,17 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
       '@fuzor/configuration':
-        specifier: file:../../fuzor/packages/configuration
-        version: file:../../fuzor/packages/configuration
+        specifier: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
       '@fuzor/identity':
-        specifier: file:../../fuzor/packages/identity
-        version: file:../../fuzor/packages/identity
+        specifier: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/knowledge':
-        specifier: file:../../fuzor/packages/knowledge
-        version: file:../../fuzor/packages/knowledge
+        specifier: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
       '@fuzor/observability':
-        specifier: file:../../fuzor/packages/observability
-        version: file:../../fuzor/packages/observability
+        specifier: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.71.1(react@19.2.4))
@@ -588,17 +588,21 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
-  '@fuzor/configuration@file:../../fuzor/packages/configuration':
-    resolution: {directory: ../../fuzor/packages/configuration, type: directory}
+  '@fuzor/configuration@file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz':
+    resolution: {integrity: sha512-R+LoVKsYiC/+k4trundt6QknICvmF8TWp2UUbF1ezR7eyTxUYAknLiHR8uHKe3RsP7iwqoLl4WEUTflnCOQWjA==, tarball: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/identity@file:../../fuzor/packages/identity':
-    resolution: {directory: ../../fuzor/packages/identity, type: directory}
+  '@fuzor/identity@file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz':
+    resolution: {integrity: sha512-1C/CeJUwFGDLXVClYz/h+1c8u5ofWgMVvznBbx6uu6+SVBYMCFjQg5C+YHXz60eq2wJ3nwr2slU6VgPL0uEDOA==, tarball: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/knowledge@file:../../fuzor/packages/knowledge':
-    resolution: {directory: ../../fuzor/packages/knowledge, type: directory}
+  '@fuzor/knowledge@file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz':
+    resolution: {integrity: sha512-pVrb6pRWemk8WHrC4C5z8wnj2ewJNwtVynXNX8/dU/tlNA4jfYp6/oYMcTn6JcH/570nSNe3d9dOsoOp9gD3aA==, tarball: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/observability@file:../../fuzor/packages/observability':
-    resolution: {directory: ../../fuzor/packages/observability, type: directory}
+  '@fuzor/observability@file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz':
+    resolution: {integrity: sha512-Gd25gSiJnAWYdQZrA8ybq15gVPquEGwnt2H3DoiOTdEESgreRb4e5FONyQHzgtQdhz4C5ta7aMeHvYFTPy4jog==, tarball: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz}
+    version: 0.1.0
 
   '@hookform/resolvers@3.10.0':
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
@@ -4357,28 +4361,28 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
-  '@fuzor/configuration@file:../../fuzor/packages/configuration':
+  '@fuzor/configuration@file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/identity@file:../../fuzor/packages/identity':
+  '@fuzor/identity@file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/knowledge@file:../../fuzor/packages/knowledge':
+  '@fuzor/knowledge@file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/observability@file:../../fuzor/packages/observability':
+  '@fuzor/observability@file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:

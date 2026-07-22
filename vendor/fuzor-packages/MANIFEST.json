@@ -1,0 +1,32 @@
+{
+  "distribution_milestone": "FUZOR-DISTRIBUTION-1A",
+  "strategy": "committed-package-artifacts",
+  "generated_at": "2026-07-22T20:34:00.000Z",
+  "update_workflow": "From canonical Fuzor workspace: npm run pack:adopted -- --output <equipify>/vendor/fuzor-packages",
+  "packages": [
+    {
+      "name": "@fuzor/identity",
+      "version": "0.1.0",
+      "file": "fuzor-identity-0.1.0.tgz",
+      "sha256": "55b64c2ba088c9d1a83a645860d72d66cff2c80afdbf0099304461eb90448357"
+    },
+    {
+      "name": "@fuzor/observability",
+      "version": "0.1.0",
+      "file": "fuzor-observability-0.1.0.tgz",
+      "sha256": "9510a56d578db78793a42e20e6a764d3fdab1f23c0c514ec0af2a76be6d9890c"
+    },
+    {
+      "name": "@fuzor/configuration",
+      "version": "0.1.0",
+      "file": "fuzor-configuration-0.1.0.tgz",
+      "sha256": "4f65153fc83a4db2234eb2674969e9342fe929cc8951b534bbf1f77ec13c2b3c"
+    },
+    {
+      "name": "@fuzor/knowledge",
+      "version": "0.1.0",
+      "file": "fuzor-knowledge-0.1.0.tgz",
+      "sha256": "d3a9a9d73e8271b72026343a96ea3028ebf8eb23b5a40614cdc9bd46904b589d"
+    }
+  ]
+}
