@@ -20,6 +20,9 @@ importers:
       '@fuzor/identity':
         specifier: file:../../fuzor/packages/identity
         version: file:../../fuzor/packages/identity
+      '@fuzor/knowledge':
+        specifier: file:../../fuzor/packages/knowledge
+        version: file:../../fuzor/packages/knowledge
       '@fuzor/observability':
         specifier: file:../../fuzor/packages/observability
         version: file:../../fuzor/packages/observability
@@ -590,6 +593,9 @@ packages:
 
   '@fuzor/identity@file:../../fuzor/packages/identity':
     resolution: {directory: ../../fuzor/packages/identity, type: directory}
+
+  '@fuzor/knowledge@file:../../fuzor/packages/knowledge':
+    resolution: {directory: ../../fuzor/packages/knowledge, type: directory}
 
   '@fuzor/observability@file:../../fuzor/packages/observability':
     resolution: {directory: ../../fuzor/packages/observability, type: directory}
@@ -4359,6 +4365,13 @@ snapshots:
       - utf-8-validate
 
   '@fuzor/identity@file:../../fuzor/packages/identity':
+    dependencies:
+      '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@fuzor/knowledge@file:../../fuzor/packages/knowledge':
     dependencies:
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:
