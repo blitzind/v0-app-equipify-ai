@@ -5,10 +5,12 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import {
-  fetchSupabaseServiceRoleKeyFromCli,
-  resolveLinkedSupabaseProjectRef,
-  resolveSupabaseUrlForProjectRef,
-} from "@/lib/growth/qa/supabase-cli-linked-project-bootstrap"
+  isSupabaseServiceRoleJwt,
+  resolveSupabaseCredentialsFromCliLinkedProject,
+  resolveSupabaseUrlFromEnvRecord,
+  resolveSupabaseUrlFromJwt,
+  sanitizeSupabaseCertEnvValue,
+} from "@/lib/growth/qa/growth-production-supabase-credential-resolution"
 import {
   applySupabaseUrlPublicAlias,
   bootstrapGrowthProductionEnv,
@@ -28,51 +30,6 @@ export type GrowthOperatorNotificationsCertBootstrapResult = {
   vercel_production_env_run: boolean
 }
 
-function sanitizeEnvValue(value: string | undefined): string {
-  if (!value) return ""
-  let trimmed = value.trim()
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    trimmed = trimmed.slice(1, -1).trim()
-  }
-  return trimmed.replace(/\\+$/, "")
-}
-
-function isServiceRoleJwt(value: string): boolean {
-  if (!value.startsWith("eyJ")) return false
-  try {
-    const payload = JSON.parse(Buffer.from(value.split(".")[1]!, "base64url").toString()) as {
-      role?: string
-      iss?: string
-    }
-    return payload.role === "service_role" || String(payload.iss ?? "").includes("supabase")
-  } catch {
-    return false
-  }
-}
-
-function resolveSupabaseUrlFromJwt(jwt: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()) as {
-      ref?: string
-    }
-    if (payload.ref) return `https://${payload.ref}.supabase.co`
-  } catch {
-    return null
-  }
-  return null
-}
-
-function resolveSupabaseUrlFromEnv(env: Record<string, string | undefined>): string | null {
-  for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL"]) {
-    const value = sanitizeEnvValue(env[key])
-    if (value.startsWith("http")) return value
-  }
-  return null
-}
-
 export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
   /** When true, only succeeds under `vercel-production-env-run.ts`. */
   requireVercelProductionEnvRun?: boolean
@@ -88,13 +45,11 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
   let url: string | null = null
   let envSource = ""
 
-  const processKey = sanitizeEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  if (isServiceRoleJwt(processKey)) {
+  const processKey = sanitizeSupabaseCertEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  if (isSupabaseServiceRoleJwt(processKey)) {
     jwt = processKey
     envSource = vercelProductionEnvRun ? "vercel_production_process_env" : "process_env"
-    url =
-      resolveSupabaseUrlFromEnv(process.env) ??
-      resolveSupabaseUrlFromJwt(processKey)
+    url = resolveSupabaseUrlFromEnvRecord(process.env) ?? resolveSupabaseUrlFromJwt(processKey)
   }
 
   if (!jwt) {
@@ -102,8 +57,8 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
       sources: GROWTH_OPERATOR_NOTIFICATIONS_PRODUCTION_ENV_SOURCES,
       inheritProcessEnv: true,
     })
-    const mergedKey = sanitizeEnvValue(boot.found.SUPABASE_SERVICE_ROLE_KEY)
-    if (isServiceRoleJwt(mergedKey)) {
+    const mergedKey = sanitizeSupabaseCertEnvValue(boot.found.SUPABASE_SERVICE_ROLE_KEY)
+    if (isSupabaseServiceRoleJwt(mergedKey)) {
       jwt = mergedKey
       envSource = boot.sources.SUPABASE_SERVICE_ROLE_KEY ?? "merged_env"
     }
@@ -113,23 +68,19 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
     }
     const { env: withAlias } = applySupabaseUrlPublicAlias(mergedEnv)
     url =
-      resolveSupabaseUrlFromEnv(withAlias) ??
+      resolveSupabaseUrlFromEnvRecord(withAlias) ??
       (jwt ? resolveSupabaseUrlFromJwt(jwt) : null)
   }
 
   if (!jwt && vercelProductionEnvRun) {
-    const projectRef = resolveLinkedSupabaseProjectRef()
-    if (projectRef) {
-      const cliKey = fetchSupabaseServiceRoleKeyFromCli(projectRef)
-      if (cliKey && isServiceRoleJwt(cliKey)) {
-        jwt = cliKey
-        envSource = "supabase_cli_linked_project"
-        url =
-          url ??
-          resolveSupabaseUrlFromEnv(process.env) ??
-          resolveSupabaseUrlFromJwt(cliKey) ??
-          resolveSupabaseUrlForProjectRef(projectRef)
-      }
+    const cliResolution = resolveSupabaseCredentialsFromCliLinkedProject({
+      existingUrl: url,
+      env: process.env,
+    })
+    if (cliResolution) {
+      jwt = cliResolution.jwt
+      url = cliResolution.url
+      envSource = cliResolution.env_source
     }
   }
 

@@ -7,6 +7,11 @@ import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { applyProcessEnvProviderKeyFallback } from "@/lib/growth/qa/provider-runtime-env-resolution"
 import {
+  isSupabaseServiceRoleJwt,
+  resolveSupabaseCredentialsFromCliLinkedProject,
+  sanitizeSupabaseCertEnvValue,
+} from "@/lib/growth/qa/growth-production-supabase-credential-resolution"
+import {
   GROWTH_PRODUCTION_ENV_SOURCES,
   mergeGrowthProductionEnvLayers,
   parseGrowthProductionEnvFile,
@@ -81,18 +86,6 @@ function classifyEnvKey(
   }
 
   return "configured"
-}
-
-function isSupabaseServiceRoleJwt(jwt: string): boolean {
-  try {
-    const payload = JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()) as {
-      role?: string
-      iss?: string
-    }
-    return payload.role === "service_role" || String(payload.iss ?? "").includes("supabase")
-  } catch {
-    return false
-  }
 }
 
 function extractServiceRoleJwtFromFiles(
@@ -280,7 +273,7 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
   inheritProcessEnvProviderKeys?: boolean
   /** Preserve Vercel-injected values — never overwrite with empty file layers. */
   protectedSnapshot?: Partial<Record<string, string>>
-}): { url: string; jwt: string; audit: GrowthVerifiedChannelsCertEnvAudit } | null {
+}): { url: string; jwt: string; env_source: string; audit: GrowthVerifiedChannelsCertEnvAudit } | null {
   const cwd = input?.cwd ?? process.cwd()
   const sourceFiles = input?.sources ?? GROWTH_PRODUCTION_ENV_SOURCES
   const protectedSnapshot = input?.protectedSnapshot ?? {}
@@ -297,22 +290,50 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
     }
   }
 
-  const jwt =
-    extractServiceRoleJwtFromFiles(cwd, sourceFiles) ??
-    (isPresentEnvValue(protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY) &&
-    isSupabaseServiceRoleJwt(protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY)
-      ? protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY.trim()
-      : null) ??
-    (isPresentEnvValue(env.SUPABASE_SERVICE_ROLE_KEY) &&
-    isSupabaseServiceRoleJwt(env.SUPABASE_SERVICE_ROLE_KEY)
-      ? env.SUPABASE_SERVICE_ROLE_KEY.trim()
-      : null) ??
-    (isPresentEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY) &&
-    isSupabaseServiceRoleJwt(process.env.SUPABASE_SERVICE_ROLE_KEY)
-      ? process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
-      : null)
+  let envSource = ""
+  let jwt: string | null = null
 
-  const url = resolveSupabaseUrl(env, jwt) ?? "https://byyfylkklbxcdofaspye.supabase.co"
+  const fileJwt = extractServiceRoleJwtFromFiles(cwd, sourceFiles)
+  const protectedKey = sanitizeSupabaseCertEnvValue(protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY)
+  const mergedKey = sanitizeSupabaseCertEnvValue(env.SUPABASE_SERVICE_ROLE_KEY)
+  const processKey = sanitizeSupabaseCertEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY)
+
+  if (fileJwt) {
+    jwt = fileJwt
+    envSource = "env_file_jwt"
+  } else if (isSupabaseServiceRoleJwt(protectedKey)) {
+    jwt = protectedKey
+    envSource =
+      process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1"
+        ? "vercel_production_process_env"
+        : "protected_snapshot"
+  } else if (isSupabaseServiceRoleJwt(mergedKey)) {
+    jwt = mergedKey
+    envSource = "merged_env"
+  } else if (isSupabaseServiceRoleJwt(processKey)) {
+    jwt = processKey
+    envSource =
+      process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1"
+        ? "vercel_production_process_env"
+        : "process_env"
+  }
+
+  let url = resolveSupabaseUrl(env, jwt)
+
+  if (!jwt && process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1") {
+    const cliResolution = resolveSupabaseCredentialsFromCliLinkedProject({
+      cwd,
+      existingUrl: url,
+      env,
+    })
+    if (cliResolution) {
+      jwt = cliResolution.jwt
+      url = cliResolution.url
+      envSource = cliResolution.env_source
+    }
+  }
+
+  url = url ?? resolveSupabaseUrl(env, jwt) ?? "https://byyfylkklbxcdofaspye.supabase.co"
   if (!jwt) return null
 
   for (const [key, value] of Object.entries(env)) {
@@ -336,5 +357,5 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
   audit.loaded_files = loaded_files
   audit.applied_defaults = applied_defaults
 
-  return { url, jwt, audit }
+  return { url, jwt, env_source: envSource, audit }
 }
