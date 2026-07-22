@@ -19,6 +19,8 @@ import {
 } from "@/lib/growth/aios/ai-event-repository"
 import { lookupAiEventRegistryEntry, subscriptionMatchesEvent } from "@/lib/growth/aios/ai-event-registry"
 import { invokeRegisteredAiOsEventHandlers } from "@/lib/growth/aios/ai-event-subscriber-registry"
+import { persistAiOsEventHandlerTelemetry } from "@/lib/growth/draft-factory/draft-factory-wake-observability-repository"
+import { resolveGrowthRuntimeInstanceId } from "@/lib/growth/draft-factory/draft-factory-wake-observability-runtime"
 import type {
   AiOsEvent,
   AiOsEventListFilter,
@@ -64,8 +66,21 @@ export async function publishAiOsEvent(
     })),
   )
 
-  const { invoked: handlersInvoked, failures: handlerFailures } =
-    await invokeRegisteredAiOsEventHandlers(event)
+  const handlerRun = await invokeRegisteredAiOsEventHandlers(event)
+  const handlersInvoked = handlerRun.invoked
+  const handlerFailures = handlerRun.failures
+
+  await persistAiOsEventHandlerTelemetry(admin, {
+    eventId: event.id,
+    organizationId: event.organizationId,
+    handlersDiscovered: handlerRun.discovered,
+    handlersInvoked: handlerRun.invoked,
+    handlersSkipped: handlerRun.skipped,
+    handlerFailures: handlerRun.runs
+      .filter((row) => row.status === "failed")
+      .map((row) => ({ subscriberId: row.subscriberId, errorMessage: row.errorMessage })),
+    runtimeInstance: resolveGrowthRuntimeInstanceId(),
+  }).catch(() => undefined)
 
   return {
     event,

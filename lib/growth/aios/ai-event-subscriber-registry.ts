@@ -30,20 +30,52 @@ export function listRegisteredAiOsEventHandlers(): string[] {
   return [...handlers.keys()]
 }
 
+export type AiOsEventHandlerRunRecord = {
+  subscriberId: string
+  status: "invoked" | "failed"
+  durationMs: number
+  errorMessage?: string
+}
+
 export async function invokeRegisteredAiOsEventHandlers(
   event: AiOsEvent,
-): Promise<{ invoked: string[]; failures: string[] }> {
+): Promise<{
+  discovered: string[]
+  invoked: string[]
+  failures: string[]
+  skipped: string[]
+  runs: AiOsEventHandlerRunRecord[]
+}> {
+  const discovered = listRegisteredAiOsEventHandlers()
   const invoked: string[] = []
   const failures: string[] = []
-  for (const entry of handlers.values()) {
+  const runs: AiOsEventHandlerRunRecord[] = []
+
+  for (const subscriberId of discovered) {
+    const entry = handlers.get(subscriberId)
+    if (!entry) continue
+    const startedAt = Date.now()
     try {
       await entry.handler(event)
       invoked.push(entry.subscriberId)
+      runs.push({
+        subscriberId: entry.subscriberId,
+        status: "invoked",
+        durationMs: Date.now() - startedAt,
+      })
     } catch (error) {
       failures.push(entry.subscriberId)
+      runs.push({
+        subscriberId: entry.subscriberId,
+        status: "failed",
+        durationMs: Date.now() - startedAt,
+        errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      })
     }
   }
-  return { invoked, failures }
+
+  const skipped = discovered.filter((id) => !invoked.includes(id) && !failures.includes(id))
+  return { discovered, invoked, failures, skipped, runs }
 }
 
 export function clearAiOsEventHandlersForTests(): void {

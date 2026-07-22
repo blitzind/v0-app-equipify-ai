@@ -27,6 +27,7 @@ import {
   type AiOsDraftFactoryWakeInput,
 } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
+import type { DraftFactoryWakeObservabilityHandle } from "@/lib/growth/draft-factory/draft-factory-wake-observability-service"
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
@@ -126,6 +127,7 @@ export async function advanceDraftFactoryForLeadLive(
     workerId?: string
     allowGeneration?: boolean
     completionHints?: AdvanceDraftFactoryForLeadInput["completionHints"]
+    observability?: DraftFactoryWakeObservabilityHandle
   },
 ): Promise<AiOsDraftFactoryAdvanceResultV5> {
   const now = input.now ?? new Date().toISOString()
@@ -204,6 +206,14 @@ export async function advanceDraftFactoryForLeadLive(
         transportBlocked: true,
       },
     }).catch(() => undefined)
+
+    if (input.observability) {
+      await input.observability
+        .recordFailure(new Error(message), "ADVANCE_STARTED", { postgres_fail_closed: true })
+        .catch(() => undefined)
+      await input.observability.finalize("FAILED", message).catch(() => undefined)
+      await input.observability.assertResearchCompleteEvidence().catch(() => undefined)
+    }
 
     return {
       qaMarker: AI_OS_DRAFT_FACTORY_DURABLE_QA_MARKER,
@@ -441,6 +451,7 @@ export async function advanceDraftFactoryForLeadLive(
     workerId,
     repository,
     completionHints,
+    observability: input.observability,
     generateViaGrowth5F: allowGeneration
       ? async ({ organizationId, leadId, now: generatedAt }) => {
           const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
@@ -474,22 +485,45 @@ export async function wakeDraftFactoryFromCompletionEvent(
     wake: string | AiOsDraftFactoryWakeInput
     portfolioSelected?: boolean
     allowGeneration?: boolean
+    observability?: DraftFactoryWakeObservabilityHandle
   },
 ): Promise<AiOsDraftFactoryAdvanceResultV5 | null> {
   try {
-    return await advanceDraftFactoryForLeadLive(admin, {
+    if (input.observability) {
+      await input.observability.recordTransition("ADVANCE_STARTED")
+    }
+    const result = await advanceDraftFactoryForLeadLive(admin, {
       organizationId: input.organizationId,
       leadId: input.leadId,
       wake: input.wake,
       portfolioSelected: input.portfolioSelected ?? true,
       allowGeneration: input.allowGeneration === true,
       completionHints: { completeCurrentStage: true },
+      observability: input.observability,
     })
+    if (input.observability) {
+      if (result.outcome === "duplicate_noop") {
+        await input.observability.finalize("SKIPPED", result.reason, { outcome: result.outcome })
+      } else if (result.outcome === "retryable_failure" || result.outcome.includes("failure")) {
+        await input.observability.finalize("FAILED", result.reason, { outcome: result.outcome })
+      } else {
+        await input.observability.finalize("SUCCESS", result.reason, { outcome: result.outcome })
+      }
+      await input.observability.assertResearchCompleteEvidence()
+    }
+    return result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (input.observability) {
+      await input.observability.recordFailure(error, "ADVANCE_STARTED").catch(() => undefined)
+      await input.observability.finalize("FAILED", message).catch(() => undefined)
+      await input.observability.assertResearchCompleteEvidence().catch(() => undefined)
+    }
     logGrowthEngine("draft_factory_wake_event_failed", {
       organization_id: input.organizationId,
       lead_id: input.leadId,
+      wake_attempt_id: input.observability?.wakeAttemptId ?? null,
+      event_id: input.observability?.eventId ?? null,
       message: message.slice(0, 240),
     })
     return null

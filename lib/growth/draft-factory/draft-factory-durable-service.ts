@@ -29,6 +29,7 @@ import {
 import { evaluatePortfolioAllocationFacade } from "@/lib/growth/portfolio-allocation/portfolio-allocation-facade-engine"
 import type { AiOsPortfolioCapacityClass } from "@/lib/growth/portfolio-allocation/portfolio-allocation-types"
 import { AI_OS_DRAFT_FACTORY_CAPACITY } from "@/lib/growth/draft-factory/draft-factory-types"
+import type { DraftFactoryWakeObservabilityHandle } from "@/lib/growth/draft-factory/draft-factory-wake-observability-service"
 
 export {
   reconstructDraftFactoryStateFromCanonicalData,
@@ -69,6 +70,8 @@ export type AdvanceDraftFactoryForLeadInput = {
     /** GE-AIOS-REVENUE-2A-HOTFIX-2 — bypass next_eligible_wake_at retry gate for integrity reconcile. */
     admissionIntegrityReconcile?: boolean
   }
+  /** GE-AIOS-DRAFT-FACTORY-OBSERVABILITY-1A — optional durable wake telemetry (no behavior change). */
+  observability?: DraftFactoryWakeObservabilityHandle
 }
 
 function defaultEvidence(partial?: AiOsDraftFactoryCanonicalEvidence): AiOsDraftFactoryCanonicalEvidence {
@@ -196,6 +199,9 @@ export async function advanceDraftFactoryForLead(
         now,
       })
       await repo.upsertLeadState(previous)
+      await input.observability
+        ?.recordTransition("UPSERT_COMPLETED", { phase: "initial_enrollment", state: previous.state })
+        .catch(() => undefined)
     } else {
       // Merge persisted package / ids into evidence.
       evidence = {
@@ -238,6 +244,7 @@ export async function advanceDraftFactoryForLead(
         transitionSummary: { reason: early.reason },
         createdAt: now,
       })
+      await input.observability?.recordTransition("RECEIPT_WRITTEN", { outcome: early.outcome }).catch(() => undefined)
       await repo.appendTransition(early)
       return early
     }
@@ -259,6 +266,9 @@ export async function advanceDraftFactoryForLead(
           updatedAt: now,
         }
         await repo.upsertLeadState(nextState, previous.version)
+        await input.observability
+          ?.recordTransition("UPSERT_COMPLETED", { phase: "duplicate_package_guard", state: nextState.state })
+          .catch(() => undefined)
         const result = buildAdvanceResultV5({
           organizationId: input.organizationId,
           leadId: input.leadId,
@@ -281,6 +291,9 @@ export async function advanceDraftFactoryForLead(
           transitionSummary: { packageId: nextState.packageId },
           createdAt: now,
         })
+        await input.observability
+          ?.recordTransition("RECEIPT_WRITTEN", { outcome: result.outcome, duplicate_package: true })
+          .catch(() => undefined)
         await repo.appendTransition(result)
         return result
       }
@@ -480,6 +493,9 @@ export async function advanceDraftFactoryForLead(
 
     const wrote = await repo.upsertLeadState(nextRecord, previous.version)
     if (!wrote) {
+      await input.observability
+        ?.recordTransition("UPSERT_COMPLETED", { phase: "version_conflict", duplicate: true })
+        .catch(() => undefined)
       const conflict = buildAdvanceResultV5({
         organizationId: input.organizationId,
         leadId: input.leadId,
@@ -496,6 +512,14 @@ export async function advanceDraftFactoryForLead(
       await repo.appendTransition(conflict)
       return conflict
     }
+
+    await input.observability
+      ?.recordTransition("UPSERT_COMPLETED", {
+        state: nextRecord.state,
+        stage: plan.stageEvaluated,
+        outcome: plan.outcome,
+      })
+      .catch(() => undefined)
 
     const result = buildAdvanceResultV5({
       organizationId: input.organizationId,
@@ -529,6 +553,9 @@ export async function advanceDraftFactoryForLead(
       },
       createdAt: now,
     })
+    await input.observability
+      ?.recordTransition("RECEIPT_WRITTEN", { outcome: result.outcome })
+      .catch(() => undefined)
     await repo.appendTransition(result)
     return result
   } finally {

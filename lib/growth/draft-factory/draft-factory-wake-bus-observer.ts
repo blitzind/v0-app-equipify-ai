@@ -33,6 +33,13 @@ import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import {
+  createDraftFactoryWakeObservabilityHandle,
+  createFailedDraftFactoryWakeAttempt,
+  createSkippedDraftFactoryWakeAttempt,
+  recordDraftFactoryWakeSubscriberObservation,
+} from "@/lib/growth/draft-factory/draft-factory-wake-observability-service"
+import { resolveGrowthRuntimeInstanceId } from "@/lib/growth/draft-factory/draft-factory-wake-observability-runtime"
 
 export type DraftFactoryWakeObservationResult = {
   qaMarker: typeof GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER
@@ -139,16 +146,98 @@ async function applyOrgCapacityWake(
 
 async function applyLeadWake(
   admin: SupabaseClient,
+  event: AiOsEvent,
   plan: Extract<DraftFactoryWakePlan, { kind: "lead" }>,
 ): Promise<boolean> {
+  const runtimeInstance = resolveGrowthRuntimeInstanceId()
+  const researchRunId =
+    typeof event.payload?.research_run_id === "string" ? event.payload.research_run_id : null
+  const subscriberStartedAt = new Date().toISOString()
+
+  const observability = await createDraftFactoryWakeObservabilityHandle(admin, {
+    eventId: event.id,
+    organizationId: plan.organizationId,
+    leadId: plan.leadId,
+    researchRunId,
+    wakeType: plan.wakeType,
+    subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+    invocationSource: event.source || event.producer,
+    runtimeInstance,
+    sourceId: plan.sourceId,
+  })
+
+  await observability.recordTransition("HANDLER_STARTED", {
+    subscriber_id: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+  })
+  await observability.recordTransition("PLAN_CREATED", {
+    wake_type: plan.wakeType,
+    source_id: plan.sourceId,
+  })
+
+  await recordDraftFactoryWakeSubscriberObservation(admin, {
+    wakeAttemptId: observability.wakeAttemptId,
+    eventId: event.id,
+    organizationId: plan.organizationId,
+    subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+    received: true,
+    status: "started",
+    startedAt: subscriberStartedAt,
+  })
+
   const result = await wakeDraftFactoryFromCompletionEvent(admin, {
     organizationId: plan.organizationId,
     leadId: plan.leadId,
     wake: { type: plan.wakeType, sourceId: plan.sourceId, eventId: plan.sourceId },
     portfolioSelected: true,
     allowGeneration: false,
+    observability,
   })
-  return Boolean(result && result.outcome !== "duplicate_noop")
+
+  const completedAt = new Date().toISOString()
+  const didAdvance = Boolean(result && result.outcome !== "duplicate_noop")
+
+  await recordDraftFactoryWakeSubscriberObservation(admin, {
+    wakeAttemptId: observability.wakeAttemptId,
+    eventId: event.id,
+    organizationId: plan.organizationId,
+    subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+    received: true,
+    status: didAdvance ? "completed" : result ? "skipped" : "failed",
+    startedAt: subscriberStartedAt,
+    completedAt,
+    durationMs: Date.parse(completedAt) - Date.parse(subscriberStartedAt),
+    skipReason: result?.outcome === "duplicate_noop" ? result.reason : result ? null : "wake_returned_null",
+    errorMessage: result ? null : "wakeDraftFactoryFromCompletionEvent returned null",
+  })
+
+  return didAdvance
+}
+
+async function recordSkippedLeadPlans(
+  admin: SupabaseClient,
+  event: AiOsEvent,
+  plans: DraftFactoryWakePlan[],
+  reason: string,
+): Promise<void> {
+  const runtimeInstance = resolveGrowthRuntimeInstanceId()
+  const researchRunId =
+    typeof event.payload?.research_run_id === "string" ? event.payload.research_run_id : null
+
+  for (const plan of plans) {
+    if (plan.kind !== "lead") continue
+    await createSkippedDraftFactoryWakeAttempt(admin, {
+      eventId: event.id,
+      organizationId: plan.organizationId,
+      leadId: plan.leadId,
+      researchRunId,
+      wakeType: plan.wakeType,
+      subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+      invocationSource: event.source || event.producer,
+      runtimeInstance,
+      sourceId: plan.sourceId,
+      reason,
+    })
+  }
 }
 
 export async function observeDraftFactoryWakeEvent(
@@ -157,6 +246,29 @@ export async function observeDraftFactoryWakeEvent(
 ): Promise<DraftFactoryWakeObservationResult> {
   const plans = mapAiOsEventToDraftFactoryWakePlans(event)
   if (plans.length === 0) {
+    const workflowStatus =
+      typeof event.payload?.workflow_status === "string" ? event.payload.workflow_status : null
+    if (workflowStatus === "research_complete" && event.entityId) {
+      const telemetryClient = admin ?? createServiceRoleClient()
+      if (telemetryClient) {
+        await createSkippedDraftFactoryWakeAttempt(telemetryClient, {
+          eventId: event.id,
+          organizationId: event.organizationId,
+          leadId: event.entityId,
+          researchRunId:
+            typeof event.payload?.research_run_id === "string" ? event.payload.research_run_id : null,
+          wakeType: "research_completed",
+          subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+          invocationSource: event.source || event.producer,
+          runtimeInstance: resolveGrowthRuntimeInstanceId(),
+          sourceId:
+            typeof event.payload?.research_run_id === "string"
+              ? event.payload.research_run_id
+              : event.id,
+          reason: "no_wake_plan_mapped",
+        }).catch(() => undefined)
+      }
+    }
     return {
       qaMarker: GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER,
       subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
@@ -183,6 +295,7 @@ export async function observeDraftFactoryWakeEvent(
 
   const killSwitches = await getRuntimeKillSwitchStates(client).catch(() => null)
   if (killSwitches && !killSwitches.autonomy_enabled) {
+    await recordSkippedLeadPlans(client, event, plans, "autonomy_disabled").catch(() => undefined)
     return {
       qaMarker: GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER,
       subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
@@ -201,7 +314,7 @@ export async function observeDraftFactoryWakeEvent(
   for (const plan of plans) {
     try {
       if (plan.kind === "lead") {
-        const didAdvance = await applyLeadWake(client, plan)
+        const didAdvance = await applyLeadWake(client, event, plan)
         if (didAdvance) advanced += 1
         else skipped += 1
         continue
@@ -226,6 +339,23 @@ export async function observeDraftFactoryWakeEvent(
       }
     } catch (error) {
       skipped += 1
+      if (plan.kind === "lead") {
+        await createFailedDraftFactoryWakeAttempt(client, {
+          eventId: event.id,
+          organizationId: plan.organizationId,
+          leadId: plan.leadId,
+          researchRunId:
+            typeof event.payload?.research_run_id === "string" ? event.payload.research_run_id : null,
+          wakeType: plan.wakeType,
+          subscriberId: GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+          invocationSource: event.source || event.producer,
+          runtimeInstance: resolveGrowthRuntimeInstanceId(),
+          sourceId: plan.sourceId,
+          reason: "plan_execution_failed",
+          error,
+          stage: "HANDLER_STARTED",
+        }).catch(() => undefined)
+      }
       logGrowthEngine("draft_factory_wake_bus_plan_failed", {
         qa_marker: GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER,
         event_type: event.eventType,
