@@ -116,6 +116,7 @@ async function finalizeProspectResearchCompletion(input: {
     admissionContext: input.admissionContext,
     evidenceBundle: input.evidenceBundle ?? resolvedFromRun.evidenceBundle,
     websiteCrawlText: input.websiteCrawlText ?? resolvedFromRun.websiteCrawlText,
+    researchRun: input.run,
   })
   if (postResearchAdmission.applied) {
     logProspectResearch("external_discovery_post_research_admission", {

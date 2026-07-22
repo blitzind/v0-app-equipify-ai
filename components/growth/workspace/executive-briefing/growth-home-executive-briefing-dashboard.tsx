@@ -414,6 +414,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
       activation: workspaceSummary?.avaActivation ?? null,
       generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
       canonicalFocusCompanyName: workspaceSummary?.canonicalOperatorFocus?.companyName ?? null,
+      emailsSentToday: workspaceSummary?.kpis?.emailsSentToday,
+      repliesToday: workspaceSummary?.kpis?.repliesToday,
+      meetingsToday: workspaceSummary?.meetings?.today,
     })
     const workingNow = buildHomeWorkingNowPresentation({
       dailyActivityNarrative: avaHero.dailyActivityNarrative,

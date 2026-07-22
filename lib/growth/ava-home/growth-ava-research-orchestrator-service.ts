@@ -40,6 +40,10 @@ import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research
 import type { GrowthLead } from "@/lib/growth/types"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
+import {
+  GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE,
+  hasLikelyDecisionMaker,
+} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 
 const OUTREACH_READY_ACTIONS = new Set([
   "call_prospect",
@@ -290,10 +294,18 @@ function leadReadyForOutreachReview(
 ): boolean {
   if (!lead) return false
   const status = workflowStatus ?? null
-  if (status === "assessed" || status === "qualified") return true
+  if (status === "assessed" || status === "qualified" || status === "research_complete") return true
+
+  if (
+    hasLikelyDecisionMaker({ lead }) &&
+    (lead.score ?? 0) >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE
+  ) {
+    return true
+  }
 
   const nba = `${lead.nextBestAction ?? ""} ${lead.prospectRecommendedNextAction ?? ""}`.toLowerCase()
   if ([...OUTREACH_READY_ACTIONS].some((action) => nba.includes(action))) return true
+  if (nba.includes("outreach") || nba.includes("draft")) return true
   if (
     lead.nextBestAction === "call_immediately" ||
     lead.nextBestAction === "call_now" ||
@@ -304,6 +316,9 @@ function leadReadyForOutreachReview(
     return true
   }
   if ((lead.score ?? 0) >= 70 && lead.workflowHealth === "healthy") return true
+  if ((lead.score ?? 0) >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE && hasLikelyDecisionMaker({ lead })) {
+    return true
+  }
   return false
 }
 

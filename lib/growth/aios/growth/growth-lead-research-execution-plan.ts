@@ -1,6 +1,9 @@
 /** GE-AIOS-GROWTH-1C — Next Best Action Workflow Planner (client-safe). */
 
 import type { AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
+import {
+  GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import type {
   GrowthLeadResearchEvidenceSummary,
   GrowthLeadResearchNextBestAction,
@@ -172,7 +175,7 @@ function prerequisitesForWorkflow(
     case "buying_committee":
       return [...base, "Company summary available", "Verified company domain or website"]
     case "outreach_generation":
-      return [...base, "Buying committee mapped or primary contact verified", "Outreach angle selected"]
+      return [...base, "One likely contact identified", "Outreach angle selected"]
     case "meeting_preparation":
       return [...base, "Engagement signal or meeting intent detected"]
     case "monitoring":
@@ -205,8 +208,16 @@ function resolveMissingPrerequisites(
   }
 
   if (
-    (workflowType === "buying_committee" || workflowType === "outreach_generation") &&
+    workflowType === "buying_committee" &&
     evidenceSummary.verifiedEvidence.every((item) => !item.toLowerCase().includes("decision"))
+  ) {
+    missing.push("Decision maker evidence not verified")
+  }
+
+  if (
+    workflowType === "outreach_generation" &&
+    evidenceSummary.verifiedEvidence.every((item) => !item.toLowerCase().includes("decision")) &&
+    qualification.confidence < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE
   ) {
     missing.push("Decision maker evidence not verified")
   }

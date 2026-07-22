@@ -3,6 +3,14 @@
 import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
 import type { GrowthLeadResearchQualificationOutput } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import {
+  GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+  GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE,
+  hasLikelyDecisionMaker,
+  isGoodEnoughForEarlyOutreach,
+  isResearchCompleteForOutreach,
+  shouldPreferOutreachOverCommitteeResearch,
+} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import { planGrowthLeadResearchExecution } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 
 export const GROWTH_AIOS_GROWTH_1B_PHASE = "GE-AIOS-GROWTH-1B" as const
@@ -132,14 +140,47 @@ function resolveRecommendation(input: {
   confidence: number
   missingEvidenceCount: number
   qualification: GrowthLeadResearchQualificationOutput
+  hasLikelyContact: boolean
+  result: GrowthLeadResearchResult
+  researchTimeBudgetExhausted?: boolean
 }): GrowthLeadResearchOpportunityRecommendation {
   if (input.fitScore < 40 || input.opportunityScore < 35) return "abandon"
+
+  if (
+    isResearchCompleteForOutreach({
+      fitScore: input.fitScore,
+      confidence: input.confidence,
+      missingEvidenceCount: input.missingEvidenceCount,
+      result: input.result,
+      researchTimeBudgetExhausted: input.researchTimeBudgetExhausted,
+    })
+  ) {
+    if (
+      isGoodEnoughForEarlyOutreach({
+        fitScore: input.fitScore,
+        confidence: input.confidence,
+        missingEvidenceCount: input.missingEvidenceCount,
+        result: input.result,
+      })
+    ) {
+      return "prepare_outreach"
+    }
+  }
+
   if (input.missingEvidenceCount >= 4 || input.confidence < 0.4) return "continue_research"
-  if (input.missingEvidenceCount >= 2 && input.confidence < 0.55) return "continue_research"
+  if (input.missingEvidenceCount >= 2 && input.confidence < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE) {
+    return "continue_research"
+  }
 
   const action = input.qualification.recommendedNextAction.toLowerCase()
   if (action.includes("verify") || action.includes("email")) return "verify_contacts"
-  if (action.includes("committee") || action.includes("decision maker")) {
+  if (
+    (action.includes("committee") || action.includes("decision maker")) &&
+    !shouldPreferOutreachOverCommitteeResearch({
+      qualification: input.qualification,
+      hasLikelyContact: input.hasLikelyContact,
+    })
+  ) {
     return "identify_buying_committee"
   }
   if (action.includes("outreach") || action.includes("email draft")) return "prepare_outreach"
@@ -148,7 +189,14 @@ function resolveRecommendation(input: {
   if (input.opportunityScore >= 75 && input.buyingSignalScore >= 60 && input.confidence >= 0.7) {
     return "pursue_immediately"
   }
-  if (input.opportunityScore >= 55) return "prepare_outreach"
+  if (
+    input.opportunityScore >= 55 ||
+    (input.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE &&
+      input.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE &&
+      input.hasLikelyContact)
+  ) {
+    return "prepare_outreach"
+  }
   if (input.buyingSignalScore < 40) return "continue_research"
   return "monitor"
 }
@@ -306,6 +354,8 @@ export function assessGrowthLeadResearchOpportunity(input: {
     confidence,
     missingEvidenceCount: input.qualification.missingEvidence.length,
     qualification: input.qualification,
+    hasLikelyContact: hasLikelyDecisionMaker({ result: input.result }),
+    result: input.result,
   })
 
   const worthPursuing =

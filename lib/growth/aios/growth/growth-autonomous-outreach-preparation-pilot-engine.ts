@@ -27,6 +27,10 @@ import {
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_WAKE_CONDITIONS,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import {
+  GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+  hasCompletedCanonicalProspectResearch,
+} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 
 const RECENT_PACKAGE_MS = 24 * 60 * 60 * 1000
 
@@ -64,7 +68,13 @@ export function evaluateOutreachMemoryReadiness(snapshot: GrowthLeadResearchWork
   if (!snapshot.executionPlan) {
     return { sufficient: false, blockReason: "Execution plan missing — planning must complete first." }
   }
-  if (snapshot.workflowStatus === "failed" || snapshot.workflowStatus === "blocked") {
+  if (snapshot.workflowStatus === "failed") {
+    return { sufficient: false, blockReason: "Workflow blocked — outreach preparation not eligible." }
+  }
+  if (
+    snapshot.workflowStatus === "blocked" &&
+    (snapshot.qualification?.confidence ?? 0) < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE
+  ) {
     return { sufficient: false, blockReason: "Workflow blocked — outreach preparation not eligible." }
   }
   return { sufficient: true, blockReason: null }
@@ -73,10 +83,22 @@ export function evaluateOutreachMemoryReadiness(snapshot: GrowthLeadResearchWork
 export function hasCompletedInternalExecution(input: {
   executionRuns: GrowthAutonomousExecutionRunRecord[]
   leadId: string
+  snapshot?: GrowthLeadResearchWorkflowSnapshot | null
 }): boolean {
-  return input.executionRuns.some(
-    (run) => run.leadId === input.leadId && run.outcome === "completed" && run.workflowType === "research_company",
-  )
+  if (
+    input.executionRuns.some(
+      (run) =>
+        run.leadId === input.leadId &&
+        run.outcome === "completed" &&
+        run.workflowType === "research_company",
+    )
+  ) {
+    return true
+  }
+  return hasCompletedCanonicalProspectResearch({
+    snapshot: input.snapshot ?? null,
+    leadId: input.leadId,
+  })
 }
 
 export function evaluateOutreachPreparationGateReadiness(input: {
@@ -90,7 +112,13 @@ export function evaluateOutreachPreparationGateReadiness(input: {
     return { eligible: false, blockReason: memory.blockReason }
   }
 
-  if (!hasCompletedInternalExecution({ executionRuns: input.executionRuns, leadId: input.leadId })) {
+  if (
+    !hasCompletedInternalExecution({
+      executionRuns: input.executionRuns,
+      leadId: input.leadId,
+      snapshot: input.snapshot,
+    })
+  ) {
     return { eligible: false, blockReason: "Internal execution has not completed successfully." }
   }
 
@@ -243,11 +271,17 @@ export function selectOutreachPreparationWakeCandidates(input: {
   rankedMissions: GrowthMissionAllocationRecommendation[]
   snapshotsByLeadId: Map<string, GrowthLeadResearchWorkflowSnapshot | null>
 }): GrowthOutreachPreparationWakeCandidate[] {
-  const completedLeadIds = new Set(
-    input.executionRuns
-      .filter((run) => run.outcome === "completed" && run.workflowType === "research_company")
-      .map((run) => run.leadId),
-  )
+  const completedLeadIds = new Set<string>()
+  for (const run of input.executionRuns) {
+    if (run.outcome === "completed" && run.workflowType === "research_company") {
+      completedLeadIds.add(run.leadId)
+    }
+  }
+  for (const [leadId, snapshot] of input.snapshotsByLeadId.entries()) {
+    if (hasCompletedCanonicalProspectResearch({ snapshot, leadId })) {
+      completedLeadIds.add(leadId)
+    }
+  }
 
   const prioritized = input.rankedMissions.filter(
     (row) =>

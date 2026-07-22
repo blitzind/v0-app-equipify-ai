@@ -2,6 +2,10 @@
 
 import type { AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 import type { GrowthLeadResearchResult, GrowthLeadResearchRunStatus } from "@/lib/growth/research-types"
+import {
+  GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+  GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE,
+} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import type {
   LeadResearchPilotStepId,
   LeadResearchPilotStepRecord,
@@ -115,7 +119,8 @@ export function deriveGrowthLeadResearchWorkflowStatus(input: {
   const complete = findStep(steps, "work_order_complete")
   if (complete && stepIsDone(complete)) {
     if (input.qualification) {
-      return input.qualification.fitScore >= 55 && input.qualification.confidence >= 0.45
+      return input.qualification.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE &&
+        input.qualification.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE
         ? "qualified"
         : "blocked"
     }
@@ -125,7 +130,8 @@ export function deriveGrowthLeadResearchWorkflowStatus(input: {
   const saveResearch = findStep(steps, "save_research")
   if (saveResearch && stepIsDone(saveResearch)) {
     if (input.qualification) {
-      return input.qualification.fitScore >= 55 && input.qualification.confidence >= 0.45
+      return input.qualification.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE &&
+        input.qualification.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE
         ? "qualified"
         : "blocked"
     }
@@ -213,7 +219,7 @@ export function qualifyGrowthLeadResearch(input: {
     missingEvidence,
   }
 
-  if (input.researchRunStatus === "partial" && confidence < 0.45) {
+  if (input.researchRunStatus === "partial" && confidence < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE) {
     return { qualification, terminalStatus: "blocked" }
   }
 
@@ -221,7 +227,7 @@ export function qualifyGrowthLeadResearch(input: {
     return { qualification, terminalStatus: "blocked" }
   }
 
-  if (fitScore >= 55 && confidence >= 0.45) {
+  if (fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE && confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE) {
     return { qualification, terminalStatus: "qualified" }
   }
 

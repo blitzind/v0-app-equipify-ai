@@ -388,6 +388,16 @@ export function resolveLeadAdmissionStateFromMetadata(
   return null
 }
 
+/**
+ * Canonical lead.status from admission evaluation at write/reconciliation time.
+ * Matches unified intake (`resolveUnifiedLeadFromIntake`) — admission is the status authority.
+ */
+export function resolveReconciledLeadStatusFromAdmission(
+  evaluation: Pick<GrowthLeadAdmissionEvaluation, "leadStatus">,
+): GrowthLeadAdmissionEvaluation["leadStatus"] {
+  return evaluation.leadStatus
+}
+
 export function buildLeadAdmissionMetadata(
   evaluation: GrowthLeadAdmissionEvaluation,
   generatedAt: string = new Date().toISOString(),

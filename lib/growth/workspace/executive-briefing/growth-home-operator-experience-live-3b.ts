@@ -146,11 +146,11 @@ export function buildHeroExecutiveBriefing(input: {
     )
   } else if (input.statusLabel === "Researching companies") {
     paragraphs.push(
-      "I'm researching the strongest companies in your pipeline and preparing the next opportunities for your review.",
+      "I'm researching companies just enough to start conversations, then drafting personalized outreach for your approval.",
     )
   } else if (input.statusLabel === "Preparing outreach") {
     paragraphs.push(
-      "I'm preparing outreach packages for your review before moving on to the next accounts in your pipeline.",
+      "I'm building your pipeline — drafting personalized outreach for your review as soon as each company is good enough to contact.",
     )
   } else if (input.statusLabel === "Finding Leads") {
     paragraphs.push(
@@ -345,16 +345,10 @@ export function buildHomeMeasurableProgressPresentation(input: {
   }
 
   const summary = input.dailySummary
-  if (summary?.researched != null && summary.researched > 0) {
-    items.push({ id: "researched", label: "Researched today", value: String(summary.researched) })
-  }
-  if (summary?.qualified != null && summary.qualified > 0) {
-    items.push({ id: "qualified", label: "Qualified today", value: String(summary.qualified) })
-  }
   if ((summary?.outreach_prepared ?? 0) > 0) {
     items.push({
-      id: "packages-prepared",
-      label: "Packages prepared",
+      id: "outreach-drafts-created",
+      label: "Outreach drafts created",
       value: String(summary!.outreach_prepared),
     })
   }
@@ -362,9 +356,24 @@ export function buildHomeMeasurableProgressPresentation(input: {
   if ((input.pendingApprovals ?? 0) > 0) {
     items.push({
       id: "packages-awaiting-review",
-      label: "Packages awaiting your review",
+      label: "Waiting for approval",
       value: String(input.pendingApprovals),
     })
+  }
+
+  if ((input.readyForOutreachReview ?? 0) > 0) {
+    items.push({
+      id: "ready-for-outreach-review",
+      label: "Drafts in progress",
+      value: String(input.readyForOutreachReview),
+    })
+  }
+
+  if (summary?.researched != null && summary.researched > 0) {
+    items.push({ id: "researched", label: "Researched today", value: String(summary.researched) })
+  }
+  if (summary?.qualified != null && summary.qualified > 0) {
+    items.push({ id: "qualified", label: "Qualified today", value: String(summary.qualified) })
   }
 
   if (input.portfolio) {

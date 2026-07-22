@@ -28,6 +28,7 @@ import { GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS } from "@/lib/growth/specialist
 import { getAutonomyBudgetSnapshot, consumeAutonomyBudget } from "@/lib/growth/autonomy/growth-autonomy-budget-service"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { isGoodEnoughForEarlyOutreachFromRun } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import {
   scheduleAslProspectResearchOutcomeReconciliation,
   scheduleAslProspectResearchOutcomeReconciliationForActiveRun,
@@ -446,6 +447,21 @@ export async function executeGrowthLeadProspectResearch(
       qualificationRan,
       generatedAt,
     })
+  }
+
+  if (
+    research.run.status === "completed" &&
+    isGoodEnoughForEarlyOutreachFromRun(research.run)
+  ) {
+    void import("@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service")
+      .then(({ runAutonomousOutreachPreparationManualRequest }) =>
+        runAutonomousOutreachPreparationManualRequest(input.admin, {
+          organizationId,
+          leadId: lead.id,
+          generatedAt,
+        }),
+      )
+      .catch(() => undefined)
   }
 
   // GE-AIOS-AUTONOMY-1B — research completion wakes Draft Factory via AI OS Event Bus

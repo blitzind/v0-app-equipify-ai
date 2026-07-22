@@ -66,6 +66,18 @@ export type GrowthHomeRuntimeResearchPaceSnapshot = {
   budgetBlocked: boolean
 }
 
+/** GE-AIOS-OUTREACH-1A — Pipeline-first operator metrics (research is secondary). */
+export type GrowthHomeRuntimePipelinePaceSnapshot = {
+  outreachDraftsCreated: number
+  awaitingApproval: number
+  approvedToday: number
+  emailsSent: number
+  repliesReceived: number
+  meetingsBooked: number
+  activeConversations: number
+  researchedToday: number
+}
+
 export type GrowthHomeRuntimeTrustHeartbeatLine = {
   id: string
   label: string
@@ -141,4 +153,6 @@ export type GrowthHomeRuntimeTrustViewModel = {
   lastAutonomousActivitySource: GrowthHomeCanonicalRuntimeActivitySource | "sales_outcome" | "scheduler_fallback" | null
   /** GE-AIOS-RUNTIME-SCALE-1A */
   researchPace: GrowthHomeRuntimeResearchPaceSnapshot | null
+  /** GE-AIOS-OUTREACH-1A */
+  pipelinePace: GrowthHomeRuntimePipelinePaceSnapshot | null
 }

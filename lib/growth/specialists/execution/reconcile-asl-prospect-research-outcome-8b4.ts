@@ -15,6 +15,7 @@ import { AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS } from "@/lib/growth/special
 import { buildSalesOutcomeMemoryEvent } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
 import { finalizeSalesSpecialistOutcomes } from "@/lib/growth/specialists/execution/sales-specialist-execution-bridge"
 import { mapCompletedProspectResearchRunToSalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-mappers"
+import { isGoodEnoughForEarlyOutreachFromRun } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 
 export const GE_AIOS_HOTFIX_LIVE_8B_4_OUTCOME_RECONCILIATION_QA_MARKER =
   "ge-aios-hotfix-live-8b-4-outcome-reconciliation-v1" as const
@@ -183,6 +184,18 @@ export async function reconcileAslProspectResearchOutcome(
     outcome_type: validated.outcome_type,
     memory_event_id: memoryEventId,
   })
+
+  if (isGoodEnoughForEarlyOutreachFromRun(input.run)) {
+    void import("@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service")
+      .then(({ runAutonomousOutreachPreparationManualRequest }) =>
+        runAutonomousOutreachPreparationManualRequest(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          generatedAt,
+        }),
+      )
+      .catch(() => undefined)
+  }
 
   return {
     ...baseResult,

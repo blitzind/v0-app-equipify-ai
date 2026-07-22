@@ -374,7 +374,7 @@ async function applyRepairMutation(input: {
         ...buildLeadAdmissionMetadata(admission, input.generatedAt),
         admission_allow_auto_research: admission.allowAutoResearch,
       },
-      status: admission.leadStatus === "disqualified" ? "disqualified" : refreshed.status,
+      status: admission.leadStatus,
     })
     const finalLead = await fetchGrowthLeadById(input.admin, input.lead.id)
     return {

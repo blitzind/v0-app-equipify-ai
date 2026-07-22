@@ -14,6 +14,7 @@ import {
   type AiOsResourceAllocationRequest,
   type AiOsScarceResourceClass,
 } from "@/lib/growth/resource-allocation/resource-allocation-types"
+import { GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -235,6 +236,35 @@ export function projectInvestmentStateFromSignals(
       confidence: Math.max(confidence, 0.7),
       blocking_conditions: blocking,
       next_review: "after_research",
+    }
+  }
+
+  if (
+    admission === "accepted" &&
+    confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE &&
+    signals.budgetAvailable !== false &&
+    signals.hasUsableResearch === true &&
+    (/prepare_outreach|pursue|enroll|qualified|outreach|draft/.test(recommendation) ||
+      recommendation === "" ||
+      /continue/.test(recommendation))
+  ) {
+    if (costTier === "outbound") {
+      return {
+        investment_state: "increase_investment",
+        reason:
+          "Research-complete account earned preparation investment; outbound transport stays approval-gated elsewhere.",
+        confidence,
+        blocking_conditions: [...blocking, "outbound_requires_separate_approval"],
+        next_review: "after_approval_for_send",
+      }
+    }
+    return {
+      investment_state: "increase_investment",
+      reason:
+        "Research-complete account earned downstream investment after canonical early-outreach qualification.",
+      confidence,
+      blocking_conditions: blocking,
+      next_review: null,
     }
   }
 

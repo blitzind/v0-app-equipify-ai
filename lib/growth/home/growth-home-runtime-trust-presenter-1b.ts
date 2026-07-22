@@ -33,6 +33,7 @@ import {
   type GrowthHomeRuntimeTrustServerPayload,
   type GrowthHomeRuntimeTrustStartStatus,
   type GrowthHomeRuntimeTrustViewModel,
+  type GrowthHomeRuntimePipelinePaceSnapshot,
   type GrowthHomeRuntimeResearchPaceSnapshot,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 
@@ -167,9 +168,9 @@ function describeCurrentStep(activeWork: AvaWorkItem | null): string | null {
     case "qualification":
       return company ? `Qualifying ${company}` : "Qualifying company"
     case "outreach":
-      return company ? `Preparing outreach for ${company}` : "Preparing outreach"
+      return company ? `Drafting personalized outreach for ${company}` : "Drafting personalized outreach"
     case "approval":
-      return company ? `Preparing package for ${company}` : "Preparing outreach package"
+      return company ? `Outreach ready for your review — ${company}` : "Outreach waiting for your approval"
     case "reply":
       return company ? `Following up with ${company}` : "Following up"
     case "meeting":
@@ -463,6 +464,83 @@ function buildStartStatus(input: {
   }
 }
 
+function buildPipelinePaceSnapshot(input: {
+  salesOutcomes: GrowthHomeSalesOutcomesPayload | null | undefined
+  pendingApprovals: number
+  emailsSentToday?: number
+  repliesToday?: number
+  meetingsToday?: number
+}): GrowthHomeRuntimePipelinePaceSnapshot | null {
+  const summary = input.salesOutcomes?.dailySummary
+  if (!summary && input.pendingApprovals <= 0) return null
+
+  const outreachDraftsCreated = summary?.outreach_prepared ?? 0
+  const awaitingApproval = Math.max(input.pendingApprovals, summary?.approvals_pending ?? 0)
+  const researchedToday = summary?.researched ?? 0
+
+  return {
+    outreachDraftsCreated,
+    awaitingApproval,
+    approvedToday: summary?.outreach_prepared ?? 0,
+    emailsSent: input.emailsSentToday ?? 0,
+    repliesReceived: input.repliesToday ?? 0,
+    meetingsBooked: input.meetingsToday ?? summary?.meetings_prepared ?? 0,
+    activeConversations: input.repliesToday ?? 0,
+    researchedToday,
+  }
+}
+
+function formatPipelineHeartbeatLines(
+  pipelinePace: GrowthHomeRuntimePipelinePaceSnapshot,
+): GrowthHomeRuntimeTrustHeartbeatLine[] {
+  const lines: GrowthHomeRuntimeTrustHeartbeatLine[] = []
+
+  if (pipelinePace.outreachDraftsCreated > 0) {
+    lines.push({
+      id: "outreach-drafts-created",
+      label: "Outreach drafts created",
+      value: String(pipelinePace.outreachDraftsCreated),
+    })
+  }
+  if (pipelinePace.awaitingApproval > 0) {
+    lines.push({
+      id: "outreach-awaiting-approval",
+      label: "Waiting for approval",
+      value: String(pipelinePace.awaitingApproval),
+    })
+  }
+  if (pipelinePace.emailsSent > 0) {
+    lines.push({
+      id: "emails-sent-today",
+      label: "Emails sent",
+      value: String(pipelinePace.emailsSent),
+    })
+  }
+  if (pipelinePace.repliesReceived > 0) {
+    lines.push({
+      id: "replies-received",
+      label: "Replies received",
+      value: String(pipelinePace.repliesReceived),
+    })
+  }
+  if (pipelinePace.meetingsBooked > 0) {
+    lines.push({
+      id: "meetings-booked",
+      label: "Meetings booked",
+      value: String(pipelinePace.meetingsBooked),
+    })
+  }
+  if (pipelinePace.researchedToday > 0) {
+    lines.push({
+      id: "researched-secondary",
+      label: "Researched today",
+      value: String(pipelinePace.researchedToday),
+    })
+  }
+
+  return lines
+}
+
 export function buildGrowthHomeRuntimeTrustViewModel(input: {
   server: GrowthHomeRuntimeTrustServerPayload | null | undefined
   salesOutcomes: GrowthHomeSalesOutcomesPayload | null | undefined
@@ -473,6 +551,9 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   activation?: GrowthAvaActivationState | null
   generatedAt?: string
   canonicalFocusCompanyName?: string | null
+  emailsSentToday?: number
+  repliesToday?: number
+  meetingsToday?: number
 }): GrowthHomeRuntimeTrustViewModel {
   const nowMs = Date.parse(input.generatedAt ?? input.server?.generatedAt ?? new Date().toISOString())
   const killSwitches = input.server?.killSwitches ?? {}
@@ -565,12 +646,33 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   const researchPace: GrowthHomeRuntimeResearchPaceSnapshot | null =
     input.server?.canonicalActivity?.pace ?? null
 
-  if (researchPace) {
+  const pipelinePace = buildPipelinePaceSnapshot({
+    salesOutcomes: input.salesOutcomes,
+    pendingApprovals: input.pendingApprovals,
+    emailsSentToday: input.emailsSentToday,
+    repliesToday: input.repliesToday,
+    meetingsToday: input.meetingsToday,
+  })
+
+  if (pipelinePace) {
+    for (const line of formatPipelineHeartbeatLines(pipelinePace).reverse()) {
+      heartbeat.unshift(line)
+    }
+  } else if (researchPace) {
     heartbeat.unshift({
       id: "research-pace-today",
       label: "Researched today",
       value: `${researchPace.researchedToday} / ${researchPace.researchTargetPerDay}`,
     })
+  }
+
+  if (researchPace && pipelinePace) {
+    heartbeat.push({
+      id: "research-pace-secondary",
+      label: "Research pace",
+      value: `${researchPace.researchedToday} / ${researchPace.researchTargetPerDay}`,
+    })
+  } else if (researchPace && !pipelinePace) {
     heartbeat.splice(1, 0, {
       id: "research-rate-hour",
       label: "Current rate",
@@ -733,5 +835,6 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     telemetryStale,
     lastAutonomousActivitySource: lastAutonomousActivitySource,
     researchPace,
+    pipelinePace,
   }
 }

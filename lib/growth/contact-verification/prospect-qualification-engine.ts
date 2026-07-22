@@ -222,7 +222,7 @@ export function resolveProspectQualificationState(input: {
   const verificationPending = input.acquisition.blockers.includes("Verification pending")
   if (verificationPending || (verificationWeak && input.contactScore < 50)) return "research"
 
-  if (input.buyingCommitteeCoverage < LOW_COMMITTEE_THRESHOLD && input.contactScore < 60) {
+  if (input.buyingCommitteeCoverage < LOW_COMMITTEE_THRESHOLD && input.contactScore < 50) {
     return "research"
   }
 
@@ -271,7 +271,7 @@ export function resolveProspectQualificationNextAction(input: {
 
   const blockers = input.acquisition.blockers
   if (
-    blockers.some((b) => b.includes("decision maker") || b.includes("No decision maker")) ||
+    blockers.some((b) => b.includes("No decision maker identified")) ||
     input.acquisition.primaryContact.fullName === "No primary contact"
   ) {
     return "find_decision_maker"

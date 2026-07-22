@@ -157,7 +157,23 @@ const missionPlanning = readSource("lib/growth/aios/ai-executive-mission-plannin
 assert.match(missionPlanning, /buildGrowthAutonomousOutreachPreparationPilotPlanContext/)
 console.log("  ✓ Mission Planning Review outreach context")
 
-assert.equal(hasCompletedInternalExecution({ executionRuns: [executionCompleteRun], leadId: LEAD }), true)
+assert.equal(
+  hasCompletedInternalExecution({
+    executionRuns: [executionCompleteRun],
+    leadId: LEAD,
+    snapshot: readySnapshot,
+  }),
+  true,
+)
+assert.equal(
+  hasCompletedInternalExecution({
+    executionRuns: [],
+    leadId: LEAD,
+    snapshot: readySnapshot,
+  }),
+  true,
+  "canonical prospect research completion satisfies outreach execution gate",
+)
 assert.equal(evaluateOutreachMemoryReadiness(readySnapshot).sufficient, true)
 assert.equal(evaluateOutreachMemoryReadiness(null).sufficient, false)
 
@@ -175,7 +191,15 @@ const gateNoExecution = evaluateOutreachPreparationGateReadiness({
   leadId: LEAD,
   confidence: 0.7,
 })
-assert.equal(gateNoExecution.eligible, false)
+assert.equal(gateNoExecution.eligible, true)
+
+const gateNoResearchContext = evaluateOutreachPreparationGateReadiness({
+  snapshot: null,
+  executionRuns: [],
+  leadId: LEAD,
+  confidence: 0.7,
+})
+assert.equal(gateNoResearchContext.eligible, false)
 
 const gateLowConfidence = evaluateOutreachPreparationGateReadiness({
   snapshot: readySnapshot,
@@ -185,7 +209,7 @@ const gateLowConfidence = evaluateOutreachPreparationGateReadiness({
 })
 assert.equal(gateLowConfidence.eligible, false)
 assert.match(gateLowConfidence.blockReason ?? "", /Confidence below threshold/)
-console.log("  ✓ Wake requires successful internal execution and confidence threshold")
+console.log("  ✓ Wake requires completed research execution and confidence threshold")
 
 const schedulerWakeRules = buildSchedulerWakeRules()
 const outreachWake = schedulerWakeRules.find((rule) => rule.agentKind === "outreach_agent")
