@@ -29,6 +29,22 @@ function isPostgrestSchemaCacheStaleError(message: string, code?: string): boole
   return false
 }
 
+export function isGrowthPostgrestMissingTableError(message: string, code?: string): boolean {
+  if (isDefinitiveMissingObjectError(message, code)) return true
+  return isPostgrestSchemaCacheStaleError(message, code)
+}
+
+/** Real PostgREST SELECT probe — head/count probes can false-positive when a table is absent from the API cache. */
+export async function probeGrowthTablePostgrestAccessible(
+  admin: SupabaseClient,
+  table: string,
+  columns: string[] = ["id"],
+): Promise<boolean> {
+  const { error } = await admin.schema("growth").from(table).select(columns.join(", ")).limit(0)
+  if (!error) return true
+  return false
+}
+
 function isDefinitiveMissingObjectError(message: string, code?: string): boolean {
   if (code === "42P01" || code === "42703") return true
   const m = message.toLowerCase()

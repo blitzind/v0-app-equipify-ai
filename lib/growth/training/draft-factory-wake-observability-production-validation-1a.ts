@@ -7,6 +7,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import { GROWTH_DRAFT_FACTORY_WAKE_OBSERVABILITY_1A_QA_MARKER } from "@/lib/growth/draft-factory/draft-factory-wake-observability-types"
+import { probeGrowthTablePostgrestAccessible } from "@/lib/growth/schema-health/growth-postgrest-table-probe"
 
 export const GROWTH_AIOS_DRAFT_FACTORY_WAKE_OBSERVABILITY_1A_QA_MARKER =
   GROWTH_DRAFT_FACTORY_WAKE_OBSERVABILITY_1A_QA_MARKER
@@ -45,10 +46,7 @@ const OBSERVABILITY_TABLES = [
 ] as const
 
 async function tableExists(admin: SupabaseClient, table: string): Promise<boolean> {
-  const { error } = await admin.schema("growth").from(table).select("id", { head: true, count: "exact" }).limit(1)
-  if (!error) return true
-  if (error.message.includes("does not exist") || error.code === "42P01") return false
-  throw new Error(`table probe failed for growth.${table}: ${error.message}`)
+  return probeGrowthTablePostgrestAccessible(admin, table, ["id"])
 }
 
 export async function runDraftFactoryWakeObservabilityProductionValidation(
