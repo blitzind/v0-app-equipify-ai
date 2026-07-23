@@ -3,6 +3,7 @@
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import type { GrowthPersonalizationQualityDiagnostics } from "@/lib/growth/personalization/quality/growth-personalization-quality-types"
 import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
+import type { GrowthOutreachPersonalizationOrganizationKnowledgeBlock } from "@/lib/growth/outreach/personalization/growth-outreach-personalization-organization-knowledge"
 
 export const OUTREACH_PERSONALIZATION_STRATEGY_VERSION = "6.15C-v1" as const
 
@@ -333,6 +334,8 @@ export type OutreachContextPacket = {
   leadEngineGuidance: OutreachLeadEngineGuidance | null
   /** GS-AI-PLAYBOOK-1C — resolved industry playbook context (verified vs industry separated). */
   industryContext: GrowthIndustryContext | null
+  /** AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1D — approved Training projection for refinement prompts. */
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null
 }
 
 export type SelectedMessageBlock = {

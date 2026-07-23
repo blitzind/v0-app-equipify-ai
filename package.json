@@ -862,6 +862,8 @@
     "test:aios-training-knowledge-integration-1b:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-aios-training-knowledge-integration-1b-production.ts",
     "test:aios-training-knowledge-integration-1c": "tsx scripts/test-aios-training-knowledge-integration-1c.ts",
     "test:aios-training-knowledge-integration-1c:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-aios-training-knowledge-integration-1c-production.ts",
+    "test:aios-training-knowledge-integration-1d": "tsx scripts/test-aios-training-knowledge-integration-1d.ts",
+    "test:aios-training-knowledge-integration-1d:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-aios-training-knowledge-integration-1d-production.ts",
     "test:ge-aios-19c-2f-about-your-ai": "tsx scripts/test-ge-aios-19c-2f-about-your-ai.ts",
     "test:ge-aios-19c-2a-single-ai-identity-cleanup": "tsx scripts/test-ge-aios-19c-2a-single-ai-identity-cleanup.ts",
     "test:ge-aios-19c-2g-home-cleanup": "tsx scripts/test-ge-aios-19c-2g-home-cleanup.ts",

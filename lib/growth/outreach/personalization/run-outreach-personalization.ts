@@ -101,7 +101,11 @@ export async function runOutreachPersonalizationGeneration(
     const health = await provider.health()
     if (health.ok) {
       const allowedFacts = collectAllowedFacts(buildAllowedFactsFromContextPacket(contextPacket))
-      const systemPrompt = buildOutreachRefinementSystemPrompt(maxWords, input.outboundIdentity)
+      const systemPrompt = buildOutreachRefinementSystemPrompt(
+        maxWords,
+        input.outboundIdentity,
+        contextPacket.organizationKnowledge,
+      )
       const userPrompt = buildOutreachRefinementUserPrompt({
         draft,
         blocks: strategy.blocks,
@@ -114,6 +118,7 @@ export async function runOutreachPersonalizationGeneration(
         maxWords,
         avoidRepeatingTopics: contextPacket.memoryAvoidRepeating,
         outboundIdentity: input.outboundIdentity,
+        organizationKnowledge: contextPacket.organizationKnowledge,
       })
 
       try {

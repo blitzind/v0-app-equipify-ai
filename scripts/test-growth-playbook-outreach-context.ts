@@ -146,7 +146,7 @@ function runEmailCert(): void {
   assertNoGenericSterling(draft.body)
   assert(/often/i.test(draft.body), `Expected industry context: ${draft.body}`)
   assert(/We noticed Sterling Biomedical/i.test(draft.body), `Expected verified company line: ${draft.body}`)
-  assert(/Equipify helps/i.test(draft.body), `Expected capability mapping: ${draft.body}`)
+  assert(/Many teams centralize|Teams often centralize/i.test(draft.body), `Expected neutral capability mapping: ${draft.body}`)
 
   const allowed = buildAllowedFactsFromContextPacket(packet)
   assert(!allowed.some((fact) => /Sterling Biomedical struggles/i.test(fact)), "research pain must not be allowed fact")
@@ -171,7 +171,7 @@ function runSmsCert(): void {
   assert(sms, "SMS draft expected")
   assert(/often struggle/i.test(sms!), sms!)
   assert(!/Sterling Biomedical struggles/i.test(sms!), sms!)
-  assert(/Equipify centralizes/i.test(sms!), sms!)
+  assert(/Teams often centralize|Many teams centralize/i.test(sms!), sms!)
 
   const built = buildPersonalizedSmsDraft({
     leadId: "lead-sterling",

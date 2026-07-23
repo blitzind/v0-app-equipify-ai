@@ -13,6 +13,7 @@ import type { GrowthBuyingStageSignalInput } from "@/lib/growth/buyer-journey/gr
 import type { GrowthPersonalizationRegenerationFeedbackCategory } from "@/lib/growth/personalization/personalization-types"
 import type { GrowthReasoningContext } from "@/lib/growth/reasoning/growth-reasoning-types"
 import type { GrowthSequenceIntelligenceContext } from "@/lib/growth/sequence-intelligence/growth-sequence-state-types"
+import type { GrowthOutreachPersonalizationOrganizationKnowledgeBlock } from "@/lib/growth/outreach/personalization/growth-outreach-personalization-organization-knowledge"
 
 export const GROWTH_INDUSTRY_CONTEXT_QA_MARKER = "growth-industry-context-gs-ai-playbook-1c-v1" as const
 
@@ -59,6 +60,8 @@ export type GrowthIndustryContext = {
   regenerationFeedback: GrowthIndustryContextRegenerationFeedback | null
   leadIndustryTags: string[]
   playbookApplied: boolean
+  /** AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1D — approved Training projection; wins over playbook branding. */
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null
 }
 
 export type GrowthIndustryContextInput = {
@@ -88,4 +91,6 @@ export type GrowthIndustryContextInput = {
   outcomeRecords?: GrowthPlaybookOutcomeRecord[]
   /** GS-AI-PLAYBOOK-4A — optional buyer journey signals. */
   buyerJourneySignals?: GrowthBuyingStageSignalInput
+  /** AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1D — canonical seller truth for capability framing. */
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null
 }

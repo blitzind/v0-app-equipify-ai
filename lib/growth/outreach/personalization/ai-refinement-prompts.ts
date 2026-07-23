@@ -16,15 +16,25 @@ import {
 import { buildGrowthPlaybookOrchestratedPrompt } from "@/lib/growth/playbooks/narrative/growth-playbook-prompt-orchestrator"
 import { buildGrowthNarrativeBriefPromptBlock } from "@/lib/growth/reasoning/growth-reasoning-diagnostics"
 import { buildGrowthSequenceGuidancePromptBlock } from "@/lib/growth/sequence-intelligence/growth-sequence-diagnostics"
+import type { GrowthOutreachPersonalizationOrganizationKnowledgeBlock } from "@/lib/growth/outreach/personalization/growth-outreach-personalization-organization-knowledge"
+import { normalizeIndustryPlaybookModuleLabel } from "@/lib/growth/playbooks/industry-capability-normalization"
 
 export function buildOutreachRefinementSystemPrompt(
   maxWords: number,
   outboundIdentity?: GrowthOutboundIdentityContext | null,
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null,
 ): string {
   const identityBlock = buildGrowthOutboundIdentitySystemPromptAppendix(outboundIdentity)
+  const orgName =
+    organizationKnowledge?.companyName?.trim() ||
+    outboundIdentity?.company?.trim() ||
+    "the organization"
   return [
-    "You refine pre-written B2B outreach copy for Equipify Growth Engine.",
+    `You refine pre-written B2B outreach copy for ${orgName}'s Growth Engine.`,
     identityBlock,
+    organizationKnowledge?.source === "approved_business_profile"
+      ? "Use the approved organizationKnowledge block as canonical seller positioning, tone, products, and words to avoid. Industry context is advisory only."
+      : "When organizationKnowledge is thin, use generic language — do not invent product names or brand the organization as Equipify.",
     "You may ONLY smooth wording, improve flow, improve readability, reduce spam language, and vary phrasing.",
     "You must NOT invent research, website findings, pain points, company facts, metrics, or personalization.",
     "Do NOT add compliments, urgency, hype, or claims not present in the deterministic draft or allowed facts list.",
@@ -48,7 +58,12 @@ export function buildOutreachRefinementUserPrompt(input: {
   maxWords: number
   avoidRepeatingTopics?: string[]
   outboundIdentity?: GrowthOutboundIdentityContext | null
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null
 }): string {
+  const organizationKnowledge =
+    input.organizationKnowledge ??
+    input.industryContext?.organizationKnowledge ??
+    null
   const verifiedFacts = input.verifiedFacts ?? input.industryContext?.verifiedFacts ?? []
   const industryFacts = input.industryFacts ?? input.industryContext?.industryFacts ?? []
   const regenerationDirectives = buildRegenerationFeedbackDirectives(input.industryContext?.regenerationFeedback ?? null)
@@ -78,7 +93,7 @@ export function buildOutreachRefinementUserPrompt(input: {
       structure: [
         "1. Industry context (teams in this space often…)",
         "2. Verified company facts (we noticed…)",
-        "3. Capability mapping (Equipify helps…)",
+        "3. Capability mapping (how the organization helps with industry needs…)",
         "4. Recommended CTA",
       ],
       rules: {
@@ -96,13 +111,37 @@ export function buildOutreachRefinementUserPrompt(input: {
         ],
         maxWords: input.maxWords,
       },
+      organizationKnowledge: organizationKnowledge
+        ? {
+            source: organizationKnowledge.source,
+            companyName: organizationKnowledge.companyName,
+            productsServices: organizationKnowledge.productsServices,
+            primaryValueProposition: organizationKnowledge.primaryValueProposition,
+            elevatorPitch: organizationKnowledge.elevatorPitch,
+            mission: organizationKnowledge.mission,
+            tone: organizationKnowledge.tone,
+            formality: organizationKnowledge.formality,
+            wordsToAvoid: organizationKnowledge.wordsToAvoid,
+            neverSay: organizationKnowledge.neverSay,
+            positioning: organizationKnowledge.positioning,
+            qualificationStandards: organizationKnowledge.qualificationStandards,
+            competitiveAdvantages: organizationKnowledge.competitiveAdvantages,
+            objections: organizationKnowledge.objections,
+          }
+        : null,
       industryContext: input.industryContext?.playbookApplied
         ? {
             industryId: input.industryContext.industryId,
             confidence: input.industryContext.confidence,
             displayName: input.industryContext.playbook?.displayName ?? null,
-            capabilityMappings: input.industryContext.capabilityMappings,
+            capabilityMappings: input.industryContext.capabilityMappings.map((mapping) => ({
+              capability: mapping.capability,
+              painSignal: mapping.painSignal,
+              industryNeutralModule: normalizeIndustryPlaybookModuleLabel(mapping.equipifyModule),
+              industryFraming: mapping.industryFraming,
+            })),
             recommendedCtas: input.industryContext.recommendedCtas,
+            advisoryOnly: true,
           }
         : null,
       narrativeOrchestration: orchestratedPrompt

@@ -21,6 +21,9 @@ import {
   fetchLatestPersonalizationRegenerationFeedback,
 } from "@/lib/growth/outreach/personalization/outreach-industry-context-builder"
 import { buildGrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import { buildGrowthOutreachPersonalizationOrganizationKnowledgeBlock } from "@/lib/growth/outreach/personalization/growth-outreach-personalization-organization-knowledge"
 import { buildLeadMemoryInfluenceContext, mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-influence-context"
 import {
   filterUsableOutreachMemorySnippet,
@@ -343,10 +346,28 @@ export async function buildOutreachContextPacket(
     memoryProgressionScore: memory.progressionScore,
     memoryUnresolvedObjectionCount: memory.unresolvedObjectionCount,
     leadEngineGuidance,
-  } satisfies Omit<OutreachContextPacket, "industryContext">
+  } satisfies Omit<OutreachContextPacket, "industryContext" | "organizationKnowledge">
 
   const regenerationFeedback = await fetchLatestPersonalizationRegenerationFeedback(admin, lead.id)
   const verifiedFacts = buildOutreachVerifiedFactsFromPacket(packetBase as OutreachContextPacket)
+
+  const organizationId = getGrowthEngineAiOrgId()
+  const sellerTruthBundle = organizationId
+    ? await loadOutreachSellerTruthBundle(admin, {
+        organizationId,
+        preparedAt: new Date().toISOString(),
+        prospectIndustry: packetBase.industryLabel,
+        prospectCompanyName: lead.companyName,
+        leadId: lead.id,
+      }).catch(() => null)
+    : null
+  const organizationKnowledge = sellerTruthBundle
+    ? buildGrowthOutreachPersonalizationOrganizationKnowledgeBlock(
+        sellerTruthBundle.sellerTruth,
+        sellerTruthBundle.approvedProfile,
+      )
+    : null
+
   const industryContext = buildGrowthIndustryContext({
     companyName: lead.companyName,
     industryLabel: packetBase.industryLabel,
@@ -357,6 +378,7 @@ export async function buildOutreachContextPacket(
     sic: metadataCodes("sic", "sic_codes", "sicCodes"),
     verifiedFacts,
     regenerationFeedback,
+    organizationKnowledge,
     leadSignals: [
       ...(packetBase.researchPainPoints ?? []),
       ...(packetBase.equipmentServiceIndicators ?? []),
@@ -402,6 +424,7 @@ export async function buildOutreachContextPacket(
   return {
     ...packetBase,
     industryContext,
+    organizationKnowledge,
   }
 }
 

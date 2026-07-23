@@ -15,6 +15,14 @@ import {
   type GrowthIndustryContextInput,
 } from "@/lib/growth/playbooks/growth-industry-context-types"
 import { GROWTH_INDUSTRY_TAXONOMY } from "@/lib/growth/playbooks/industry-taxonomy"
+import {
+  buildNeutralCapabilityParagraph,
+  buildNeutralCapabilitySmsLine,
+  buildNeutralCapabilityVoiceLine,
+  buildNeutralIndustryCapabilityFraming,
+  normalizeIndustryPlaybookModuleLabel,
+} from "@/lib/growth/playbooks/industry-capability-normalization"
+import type { GrowthOutreachPersonalizationOrganizationKnowledgeBlock } from "@/lib/growth/outreach/personalization/growth-outreach-personalization-organization-knowledge"
 
 export {
   GROWTH_INDUSTRY_CONTEXT_MIN_CONFIDENCE,
@@ -78,12 +86,19 @@ function buildIndustryFactsFromSelection(
 function buildCapabilityMappingsFromSelection(
   displayName: string,
   mappings: Array<{ capability: string; painSignal: string; equipifyModule: string }>,
+  organizationKnowledge?: GrowthOutreachPersonalizationOrganizationKnowledgeBlock | null,
 ): GrowthIndustryContext["capabilityMappings"] {
   return mappings.map((mapping) => ({
     capability: mapping.capability,
     painSignal: mapping.painSignal,
-    equipifyModule: mapping.equipifyModule,
-    industryFraming: `Companies like yours in ${displayName} often address ${mapping.painSignal.toLowerCase()} through ${mapping.capability} — Equipify ${mapping.equipifyModule}.`,
+    equipifyModule: normalizeIndustryPlaybookModuleLabel(mapping.equipifyModule),
+    industryFraming: buildNeutralIndustryCapabilityFraming({
+      displayName,
+      capability: mapping.capability,
+      painSignal: mapping.painSignal,
+      moduleLabel: mapping.equipifyModule,
+      organizationKnowledge,
+    }),
   }))
 }
 
@@ -198,7 +213,11 @@ export function buildGrowthIndustryContext(input: GrowthIndustryContextInput): G
 
   const capabilityMappings =
     playbookApplied && playbook && resolvedPlaybookContext
-      ? buildCapabilityMappingsFromSelection(playbook.displayName, resolvedPlaybookContext.selectedCapabilities)
+      ? buildCapabilityMappingsFromSelection(
+          playbook.displayName,
+          resolvedPlaybookContext.selectedCapabilities,
+          input.organizationKnowledge,
+        )
       : []
 
   const discoveryQuestions = resolvedPlaybookContext?.selectedDiscoveryQuestions ?? []
@@ -223,6 +242,7 @@ export function buildGrowthIndustryContext(input: GrowthIndustryContextInput): G
     regenerationFeedback: input.regenerationFeedback ?? null,
     leadIndustryTags: [],
     playbookApplied,
+    organizationKnowledge: input.organizationKnowledge ?? null,
     narrativeContext: null,
     personaMessagingContext: null,
     accountIntelligenceContext: buildGrowthAccountIntelligence({
@@ -307,7 +327,11 @@ export function buildIndustryContextEmailParagraphs(context: GrowthIndustryConte
 
   const mapping = context.capabilityMappings[0]
   const capabilityParagraph = mapping
-    ? `Equipify helps teams centralize ${mapping.capability.toLowerCase()} through ${mapping.equipifyModule}.`
+    ? buildNeutralCapabilityParagraph({
+        capability: mapping.capability,
+        moduleLabel: mapping.equipifyModule,
+        organizationKnowledge: context.organizationKnowledge,
+      })
     : null
 
   const cta = context.playbookContext?.primaryCta ?? context.recommendedCtas[0] ?? "Open to a quick walkthrough?"
@@ -323,7 +347,11 @@ export function buildIndustryContextSmsDraft(context: GrowthIndustryContext): st
   if (!pain && !mapping) return null
   const painLine = pain ? `${context.playbook?.displayName ?? "Teams"} often struggle with ${pain.toLowerCase()}.` : ""
   const capabilityLine = mapping
-    ? `Equipify centralizes ${mapping.capability.toLowerCase()} and ${mapping.equipifyModule.toLowerCase()}.`
+    ? buildNeutralCapabilitySmsLine({
+        capability: mapping.capability,
+        moduleLabel: mapping.equipifyModule,
+        organizationKnowledge: context.organizationKnowledge,
+      })
     : ""
   const cta = context.playbookContext?.primaryCta ?? "Worth a quick conversation?"
   return [painLine, capabilityLine, cta.endsWith("?") ? cta : `${cta}?`].filter(Boolean).join(" ")
@@ -337,7 +365,12 @@ export function buildIndustryContextVoiceScript(context: GrowthIndustryContext, 
   return [
     `Hi — quick note for ${companyName}.`,
     hook.replace(/\.$/, "") + ".",
-    mapping ? `Equipify helps with ${mapping.capability.toLowerCase()}.` : "",
+    mapping
+      ? buildNeutralCapabilityVoiceLine({
+          capability: mapping.capability,
+          organizationKnowledge: context.organizationKnowledge,
+        })
+      : "",
     context.playbookContext?.primaryCta ?? context.recommendedCtas[0] ?? "Happy to share a brief walkthrough if useful.",
   ]
     .filter(Boolean)
