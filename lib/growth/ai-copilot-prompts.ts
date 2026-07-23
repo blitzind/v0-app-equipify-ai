@@ -10,6 +10,7 @@ import { buildGrowthPlaybookOrchestratedPromptBlock } from "@/lib/growth/playboo
 import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
 import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
 import { buildGrowthOutboundIdentitySystemPromptAppendix } from "@/lib/growth/signatures/outbound-sender-persona-instructions"
+import type { GrowthAiCopilotOrganizationKnowledgeBlock } from "@/lib/growth/ai-copilot-organization-knowledge"
 import {
   describeFrameworkKeys,
   GROWTH_AI_COPILOT_BUYING_SIGNAL_FRAMEWORK,
@@ -42,12 +43,20 @@ export function buildGrowthAiCopilotSystemPrompt(
   promptVariant: GrowthAiCopilotPromptVariant | string,
   playbookRules: GrowthAiCopilotPlaybookResolvedRule[] = [],
   outboundIdentity?: GrowthOutboundIdentityContext | null,
+  organizationKnowledge?: GrowthAiCopilotOrganizationKnowledgeBlock | null,
 ): string {
   const playbookBlock = formatPlaybookRulesForCopilotPrompt(playbookRules, generationType)
   const identityBlock = buildGrowthOutboundIdentitySystemPromptAppendix(outboundIdentity)
+  const orgName =
+    organizationKnowledge?.companyName?.trim() ||
+    outboundIdentity?.company?.trim() ||
+    "the organization"
   return [
-    "You are Equipify Growth Engine AI Communication Copilot.",
+    `You are ${orgName}'s Growth Engine AI Communication Copilot.`,
     identityBlock,
+    organizationKnowledge?.source === "approved_business_profile"
+      ? "Use the approved organizationKnowledge block as canonical seller positioning, tone, objections, and discovery guidance."
+      : null,
     "You suggest copy only. You do NOT send email, place calls, or modify CRM data.",
     "Do not invent facts not present in the input snapshot.",
     "When relationshipMemory is present, honor avoidRepeatingTopics and do not re-ask answered questions.",
@@ -70,6 +79,7 @@ export function buildGrowthAiCopilotUserPrompt(
     industryContext?: GrowthIndustryContext | null
     narrativeContext?: GrowthNarrativeContext | null
     outboundIdentity?: GrowthOutboundIdentityContext | null
+    organizationKnowledge?: GrowthAiCopilotOrganizationKnowledgeBlock | null
   },
 ): string {
   const objectionNotes = describeFrameworkKeys(
@@ -149,6 +159,7 @@ export function buildGrowthAiCopilotUserPrompt(
         buyingSignals: buyingNotes,
         commitmentSignals: commitmentNotes,
       },
+      organizationKnowledge: options?.organizationKnowledge ?? undefined,
     },
     null,
     2,

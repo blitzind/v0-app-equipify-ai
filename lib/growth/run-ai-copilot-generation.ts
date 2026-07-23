@@ -2,7 +2,8 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
+import { buildGrowthAiCopilotOrganizationKnowledgeBlock } from "@/lib/growth/ai-copilot-organization-knowledge"
 import { buildGrowthAiCopilotInput } from "@/lib/growth/ai-copilot-input"
 import {
   buildGrowthAiCopilotSystemPrompt,
@@ -65,6 +66,7 @@ import { resolveGrowthOutboundIdentityContext } from "@/lib/growth/signatures/ou
 import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { tryMaterializeCanonicalCopilotGeneration } from "@/lib/growth/aios/growth/growth-send-plane-1a-copilot-bridge"
+import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 
 export type RunGrowthAiCopilotGenerationInput = {
   admin: SupabaseClient
@@ -115,6 +117,19 @@ export async function runGrowthAiCopilotGeneration(
   if (!lead) {
     return { ok: false, code: "lead_not_found", message: "Lead not found." }
   }
+
+  const organizationId = input.organizationId ?? getGrowthEngineAiOrgId()
+  const sellerTruth = organizationId
+    ? await loadOutreachSellerTruthForOrganization(input.admin, {
+        organizationId,
+        preparedAt: new Date().toISOString(),
+        prospectCompanyName: lead.companyName,
+        leadId: lead.id,
+      }).catch(() => null)
+    : null
+  const organizationKnowledge = sellerTruth
+    ? buildGrowthAiCopilotOrganizationKnowledgeBlock(sellerTruth)
+    : null
 
   const [rules, emailSummary] = await Promise.all([
     listGrowthAiCopilotRules(input.admin),
@@ -355,6 +370,7 @@ export async function runGrowthAiCopilotGeneration(
     promptVariant,
     playbookResolution.rules,
     outboundIdentity,
+    organizationKnowledge,
   )
   const industryContextBase = await buildOutreachIndustryContextForLead(input.admin, lead)
   const reasoningChannel: GrowthReasoningChannel = input.generationType.startsWith("call_")
@@ -384,6 +400,7 @@ export async function runGrowthAiCopilotGeneration(
     industryContext,
     narrativeContext: industryContext.narrativeContext,
     outboundIdentity,
+    organizationKnowledge,
   })
 
   const aiResult = await provider.generate({

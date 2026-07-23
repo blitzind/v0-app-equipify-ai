@@ -9,6 +9,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
 import { fetchLatestBusinessIntelligenceReport } from "@/lib/growth/business-intelligence/business-intelligence-repository"
+import { isCanonicalSellerKnowledgeEnriched } from "@/lib/growth/training/canonical-seller-knowledge-onboarding-1a"
+import { evaluateBusinessStrategyCompleteness } from "@/lib/growth/training/evaluate-business-strategy-completeness"
 import { fetchOrganizationKnowledgeStore } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { runKnowledgeRetrieval } from "@/lib/growth/knowledge-center/knowledge-repository"
 import { resolveIndustryPlaybook } from "@/lib/growth/playbooks/industry-playbook-registry"
@@ -33,11 +35,21 @@ export async function loadOutreachSellerTruthForOrganization(
     input.organizationId,
   ).catch(() => null)
 
-  // MASTER-KNOWLEDGE-1A — merge MCD ingestion + canonical seed into profile_json shape (SoT remains profile).
-  const profile = profileRecord?.profile
-    ? enrichBusinessProfileFromMasterContextDocument(profileRecord.profile, {
-        ingestedAt: input.preparedAt,
-      })
+  // Use stored approved profile directly when Training authority is complete; runtime merge only gap-fills thin profiles.
+  const rawProfile = profileRecord?.profile ?? null
+  const strategyCompleteness = evaluateBusinessStrategyCompleteness(rawProfile?.businessStrategy)
+  const useApprovedProfileAsIs = Boolean(
+    rawProfile &&
+      (isCanonicalSellerKnowledgeEnriched(rawProfile) ||
+        (strategyCompleteness.hasContent &&
+          strategyCompleteness.filledSectionCount >= strategyCompleteness.totalSectionCount)),
+  )
+  const profile = rawProfile
+    ? useApprovedProfileAsIs
+      ? rawProfile
+      : enrichBusinessProfileFromMasterContextDocument(rawProfile, {
+          ingestedAt: input.preparedAt,
+        })
     : null
 
   const biRecord = await fetchLatestBusinessIntelligenceReport(
