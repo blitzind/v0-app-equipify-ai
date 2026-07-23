@@ -15,7 +15,7 @@ import {
   buildPlatformKnowledgeCitations,
   assertAllPlatformKnowledgeRecommendationsCited,
   PLATFORM_KNOWLEDGE_CENTER_QA_MARKER,
-  setPlatformKnowledgeDefaultOrganizationId,
+  resolvePlatformKnowledgeOrganizationId,
 } from "@fuzor/knowledge"
 
 import { classifyKnowledgeDocument } from "../lib/growth/knowledge-center/knowledge-classification"
@@ -66,15 +66,16 @@ assert.strictEqual(KNOWLEDGE_CENTER_QA_MARKER, PLATFORM_KNOWLEDGE_CENTER_QA_MARK
 
 const originalEnvOrg = process.env.GROWTH_ENGINE_AI_ORG_ID
 delete process.env.GROWTH_ENGINE_AI_ORG_ID
-setPlatformKnowledgeDefaultOrganizationId(null)
 
 assert.equal(resolveKnowledgeOrganizationId(undefined), null)
 assert.equal(ensureKnowledgeOrganizationBootstrap(undefined), null)
+assert.equal(resolvePlatformKnowledgeOrganizationId(undefined), null)
 
 process.env.GROWTH_ENGINE_AI_ORG_ID = ENV_ORG
 assert.equal(resolveKnowledgeOrganizationId(undefined), ENV_ORG)
 assert.equal(resolveKnowledgeOrganizationId(TEST_ORG), TEST_ORG)
 assert.equal(resolveKnowledgeOrganizationId(null), ENV_ORG)
+assert.equal(resolvePlatformKnowledgeOrganizationId(undefined), null)
 
 delete process.env.GROWTH_ENGINE_AI_ORG_ID
 assert.equal(resolveKnowledgeOrganizationId(undefined), null)
@@ -85,9 +86,8 @@ process.env.GROWTH_ENGINE_AI_ORG_ID = OTHER_ORG
 assert.equal(resolveKnowledgeOrganizationId(undefined), OTHER_ORG)
 
 delete process.env.GROWTH_ENGINE_AI_ORG_ID
-setPlatformKnowledgeDefaultOrganizationId(TEST_ORG)
 assert.equal(resolveKnowledgeOrganizationId(undefined), null)
-setPlatformKnowledgeDefaultOrganizationId(null)
+assert.equal(resolvePlatformKnowledgeOrganizationId(undefined), null)
 
 const fixtureInput = {
   source_type: "text" as const,
@@ -177,6 +177,5 @@ if (originalEnvOrg === undefined) {
 } else {
   process.env.GROWTH_ENGINE_AI_ORG_ID = originalEnvOrg
 }
-setPlatformKnowledgeDefaultOrganizationId(null)
 
-console.log("[FUZOR-ADOPTION-1E] PASS")
+console.log("[FUZOR-ADOPTION-1E] PASS — Equipify knowledge-org-bootstrap adapter + platform delegation parity")
