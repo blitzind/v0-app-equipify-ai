@@ -7,6 +7,7 @@ import {
   resolveWorkItemStatus,
 } from "@/lib/growth/work-manager/state/work-item-state"
 import { detectWorkInterruptions, prioritizeWorkItems } from "@/lib/growth/work-manager/scheduler/prioritize-work-items"
+import type { GrowthLead } from "@/lib/growth/types"
 import type {
   AvaWorkInterruption,
   AvaWorkItem,
@@ -114,11 +115,18 @@ export function buildCompletedWorkItems(
 export function buildDailyWorkPlan(input: {
   workItems: AvaWorkItem[]
   completedToday: AvaWorkItem[]
+  leadsById?: ReadonlyMap<string, GrowthLead>
+  generatedAt?: string
+  organizationId?: string | null
 }): Pick<
   AvaWorkManagerResult,
   "active_work" | "work_plan" | "blocked" | "deferred" | "interruptions" | "operator_queue" | "all_work_items"
 > {
-  const sorted = prioritizeWorkItems(input.workItems.filter((item) => item.type !== "wait"))
+  const sorted = prioritizeWorkItems(input.workItems.filter((item) => item.type !== "wait"), {
+    leadsById: input.leadsById,
+    generatedAt: input.generatedAt,
+    organizationId: input.organizationId,
+  })
   const operatorQueue = sorted
     .filter((item) => isOperatorWorkItem(item))
     .map((item) => applyWorkItemStatus(item, resolveWorkItemStatus(item, { forceOperatorWait: true })))

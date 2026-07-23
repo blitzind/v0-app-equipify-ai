@@ -237,15 +237,20 @@ function main(): void {
     waitingOnYou: input.waitingOnYou,
     dailyWorkQueue: input.dailyWorkQueue,
     timeline: input.timeline,
+    pendingApprovalCount: input.workspaceSummary.kpis.approvalQueueCount,
   })
   assert.equal(briefing.work_manager_qa_marker, GROWTH_WORK_MANAGER_QA_MARKER)
   assert.ok(briefing.work_manager_result)
   assert.ok(
     briefing.daily_activity_narrative?.waiting_on_you.some((line) =>
-      /waiting for (your )?approval/i.test(line),
+      /opportunity packages ready for your review|packages are ready for your review|waiting for (your )?approval/i.test(
+        line,
+      ),
     ) ||
       briefing.story_blocks.some((block) =>
-        /waiting for (your )?approval|while that's pending|right now/i.test(block.text),
+        /opportunity packages ready for your review|packages are ready for your review|waiting for (your )?approval|while that's pending|right now/i.test(
+          block.text,
+        ),
       ),
   )
 

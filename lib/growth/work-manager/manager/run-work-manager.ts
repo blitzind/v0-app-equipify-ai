@@ -74,7 +74,14 @@ export function runWorkManager(input: RunWorkManagerInput): AvaWorkManagerResult
     timestamp,
   )
 
-  const plan = buildDailyWorkPlan({ workItems, completedToday })
+  const leadsById = new Map((input.portfolioLeads ?? []).map((lead) => [lead.id, lead]))
+  const plan = buildDailyWorkPlan({
+    workItems,
+    completedToday,
+    leadsById,
+    generatedAt: timestamp,
+    organizationId: input.organizationId ?? null,
+  })
   const baseResult: AvaWorkManagerResult = {
     qaMarker: GROWTH_WORK_MANAGER_QA_MARKER,
     ...plan,

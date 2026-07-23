@@ -928,6 +928,7 @@
     "test:ge-aios-admission-policy-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-admission-policy-1a.ts",
     "test:ge-aios-investment-propagation-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-investment-propagation-1b.ts",
     "test:ge-aios-investment-propagation-1b-execution-closure": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-investment-propagation-1b-execution-closure.ts",
+    "test:ge-aios-mission-balance-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-mission-balance-1a.ts",
     "test:ge-aios-revenue-flow-recovery-1a-wiring": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-revenue-flow-recovery-1a-wiring.ts",
     "validate:ge-aios-runtime-scale-1a-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-runtime-scale-1a-production.ts",
     "validate:ge-aios-runtime-scale-1b-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-runtime-scale-1b-production.ts",

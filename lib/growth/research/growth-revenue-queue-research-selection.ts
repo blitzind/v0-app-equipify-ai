@@ -5,6 +5,7 @@ import {
   GROWTH_AVA_RESEARCH_QUEUE_SECTIONS,
 } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import { applyMissionBalanceToRevenueQueueCards } from "@/lib/growth/mission-balance/growth-mission-balance-1a"
 import { shouldAutoQueueLeadResearch } from "@/lib/growth/research/growth-lead-research-readiness"
 import { buildRevenueQueueDashboardSectionsFromLeads } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
@@ -12,6 +13,9 @@ import type { GrowthLead } from "@/lib/growth/types"
 
 export const GE_AIOS_LIVE_8B_WORK_MANAGER_RESEARCH_PROJECTION_QA_MARKER =
   "ge-aios-live-8b-work-manager-research-projection-v1" as const
+
+export const GE_AIOS_MISSION_BALANCE_1A_RESEARCH_SELECTION_QA_MARKER =
+  "ge-aios-mission-balance-1a-research-selection-v1" as const
 
 function selectFromRevenueQueueSections(
   leads: GrowthLead[],
@@ -39,23 +43,32 @@ function selectFromRevenueQueueSections(
   return selected
 }
 
-/** Canonical revenue-queue research ordering (high_priority → needs_review). */
+function applyMissionBalanceResearchOrdering(
+  cards: RevenueQueueCardView[],
+  leads: GrowthLead[],
+): RevenueQueueCardView[] {
+  return applyMissionBalanceToRevenueQueueCards(cards, leads)
+}
+
+/** Canonical revenue-queue research ordering (section intake → Mission Balance reorder). */
 export function selectRevenueQueueResearchCandidates(
   leads: GrowthLead[],
   maxLeads: number = GROWTH_AVA_RESEARCH_QUEUE_DEFAULT_MAX_LEADS,
 ): RevenueQueueCardView[] {
-  return selectFromRevenueQueueSections(leads, maxLeads, () => true)
+  const selected = selectFromRevenueQueueSections(leads, maxLeads, () => true)
+  return applyMissionBalanceResearchOrdering(selected, leads)
 }
 
-/** Work Manager projection: review admission + research-ready only, same section ordering. */
+/** Work Manager projection: review admission + research-ready only, then Mission Balance reorder. */
 export function selectRevenueQueueReviewResearchCandidates(
   leads: GrowthLead[],
   maxLeads: number = GROWTH_AVA_RESEARCH_QUEUE_DEFAULT_MAX_LEADS,
 ): RevenueQueueCardView[] {
-  return selectFromRevenueQueueSections(leads, maxLeads, (lead) => {
+  const selected = selectFromRevenueQueueSections(leads, maxLeads, (lead) => {
     if (resolveLeadAdmissionStateFromMetadata(lead.metadata) !== "review") return false
     return shouldAutoQueueLeadResearch(lead)
   })
+  return applyMissionBalanceResearchOrdering(selected, leads)
 }
 
 export function buildReviewResearchProjectionLeadIds(leads: GrowthLead[]): ReadonlySet<string> {
