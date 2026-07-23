@@ -9,6 +9,7 @@ export default function GrowthTrainingOverviewPage() {
   const overview = useGrowthTrainingOverviewData({
     dashboard,
     organizationalKnowledge: workspaceSummary?.organizationalKnowledge ?? null,
+    canonicalOrganizationTraining: workspaceSummary?.canonicalOrganizationTraining ?? null,
   })
 
   return (

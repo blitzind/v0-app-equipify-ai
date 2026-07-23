@@ -342,7 +342,7 @@ function buildStartStatus(input: {
     }
   }
 
-  if (input.activation?.readiness.ready && !input.activation.activated) {
+  if (input.activation?.readiness.ready && !input.activation.activated && !input.activation.activatedAt) {
     return {
       ...base,
       mode: "activation_required",
@@ -373,6 +373,19 @@ function buildStartStatus(input: {
       primaryActionLabel: input.pendingApprovals > 0 ? "Review what I prepared" : null,
       primaryActionHref: input.pendingApprovals > 0 ? GROWTH_HOME_STARTUP_STEP_PATHS.approvals : null,
       primaryActionKind: input.pendingApprovals > 0 ? "link" : null,
+    }
+  }
+
+  if (input.activation?.activatedAt && !input.activation.activated) {
+    return {
+      ...base,
+      mode: "autonomous_paused",
+      headline: "Autonomous mode is paused",
+      detail:
+        "Your training and activation are saved. Turn autonomous mode back on when you're ready for me to resume background work.",
+      primaryActionLabel: input.activation.readiness.ready ? GROWTH_AVA_ACTIVATION_CTA : "Continue setup",
+      primaryActionHref: input.activation.readiness.ready ? null : GROWTH_TRAINING_WORKSPACE_ROUTE,
+      primaryActionKind: input.activation.readiness.ready ? "activate" : "link",
     }
   }
 

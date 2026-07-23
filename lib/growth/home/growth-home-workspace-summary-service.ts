@@ -105,7 +105,13 @@ import { projectCanonicalActiveMissionsForHome } from "@/lib/growth/aios/mission
 import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a"
 import { loadGrowthOrganizationalEvidenceCompletenessFromProduction } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-production-loader-next-3b"
 import { loadGrowthHomeRuntimeTrustPayload } from "@/lib/growth/home/growth-home-runtime-trust-loader-1b"
-import { ensureScaleResearchBudgetForActivatedOrg, loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
+import { ensureScaleResearchBudgetForActivatedOrg } from "@/lib/growth/ava-activation/growth-ava-activation-service"
+import {
+  buildGrowthAvaActivationFallbackFromTrainingProjection,
+  loadGrowthAvaActivationStateCore,
+  loadGrowthCanonicalOrganizationTrainingProjection,
+} from "@/lib/growth/training/growth-canonical-organization-training-projection-1d-hotfix"
+import { buildGrowthAvaEmploymentStats } from "@/lib/growth/ava-activation/growth-ava-employment-stats-loader-1c"
 import { buildGrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-server-1e"
 import { hydrateCanonicalPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
 import { GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-snapshot-1f-types"
@@ -627,6 +633,31 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       })
     : null
 
+  const canonicalOrganizationTrainingStep = organizationId
+    ? await withGrowthHomeLoaderBudget({
+        label: "canonical_organization_training",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          loadGrowthCanonicalOrganizationTrainingProjection({
+            admin: input.admin,
+            organizationId,
+            actorUserId: input.actorUserId ?? null,
+            generatedAt,
+            preloaded: {
+              activeApproved: approvedBusinessProfile,
+              organizationalKnowledge,
+              objectives: missionDiscoveryObjectives,
+            },
+          }),
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
+    : null
+
+  const canonicalOrganizationTraining = canonicalOrganizationTrainingStep
+
   const portfolioManagerBase =
     organizationId
       ? buildGrowthPortfolioManagerSnapshot({
@@ -986,14 +1017,24 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
           label: "ava_activation",
           budgetMs: runtimeCriticalLoaderBudgetMs,
           fn: async () => {
-            const value = await loadGrowthAvaActivationState({
+            const core = await loadGrowthAvaActivationStateCore({
               admin: input.admin,
               organizationId,
               actorUserId: input.actorUserId,
               generatedAt,
-              salesOutcomes,
-              missionDiscovery: productionMissionDiscovery,
+              preloadedProjection: canonicalOrganizationTraining,
             })
+            const employment = core.activated
+              ? await buildGrowthAvaEmploymentStats({
+                  admin: input.admin,
+                  organizationId,
+                  activatedAt: core.activatedAt,
+                  salesOutcomes,
+                  missionDiscovery: productionMissionDiscovery,
+                  generatedAt,
+                })
+              : null
+            const value = { ...core, employment }
             if (value.activated) {
               await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId)
             }
@@ -1075,9 +1116,22 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const runtimeTrust = runtimeTrustStep.value
-  const avaActivation = avaActivationStep.value
+  let avaActivation = avaActivationStep.value
   const executiveGrowthIntelligence = executiveGrowthIntelligenceStep.value
   const canonicalPortfolioAuthority = canonicalPortfolioAuthorityStep.value
+
+  if (
+    !avaActivation &&
+    canonicalOrganizationTraining &&
+    input.actorUserId?.trim() &&
+    input.actorUserId !== "undefined"
+  ) {
+    avaActivation = buildGrowthAvaActivationFallbackFromTrainingProjection({
+      projection: canonicalOrganizationTraining,
+      autonomyEnabled: runtimeTrust?.killSwitches?.autonomy_enabled === true,
+      objectiveModeEnabled: runtimeTrust?.killSwitches?.autonomy_objective_mode_enabled === true,
+    })
+  }
 
   return {
     ok: true,
@@ -1127,6 +1181,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     avaActivation,
     executiveGrowthIntelligence,
     canonicalPortfolioAuthority,
+    canonicalOrganizationTraining,
   }
 }
 

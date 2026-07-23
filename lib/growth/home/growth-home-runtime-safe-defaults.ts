@@ -129,6 +129,7 @@ export function normalizeGrowthHomeWorkspaceSummaryPayload(
     leadPool,
     missionDiscovery: payload.missionDiscovery ?? null,
     canonicalOperatorFocus: payload.canonicalOperatorFocus ?? null,
+    canonicalOrganizationTraining: payload.canonicalOrganizationTraining ?? null,
   }
 }
 

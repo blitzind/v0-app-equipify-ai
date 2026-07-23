@@ -7,6 +7,7 @@ import {
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
 import type { GrowthHomeOrganizationalKnowledgePayload } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+import type { GrowthCanonicalOrganizationTrainingProjection } from "@/lib/growth/training/growth-canonical-organization-training-projection-types"
 import type { GrowthHomeLaunchMissionSetupViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-synthesizer"
 import { synthesizeGrowthHomeLaunchMissionSetup } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-synthesizer"
 import { GROWTH_MISSION_CENTER_API_PATH } from "@/lib/growth/mission-center/growth-mission-center-api-contract"
@@ -28,6 +29,16 @@ type AutonomyApiResponse = {
     settings?: {
       approvalPolicies?: GrowthAutonomyApprovalPolicies
     }
+  }
+}
+
+async function fetchJson<T>(url: string): Promise<{ ok: boolean; payload: T | null }> {
+  try {
+    const response = await fetch(url, { cache: "no-store" })
+    const payload = (await response.json()) as T
+    return { ok: response.ok, payload }
+  } catch {
+    return { ok: false, payload: null }
   }
 }
 
@@ -53,77 +64,101 @@ function resolveSetupHealthSignals(payload: GrowthOperatorSetupHealthPayload | n
 export function useGrowthTrainingOverviewData(input: {
   dashboard: GrowthWorkspaceDashboardViewModel | null
   organizationalKnowledge: GrowthHomeOrganizationalKnowledgePayload | null
+  canonicalOrganizationTraining?: GrowthCanonicalOrganizationTrainingProjection | null
 }) {
-  const [loading, setLoading] = useState(true)
-  const [activeApproved, setActiveApproved] = useState<BusinessProfileRecord | null>(null)
-  const [latestDraft, setLatestDraft] = useState<BusinessProfileRecord | null>(null)
-  const [launchSetup, setLaunchSetup] = useState<GrowthHomeLaunchMissionSetupViewModel | null>(null)
+  const canonicalTraining = input.canonicalOrganizationTraining ?? null
+  const [loading, setLoading] = useState(!canonicalTraining)
+  const [activeApproved, setActiveApproved] = useState<BusinessProfileRecord | null>(
+    canonicalTraining?.activeApproved ?? null,
+  )
+  const [latestDraft, setLatestDraft] = useState<BusinessProfileRecord | null>(
+    canonicalTraining?.latestDraft ?? null,
+  )
+  const [launchSetup, setLaunchSetup] = useState<GrowthHomeLaunchMissionSetupViewModel | null>(
+    canonicalTraining?.launchSetup ?? null,
+  )
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (canonicalTraining) {
+      setActiveApproved(canonicalTraining.activeApproved)
+      setLatestDraft(canonicalTraining.latestDraft)
+      setLaunchSetup(canonicalTraining.launchSetup)
+      setLoading(false)
+    }
+  }, [canonicalTraining])
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       setError(null)
-      try {
-        const [profileRes, missionRes, aiTeammateRes, autonomyRes, setupHealthRes] = await Promise.all([
-          fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" }),
-          fetch(GROWTH_MISSION_CENTER_API_PATH, { cache: "no-store" }),
-          fetch(GROWTH_HOME_STARTUP_API_PATHS.aiTeammate, { cache: "no-store" }),
-          fetch(GROWTH_HOME_STARTUP_API_PATHS.autonomy, { cache: "no-store" }),
-          fetch(GROWTH_HOME_STARTUP_API_PATHS.operatorSetupHealth, { cache: "no-store" }),
+      if (canonicalTraining) {
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
+
+      const [profileResult, missionResult, aiTeammateResult, autonomyResult, setupHealthResult] =
+        await Promise.all([
+          fetchJson<GrowthBusinessProfileApiResponse>(GROWTH_BUSINESS_PROFILE_API_PATH),
+          fetchJson<GrowthMissionCenterSourcesPayload>(GROWTH_MISSION_CENTER_API_PATH),
+          fetchJson<AiTeammateApiResponse>(GROWTH_HOME_STARTUP_API_PATHS.aiTeammate),
+          fetchJson<AutonomyApiResponse>(GROWTH_HOME_STARTUP_API_PATHS.autonomy),
+          fetchJson<GrowthOperatorSetupHealthPayload & { ok?: boolean }>(
+            GROWTH_HOME_STARTUP_API_PATHS.operatorSetupHealth,
+          ),
         ])
 
-        const profilePayload = (await profileRes.json()) as GrowthBusinessProfileApiResponse
-        const missionPayload = (await missionRes.json()) as GrowthMissionCenterSourcesPayload
-        const aiTeammatePayload = (await aiTeammateRes.json()) as AiTeammateApiResponse
-        const autonomyPayload = (await autonomyRes.json()) as AutonomyApiResponse
-        const setupHealthPayload = (await setupHealthRes.json()) as GrowthOperatorSetupHealthPayload & {
-          ok?: boolean
-        }
+      if (cancelled) return
 
-        if (cancelled) return
-
-        if (profileRes.ok && profilePayload.ok) {
-          setActiveApproved(profilePayload.activeApproved ?? null)
-          setLatestDraft(profilePayload.latestDraft ?? null)
-        }
-
-        const objectives = missionPayload.objectiveDashboard?.objectives ?? []
-        const setupSignals = resolveSetupHealthSignals(
-          setupHealthRes.ok && setupHealthPayload.qaMarker ? setupHealthPayload : null,
-        )
-
-        const setup = synthesizeGrowthHomeLaunchMissionSetup({
-          businessProfileApproved: Boolean(profilePayload.activeApproved),
-          hasBusinessProfileDraft: Boolean(profilePayload.latestDraft),
-          objectives,
-          mailboxWarnings: input.dashboard?.briefing?.mailbox.warnings ?? 0,
-          expiredMailboxes: input.dashboard?.briefing?.mailbox.expired_mailboxes ?? 0,
-          connectedMailboxes: setupSignals.connectedMailboxes,
-          aiTeammateOnboardingCompleted: Boolean(aiTeammatePayload.identity?.onboardingCompleted),
-          autonomyGuardrailsConfigured: areStartupAutonomyGuardrailsConfigured({
-            approvalPolicies: autonomyPayload.viewModel?.settings?.approvalPolicies ?? {},
-          }),
-          calendarConnected: setupSignals.calendarConnected,
-          bookingPagesCount: setupSignals.bookingPagesCount,
-        })
-
-        setLaunchSetup(setup)
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Could not load training overview.")
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+      const profilePayload = profileResult.payload
+      if (profileResult.ok && profilePayload?.ok) {
+        setActiveApproved(profilePayload.activeApproved ?? null)
+        setLatestDraft(profilePayload.latestDraft ?? null)
       }
+
+      const missionPayload = missionResult.payload
+      const objectives = missionPayload?.objectiveDashboard?.objectives ?? []
+      const setupHealthPayload = setupHealthResult.payload
+      const setupSignals = resolveSetupHealthSignals(
+        setupHealthResult.ok && setupHealthPayload?.qaMarker ? setupHealthPayload : null,
+      )
+
+      const aiTeammatePayload = aiTeammateResult.payload
+      const autonomyPayload = autonomyResult.payload
+
+      const setup = synthesizeGrowthHomeLaunchMissionSetup({
+        businessProfileApproved: Boolean(profilePayload?.activeApproved ?? canonicalTraining?.activeApproved),
+        hasBusinessProfileDraft: Boolean(profilePayload?.latestDraft ?? canonicalTraining?.latestDraft),
+        objectives,
+        mailboxWarnings: input.dashboard?.briefing?.mailbox.warnings ?? 0,
+        expiredMailboxes: input.dashboard?.briefing?.mailbox.expired_mailboxes ?? 0,
+        connectedMailboxes: setupSignals.connectedMailboxes,
+        aiTeammateOnboardingCompleted: Boolean(aiTeammatePayload?.identity?.onboardingCompleted),
+        autonomyGuardrailsConfigured: areStartupAutonomyGuardrailsConfigured({
+          approvalPolicies: autonomyPayload?.viewModel?.settings?.approvalPolicies ?? {},
+        }),
+        calendarConnected: setupSignals.calendarConnected,
+        bookingPagesCount: setupSignals.bookingPagesCount,
+      })
+
+      setLaunchSetup(setup)
+      if (!cancelled) setLoading(false)
     }
 
     void load()
     return () => {
       cancelled = true
     }
-  }, [input.dashboard?.briefing?.mailbox.expired_mailboxes, input.dashboard?.briefing?.mailbox.warnings])
+  }, [
+    canonicalTraining,
+    input.dashboard?.briefing?.mailbox.expired_mailboxes,
+    input.dashboard?.briefing?.mailbox.warnings,
+  ])
+
+  const organizationalKnowledge =
+    canonicalTraining?.organizationalKnowledge ?? input.organizationalKnowledge
 
   return useMemo(
     () => ({
@@ -131,9 +166,18 @@ export function useGrowthTrainingOverviewData(input: {
       activeApproved,
       latestDraft,
       launchSetup,
-      organizationalKnowledge: input.organizationalKnowledge,
+      organizationalKnowledge,
       error,
+      diagnostic: canonicalTraining?.diagnostic ?? null,
     }),
-    [activeApproved, error, input.organizationalKnowledge, latestDraft, launchSetup, loading],
+    [
+      activeApproved,
+      canonicalTraining?.diagnostic,
+      error,
+      latestDraft,
+      launchSetup,
+      loading,
+      organizationalKnowledge,
+    ],
   )
 }

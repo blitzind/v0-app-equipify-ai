@@ -402,7 +402,10 @@ export function GrowthHomeExecutiveBriefingDashboard({
     aiOsUx.dailyWorkQueue,
   ])
 
-  const setupIncomplete = !employeeMode && avaHero.dailyActivityNarrative?.focus === "setup"
+  const setupIncomplete =
+    !employeeMode &&
+    (workspaceSummary?.canonicalOrganizationTraining?.setupIncomplete ??
+      avaHero.dailyActivityNarrative?.focus === "setup")
   const setupMessage =
     avaHero.dailyActivityNarrative?.working_next[0] ??
     avaHero.dailyActivityNarrative?.waiting_on_you[0] ??

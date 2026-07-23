@@ -173,4 +173,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   executiveGrowthIntelligence?: GrowthExecutiveGrowthIntelligenceReadModel | null
   /** AVA-GROWTH-OPERATOR-1F — Portfolio-wide canonical authority hydration (shared read model) */
   canonicalPortfolioAuthority?: GrowthCanonicalPortfolioAuthoritySnapshot | null
+  /** AVA-GROWTH-HOTFIX-1F-1D — Canonical organization training + activation readiness projection */
+  canonicalOrganizationTraining?: import("@/lib/growth/training/growth-canonical-organization-training-projection-types").GrowthCanonicalOrganizationTrainingProjection | null
 }
