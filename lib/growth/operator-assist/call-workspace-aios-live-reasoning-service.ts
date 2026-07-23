@@ -7,10 +7,8 @@ import { detectAdaptiveStrategyChanges } from "@/lib/growth/aios/growth/growth-a
 import { loadPendingAdaptiveEventsForLead } from "@/lib/growth/aios/growth/growth-adaptive-loop-1b-relationship-event-record"
 import type { GrowthOutreachLearningThemeWeight } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 import { buildOutreachSalesStrategyBrief } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
-import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { resolveCanonicalOutreachPackageForLead } from "@/lib/growth/aios/growth/growth-send-plane-1a-canonical-loader"
-import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
-import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
@@ -108,6 +106,14 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) return null
 
+  const sellerTruthBundle = await loadOutreachSellerTruthBundle(admin, {
+    organizationId: input.organizationId,
+    preparedAt: generatedAt,
+    prospectIndustry: null,
+    prospectCompanyName: lead.companyName,
+    leadId: input.leadId,
+  })
+
   const [decisionMakers, canonicalPackage, learningWeights] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, input.leadId).catch(() => []),
     resolveCanonicalOutreachPackageForLead(admin, {
@@ -124,6 +130,7 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
     packageSnapshot: canonicalPackage,
     skipPackageLoad: true,
     liveDeltas: await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []),
+    preloadedSellerTruthBundle: sellerTruthBundle,
   })
 
   const leadMemory = memoryBundle.influence
@@ -136,20 +143,8 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
   const primaryDm =
     decisionMakers.find((row) => row.id === lead.primaryDecisionMakerId) ?? decisionMakers[0] ?? null
 
-  const profileRecord = await getActiveApprovedBusinessProfile(admin, input.organizationId).catch(() => null)
-  const enrichedProfile = profileRecord?.profile
-    ? enrichBusinessProfileFromMasterContextDocument(profileRecord.profile, {
-        ingestedAt: generatedAt,
-      })
-    : null
-
-  const sellerTruth = await loadOutreachSellerTruthForOrganization(admin, {
-    organizationId: input.organizationId,
-    preparedAt: generatedAt,
-    prospectIndustry: null,
-    prospectCompanyName: lead.companyName,
-    leadId: input.leadId,
-  })
+  const sellerTruth = sellerTruthBundle.sellerTruth
+  const enrichedProfile = sellerTruthBundle.approvedProfile
 
   const researchRun = await fetchLatestCompletedProspectResearchRun(admin, input.leadId).catch(() => null)
   const prospectKnowledgePack = researchRun?.signals?.prospectKnowledgePack_v25c ?? null
@@ -169,8 +164,11 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
       hasMeetingScheduled: Boolean(lead.followUpAt),
       sellerTruth,
       approvedProfile: enrichedProfile,
-      approvedProfileId: profileRecord?.id ?? null,
-      sellerCompanyName: enrichedProfile?.company?.companyName ?? sellerTruth.sellerCompanyName,
+      approvedProfileId: sellerTruthBundle.metadata.profileRecordId,
+      sellerCompanyName:
+        sellerTruthBundle.metadata.sellerCompanyName ??
+        enrichedProfile?.company?.companyName ??
+        sellerTruth.sellerCompanyName,
       biEnrichmentLines: [],
       organizationalKnowledge: [],
       knowledgeCenterLines: [],

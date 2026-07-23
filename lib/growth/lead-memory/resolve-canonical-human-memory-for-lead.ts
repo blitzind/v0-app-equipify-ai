@@ -23,8 +23,6 @@ import {
 } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
 import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
 import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
-import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
-import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchLeadMemoryProfileView } from "@/lib/growth/lead-memory/dashboard"
@@ -46,7 +44,10 @@ import {
 } from "@/lib/growth/lead-memory/canonical-human-memory-types"
 import { projectLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-projection"
 import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalization/context-packet-builder"
-import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import {
+  loadOutreachSellerTruthBundle,
+  type OutreachSellerTruthBundle,
+} from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { loadSequenceOptimizationOutreachSignals } from "@/lib/growth/sequence-optimization/sequence-optimization-queries"
 
@@ -124,6 +125,7 @@ export async function resolveCanonicalHumanMemoryForLead(
     skipPackageLoad?: boolean
     liveDeltas?: AdaptiveProspectEvent[]
     companyName?: string | null
+    preloadedSellerTruthBundle?: OutreachSellerTruthBundle | null
   },
 ): Promise<CanonicalHumanMemoryBundle> {
   const generatedAt = input.generatedAt ?? new Date().toISOString()
@@ -134,6 +136,17 @@ export async function resolveCanonicalHumanMemoryForLead(
 
   const companyNameRaw = lead.companyName ?? input.companyName ?? "this company"
 
+  const sellerTruthBundlePromise =
+    input.preloadedSellerTruthBundle != null
+      ? Promise.resolve(input.preloadedSellerTruthBundle)
+      : loadOutreachSellerTruthBundle(admin, {
+          organizationId: input.organizationId,
+          preparedAt: generatedAt,
+          prospectIndustry: null,
+          prospectCompanyName: companyNameRaw,
+          leadId: input.leadId,
+        })
+
   const [
     profileView,
     contextPacket,
@@ -141,8 +154,7 @@ export async function resolveCanonicalHumanMemoryForLead(
     pendingAdaptiveEvents,
     decisionMakers,
     buyingCommitteeSnapshot,
-    sellerTruth,
-    profileRecord,
+    sellerTruthBundle,
     researchRun,
     learningWeights,
   ] = await Promise.all([
@@ -161,17 +173,13 @@ export async function resolveCanonicalHumanMemoryForLead(
       : loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []),
     listGrowthLeadDecisionMakers(admin, input.leadId).catch(() => []),
     resolveBuyingCommitteeSnapshot(admin, input.leadId),
-    loadOutreachSellerTruthForOrganization(admin, {
-      organizationId: input.organizationId,
-      preparedAt: generatedAt,
-      prospectIndustry: null,
-      prospectCompanyName: companyNameRaw,
-      leadId: input.leadId,
-    }),
-    getActiveApprovedBusinessProfile(admin, input.organizationId).catch(() => null),
+    sellerTruthBundlePromise,
     fetchLatestCompletedProspectResearchRun(admin, input.leadId).catch(() => null),
     resolveLearningWeights(admin, generatedAt),
   ])
+
+  const sellerTruth = sellerTruthBundle.sellerTruth
+  const enrichedProfile = sellerTruthBundle.approvedProfile
 
   const primaryDm =
     decisionMakers.find((row) => row.id === lead.primaryDecisionMakerId) ?? decisionMakers[0] ?? null
@@ -179,9 +187,6 @@ export async function resolveCanonicalHumanMemoryForLead(
   const snapshot = input.researchSnapshot ?? null
   const verifiedEvidence = snapshot?.evidenceSummary?.verifiedEvidence ?? []
   const prospectKnowledgePack = researchRun?.signals?.prospectKnowledgePack_v25c ?? null
-  const enrichedProfile = profileRecord?.profile
-    ? enrichBusinessProfileFromMasterContextDocument(profileRecord.profile, { ingestedAt: generatedAt })
-    : null
 
   const canonicalDisplayIdentity =
     loadedPackage?.canonicalDisplayIdentity ??

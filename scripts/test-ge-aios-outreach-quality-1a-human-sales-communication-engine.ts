@@ -12,6 +12,7 @@ import {
   countWords,
   estimateReadTimeSeconds,
 } from "../lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
+import { buildOutreachSellerTruth } from "../lib/growth/aios/growth/growth-outreach-seller-truth"
 import {
   generateOutreachDraftsFromSalesStrategyBrief,
   summarizeStrategyDerivedAssetsForPackage,
@@ -59,6 +60,7 @@ const brief = buildOutreachSalesStrategyBrief({
   fitReason: "Fits approved ICP for imaging service operators",
   qualificationConfidence: 0.78,
   researchConfidence: 0.78,
+  sellerTruth: buildOutreachSellerTruth({ profile: null }),
 })
 
 assert.ok(brief.executiveSummary.length > 40)

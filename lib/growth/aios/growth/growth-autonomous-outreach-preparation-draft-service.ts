@@ -19,9 +19,7 @@ import {
   generateOutreachDraftsFromSalesStrategyBrief,
   summarizeStrategyDerivedAssetsForPackage,
 } from "@/lib/growth/aios/growth/growth-outreach-strategy-drafts"
-import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
-import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
-import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
+import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
@@ -96,6 +94,18 @@ export async function buildAutonomousOutreachApprovalPackage(
     input.adaptiveEvents ??
     (await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []))
 
+  const companyNameRaw = lead.companyName ?? input.companyName ?? "this company"
+
+  const sellerTruthBundle = await loadOutreachSellerTruthBundle(admin, {
+    organizationId: input.organizationId,
+    preparedAt: input.generatedAt,
+    prospectIndustry: null,
+    prospectCompanyName: companyNameRaw,
+    leadId: input.leadId,
+  })
+  const sellerTruth = sellerTruthBundle.sellerTruth
+  const enrichedProfile = sellerTruthBundle.approvedProfile
+
   const memoryBundle =
     input.runtimeContext != null
       ? await input.runtimeContext.getMemory().catch(() => null)
@@ -108,13 +118,13 @@ export async function buildAutonomousOutreachApprovalPackage(
           skipPackageLoad: !input.previousPackage,
           liveDeltas: adaptiveEvents,
           companyName: input.companyName,
+          preloadedSellerTruthBundle: sellerTruthBundle,
         })
 
   if (!memoryBundle) {
     throw new Error("Canonical human memory resolution failed for outreach preparation.")
   }
 
-  const companyNameRaw = lead.companyName ?? input.companyName ?? "this company"
   const verifiedEvidence = input.snapshot.evidenceSummary?.verifiedEvidence ?? []
   const missingEvidence = input.snapshot.evidenceSummary?.missingEvidence ?? []
   const assumptions = input.snapshot.evidenceSummary?.assumptions ?? []
@@ -128,24 +138,6 @@ export async function buildAutonomousOutreachApprovalPackage(
 
   const confidence = resolveOutreachPreparationConfidence(input.snapshot)
   const teammate = resolveAiTeammatePresentation(input.teammateName)
-
-  // SALES-PLAYBOOK-1B / MASTER-KNOWLEDGE-1A — Seller Truth from enriched Approved Business Profile.
-  const profileRecord = await getActiveApprovedBusinessProfile(admin, input.organizationId).catch(
-    () => null,
-  )
-  const enrichedProfile = profileRecord?.profile
-    ? enrichBusinessProfileFromMasterContextDocument(profileRecord.profile, {
-        ingestedAt: input.generatedAt,
-      })
-    : null
-
-  const sellerTruth = await loadOutreachSellerTruthForOrganization(admin, {
-    organizationId: input.organizationId,
-    preparedAt: input.generatedAt,
-    prospectIndustry: null,
-    prospectCompanyName: companyNameRaw,
-    leadId: input.leadId,
-  })
 
   const researchRun = await fetchLatestCompletedProspectResearchRun(admin, input.leadId).catch(
     () => null,
@@ -269,7 +261,7 @@ export async function buildAutonomousOutreachApprovalPackage(
     isCustomer: /customer|won|converted/i.test(lead.status),
     sellerTruth,
     approvedProfile: enrichedProfile,
-    approvedProfileId: profileRecord?.id ?? null,
+    approvedProfileId: sellerTruthBundle.metadata.profileRecordId,
     prospectKnowledgePack,
     learningWeights,
     relationshipStrengthTier: lead.relationshipStrengthTier,
@@ -384,7 +376,7 @@ export async function buildAutonomousOutreachApprovalPackage(
         : null,
       "Customer-facing drafts reviewed for elite human SDR voice (CONVERSATION-INTELLIGENCE-1B).",
       sellerTruth.source === "approved_business_profile"
-        ? enrichedProfile?.masterKnowledgeIngestion?.isRuntimeSourceOfTruth === false
+        ? sellerTruthBundle.metadata.runtimeEnrichmentApplied
           ? "Seller messaging derived from enriched Approved Business Profile (Master Context ingested, not runtime SoT)."
           : "Seller messaging derived from Approved Business Profile."
         : "Seller messaging used safe defaults — Approved Business Profile not available.",

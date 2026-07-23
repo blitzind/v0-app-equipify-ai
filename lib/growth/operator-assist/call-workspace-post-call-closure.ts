@@ -11,7 +11,7 @@ import { ingestLiveRelationshipEvent } from "@/lib/growth/aios/growth/growth-ada
 import { isRelationshipMaterialChange } from "@/lib/growth/aios/growth/growth-adaptive-loop-1b-material-change"
 import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { buildRevenueStrategyIntelligence } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
-import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { resolveCanonicalOutreachPackageForLead } from "@/lib/growth/aios/growth/growth-send-plane-1a-canonical-loader"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { writeCanonicalLeadMemoryAndRebuild } from "@/lib/growth/lead-memory/canonical-human-memory-write"
@@ -136,11 +136,19 @@ export async function executeCallWorkspacePostCallClosure(
   const lead = await fetchGrowthLeadById(admin, closureInput.leadId)
   if (!lead) throw new Error("lead_not_found")
 
+  const sellerTruthBundle = await loadOutreachSellerTruthBundle(admin, {
+    organizationId: closureInput.organizationId,
+    preparedAt: closureInput.generatedAt,
+    prospectCompanyName: closureInput.companyName ?? lead.companyName,
+    leadId: closureInput.leadId,
+  }).catch(() => null)
+
   const [memoryBundle, priorPackage, realtimeSession] = await Promise.all([
     resolveCanonicalHumanMemoryForLead(admin, {
       organizationId: closureInput.organizationId,
       leadId: closureInput.leadId,
       generatedAt: closureInput.generatedAt,
+      preloadedSellerTruthBundle: sellerTruthBundle,
     }).catch(() => null),
     resolveCanonicalOutreachPackageForLead(admin, {
       organizationId: closureInput.organizationId,
@@ -192,12 +200,7 @@ export async function executeCallWorkspacePostCallClosure(
   let strategyRefreshScheduled = false
   let strategyChange: ReturnType<typeof detectAdaptiveStrategyChanges> | null = null
 
-  const sellerTruth = await loadOutreachSellerTruthForOrganization(admin, {
-    organizationId: closureInput.organizationId,
-    preparedAt: closureInput.generatedAt,
-    prospectCompanyName: closureInput.companyName ?? lead.companyName,
-    leadId: closureInput.leadId,
-  }).catch(() => null)
+  const sellerTruth = sellerTruthBundle?.sellerTruth ?? null
 
   const previousAssessment = closureInput.liveReasoning?.relationshipAssessment ?? null
   const previousRevenue = closureInput.liveReasoning?.revenueStrategyIntelligence ?? null

@@ -255,12 +255,12 @@ async function main(): Promise<void> {
   console.log("  ✓ reusable prompt sources contain no hardcoded Equipify product description")
 
   const providerService = readSource("lib/growth/aios/ai-provider-service.ts")
-  assert.match(providerService, /loadGrowthProspectResearchOrganizationContextForOrganization/)
-  assert.match(providerService, /research_company/)
-  console.log("  ✓ AI OS provider service loads organization research context once for research_company")
+  assert.match(providerService, /loadOutreachSellerTruthBundle/)
+  assert.match(providerService, /researchOrganizationContext/)
+  console.log("  ✓ AI OS provider service loads organization research context from canonical bundle")
 
   const sellerTruthLoader = readSource("lib/growth/aios/growth/growth-outreach-seller-truth-loader.ts")
-  assert.match(sellerTruthLoader, /loadOutreachSellerTruthBundle/)
+  assert.match(sellerTruthLoader, /export async function loadOutreachSellerTruthBundle/)
   assert.match(sellerTruthLoader, /loadGrowthProspectResearchOrganizationContextForOrganization/)
   const profileFetchCount = (sellerTruthLoader.match(/await getActiveApprovedBusinessProfile/g) ?? []).length
   assert.equal(profileFetchCount, 1)

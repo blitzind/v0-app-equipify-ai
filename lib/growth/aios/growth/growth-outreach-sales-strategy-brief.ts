@@ -5,7 +5,6 @@
 
 import {
   buildOutreachConversationStrategy,
-  buildOutreachSellerTruth,
   deriveOutreachRelationshipStage,
   type GrowthOutreachConversationStrategy,
   type GrowthOutreachEvidenceCitation,
@@ -137,9 +136,9 @@ export type BuildSalesStrategyBriefInput = {
   leadStatus?: string | null
   hasMeetingScheduled?: boolean
   isCustomer?: boolean
-  /** Preloaded seller truth (preferred). */
-  sellerTruth?: GrowthOutreachSellerTruth | null
-  /** Enriched approved profile used for quality scoring. */
+  /** Canonical seller truth from loadOutreachSellerTruthBundle (required). */
+  sellerTruth: GrowthOutreachSellerTruth
+  /** Enriched-or-approved profile snapshot aligned with sellerTruth (optional quality scoring). */
   approvedProfile?: BusinessProfileDraftContent | null
   approvedProfileId?: string | null
   sellerCompanyName?: string | null
@@ -316,19 +315,7 @@ export function buildOutreachSalesStrategyBrief(
   const dmName = cleanLine(input.contactName)
   const dmTitle = cleanLine(input.contactTitle)
 
-  const sellerTruth =
-    input.sellerTruth ??
-    buildOutreachSellerTruth({
-      profileId: input.approvedProfileId,
-      profile: input.approvedProfile,
-      sellerCompanyName: input.sellerCompanyName,
-      biEnrichmentLines: input.biEnrichmentLines,
-      organizationalKnowledge: input.organizationalKnowledge,
-      knowledgeCenterLines: input.knowledgeCenterLines,
-      industryPlaybook: input.industryPlaybook,
-      prospectIndustry: input.industry,
-      prospectTitle: input.contactTitle,
-    })
+  const sellerTruth = input.sellerTruth
 
   const relationshipStage = deriveOutreachRelationshipStage({
     relationshipStrengthTier: input.relationshipStrengthTier,

@@ -4,7 +4,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAiOsProviderMessagesFromContextPackage } from "@/lib/growth/aios/ai-provider-context-prompt"
-import { loadGrowthProspectResearchOrganizationContextForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { invokeAiOsProviderWithFailover } from "@/lib/growth/aios/ai-provider-failover"
 import { lookupAiOsModelCapability } from "@/lib/growth/aios/ai-provider-model-registry"
 import {
@@ -50,18 +50,20 @@ export async function invokeAiOsProviderWithContextPackage(
   const modelTier = input.modelTier ?? "balanced"
   const organizationContext =
     input.purpose === "research_company"
-      ? await loadGrowthProspectResearchOrganizationContextForOrganization(admin, {
-          organizationId: input.organizationId,
-          preparedAt: new Date().toISOString(),
-          prospectCompanyName:
-            typeof contextPackage.entityMetadata?.company_name === "string"
-              ? contextPackage.entityMetadata.company_name
-              : null,
-          leadId:
-            typeof contextPackage.entityMetadata?.lead_id === "string"
-              ? contextPackage.entityMetadata.lead_id
-              : null,
-        })
+      ? (
+          await loadOutreachSellerTruthBundle(admin, {
+            organizationId: input.organizationId,
+            preparedAt: new Date().toISOString(),
+            prospectCompanyName:
+              typeof contextPackage.entityMetadata?.company_name === "string"
+                ? contextPackage.entityMetadata.company_name
+                : null,
+            leadId:
+              typeof contextPackage.entityMetadata?.lead_id === "string"
+                ? contextPackage.entityMetadata.lead_id
+                : null,
+          })
+        ).researchOrganizationContext
       : undefined
   const messages = buildAiOsProviderMessagesFromContextPackage({
     contextPackage,

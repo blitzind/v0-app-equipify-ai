@@ -1,5 +1,6 @@
 /**
- * GE-AIOS-SALES-PLAYBOOK-1B — Load seller knowledge for outreach brief (server-only).
+ * GE-AIOS-SALES-PLAYBOOK-1B / AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1C
+ * Canonical seller-truth loading authority (server-only).
  * Profile remains SoT. BI / Org Knowledge / Knowledge Center / Industry Playbooks enrich only.
  */
 
@@ -10,7 +11,10 @@ import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/
 import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
 import { fetchLatestBusinessIntelligenceReport } from "@/lib/growth/business-intelligence/business-intelligence-repository"
 import { isCanonicalSellerKnowledgeEnriched } from "@/lib/growth/training/canonical-seller-knowledge-onboarding-1a"
-import { evaluateBusinessStrategyCompleteness } from "@/lib/growth/training/evaluate-business-strategy-completeness"
+import {
+  evaluateBusinessStrategyCompleteness,
+  type BusinessStrategyCompleteness,
+} from "@/lib/growth/training/evaluate-business-strategy-completeness"
 import { fetchOrganizationKnowledgeStore } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { runKnowledgeRetrieval } from "@/lib/growth/knowledge-center/knowledge-repository"
 import { resolveIndustryPlaybook } from "@/lib/growth/playbooks/industry-playbook-registry"
@@ -25,6 +29,9 @@ import {
   type GrowthProspectResearchOrganizationContext,
 } from "@/lib/growth/research/growth-prospect-research-organization-context"
 
+export const AIOS_TRAINING_KNOWLEDGE_INTEGRATION_1C_QA_MARKER =
+  "aios-training-knowledge-integration-1c-v1" as const
+
 export type LoadOutreachSellerTruthInput = {
   organizationId: string
   preparedAt: string
@@ -33,12 +40,35 @@ export type LoadOutreachSellerTruthInput = {
   leadId?: string | null
 }
 
-type OutreachSellerTruthBundle = {
-  sellerTruth: GrowthOutreachSellerTruth
-  approvedProfile: BusinessProfileDraftContent | null
+export type OutreachSellerTruthBundleMetadata = {
+  profileRecordId: string | null
+  sellerCompanyName: string | null
+  useApprovedProfileAsIs: boolean
+  runtimeEnrichmentApplied: boolean
+  strategyCompleteness: BusinessStrategyCompleteness
 }
 
-async function loadOutreachSellerTruthBundle(
+/** Canonical organization-knowledge bundle — one approved-profile read, shared downstream projections. */
+export type OutreachSellerTruthBundle = {
+  sellerTruth: GrowthOutreachSellerTruth
+  approvedProfile: BusinessProfileDraftContent | null
+  researchOrganizationContext: GrowthProspectResearchOrganizationContext
+  metadata: OutreachSellerTruthBundleMetadata
+}
+
+function buildResearchOrganizationContextFromBundle(
+  bundle: Pick<OutreachSellerTruthBundle, "sellerTruth" | "approvedProfile">,
+): GrowthProspectResearchOrganizationContext {
+  return buildGrowthProspectResearchOrganizationContextFromSellerTruth({
+    sellerTruth: bundle.sellerTruth,
+    geography: bundle.approvedProfile?.idealCustomers.geography ?? [],
+    companySizeRanges: bundle.approvedProfile?.idealCustomers.companySizeRanges ?? [],
+    painPoints: bundle.approvedProfile?.problemsAndTriggers.painPoints ?? [],
+  })
+}
+
+/** Single canonical loader — all seller-facing AI consumers should start here. */
+export async function loadOutreachSellerTruthBundle(
   admin: SupabaseClient,
   input: LoadOutreachSellerTruthInput,
 ): Promise<OutreachSellerTruthBundle> {
@@ -117,19 +147,32 @@ async function loadOutreachSellerTruthBundle(
         }).playbook
       : null
 
+  const sellerTruth = buildOutreachSellerTruth({
+    profileId: profileRecord?.id ?? null,
+    profile,
+    sellerCompanyName: profileRecord?.companyName ?? profile?.company.companyName ?? null,
+    biEnrichmentLines: biLines,
+    organizationalKnowledge: orgKnowledgePayload?.store.items ?? [],
+    knowledgeCenterLines,
+    industryPlaybook: playbook,
+    prospectIndustry: input.prospectIndustry,
+    prospectTitle: null,
+  })
+
+  const metadata: OutreachSellerTruthBundleMetadata = {
+    profileRecordId: profileRecord?.id ?? null,
+    sellerCompanyName: profileRecord?.companyName ?? profile?.company.companyName ?? null,
+    useApprovedProfileAsIs,
+    runtimeEnrichmentApplied: Boolean(rawProfile && !useApprovedProfileAsIs),
+    strategyCompleteness,
+  }
+
+  const approvedProfile = profile
+  const bundleBase = { sellerTruth, approvedProfile }
   return {
-    sellerTruth: buildOutreachSellerTruth({
-      profileId: profileRecord?.id ?? null,
-      profile,
-      sellerCompanyName: profileRecord?.companyName ?? profile?.company.companyName ?? null,
-      biEnrichmentLines: biLines,
-      organizationalKnowledge: orgKnowledgePayload?.store.items ?? [],
-      knowledgeCenterLines,
-      industryPlaybook: playbook,
-      prospectIndustry: input.prospectIndustry,
-      prospectTitle: null,
-    }),
-    approvedProfile: profile,
+    ...bundleBase,
+    researchOrganizationContext: buildResearchOrganizationContextFromBundle(bundleBase),
+    metadata,
   }
 }
 
@@ -141,16 +184,11 @@ export async function loadOutreachSellerTruthForOrganization(
   return bundle.sellerTruth
 }
 
-/** AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1B — Approved profile projection for prospect research prompts. */
+/** AIOS-TRAINING-KNOWLEDGE-INTEGRATION-1B — Research prompt projection from canonical bundle. */
 export async function loadGrowthProspectResearchOrganizationContextForOrganization(
   admin: SupabaseClient,
   input: LoadOutreachSellerTruthInput,
 ): Promise<GrowthProspectResearchOrganizationContext> {
   const bundle = await loadOutreachSellerTruthBundle(admin, input)
-  return buildGrowthProspectResearchOrganizationContextFromSellerTruth({
-    sellerTruth: bundle.sellerTruth,
-    geography: bundle.approvedProfile?.idealCustomers.geography ?? [],
-    companySizeRanges: bundle.approvedProfile?.idealCustomers.companySizeRanges ?? [],
-    painPoints: bundle.approvedProfile?.problemsAndTriggers.painPoints ?? [],
-  })
+  return bundle.researchOrganizationContext
 }

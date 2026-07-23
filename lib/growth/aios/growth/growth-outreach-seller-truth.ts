@@ -230,7 +230,8 @@ function matchIndustryKnowledge(
 }
 
 /**
- * Build seller truth from Approved Business Profile.
+ * Pure seller-truth projection from an approved profile snapshot.
+ * Production callers must use loadOutreachSellerTruthBundle — direct use is limited to the canonical loader and deterministic tests.
  * Industry playbook / BI / org knowledge / KC only fill gaps or enrich — never replace profile SoT.
  */
 export function buildOutreachSellerTruth(input: BuildSellerTruthInput): GrowthOutreachSellerTruth {
