@@ -12,6 +12,7 @@ import {
   shouldPreferOutreachOverCommitteeResearch,
 } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import { planGrowthLeadResearchExecution } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import { applyBoundedResearchExecutionPlan } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-execution-closure"
 
 export const GROWTH_AIOS_GROWTH_1B_PHASE = "GE-AIOS-GROWTH-1B" as const
 
@@ -342,6 +343,7 @@ function buildEvidenceSummary(input: {
 export function assessGrowthLeadResearchOpportunity(input: {
   result: GrowthLeadResearchResult
   qualification: GrowthLeadResearchQualificationOutput
+  leadMetadata?: Record<string, unknown> | null
 }): GrowthLeadResearchIntelligenceOutput {
   const fitScore = input.qualification.fitScore
   const confidence = input.qualification.confidence
@@ -396,11 +398,14 @@ export function assessGrowthLeadResearchOpportunity(input: {
 
   const nextBestAction = resolveNextBestAction(recommendation, input.qualification)
 
-  const executionPlan = planGrowthLeadResearchExecution({
-    nextBestAction,
-    opportunityAssessment,
-    evidenceSummary,
-    qualification: input.qualification,
+  const executionPlan = applyBoundedResearchExecutionPlan({
+    metadata: input.leadMetadata ?? null,
+    executionPlan: planGrowthLeadResearchExecution({
+      nextBestAction,
+      opportunityAssessment,
+      evidenceSummary,
+      qualification: input.qualification,
+    }),
   })
 
   return {

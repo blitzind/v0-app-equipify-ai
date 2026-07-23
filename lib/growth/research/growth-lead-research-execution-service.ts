@@ -7,8 +7,14 @@ import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { runAutonomousQualificationManualEvaluation } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
 import type { GrowthLeadResearchEvidenceSummary } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import { publishGrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthLeadById, updateGrowthLeadFromImportMerge } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import {
+  buildBoundedResearchInProgressMetadataPatch,
+  evaluateBoundedResearchExecutionGate,
+  rejectGenericBoundedResearchAction,
+  shouldQueueSpecificBoundedResearchActionByKey,
+} from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-execution-closure"
 import { shadowEvaluateResourceAllocation } from "@/lib/growth/resource-allocation/resource-allocation-facade"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import {
@@ -210,6 +216,8 @@ export async function executeGrowthLeadProspectResearch(
 
   const rebuild = Boolean(input.rebuild) || input.trigger === "stale_refresh"
   const force = Boolean(input.force)
+  const explicitOperatorRequest =
+    force || input.trigger === "manual" || input.trigger === "drawer_opportunistic"
 
   if (input.trigger === "stale_refresh" && lead.lastProspectResearchedAt) {
     const { publishDraftFactoryResearchBecameStale } = await import(
@@ -228,6 +236,56 @@ export async function executeGrowthLeadProspectResearch(
       outcome: "skipped",
       code: "research_not_needed",
       message: "Lead already has fresh research.",
+    }
+  }
+
+  const leadMetadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : {}
+  const boundedGate = evaluateBoundedResearchExecutionGate(leadMetadata)
+  let boundedActionKey: string | undefined
+  let boundedMissingEvidenceTarget: string | undefined
+
+  if (boundedGate.mode === "bounded") {
+    if (!force && !explicitOperatorRequest) {
+      if (!boundedGate.authorized || !boundedGate.selection) {
+        return {
+          ok: false,
+          outcome: "skipped",
+          code: boundedGate.reason ?? "bounded_research_unauthorized",
+          message: "Bounded research authorization blocked autonomous execution.",
+        }
+      }
+      boundedActionKey = boundedGate.selection.actionKey
+      boundedMissingEvidenceTarget = boundedGate.selection.missingEvidenceTarget
+      await updateGrowthLeadFromImportMerge(input.admin, lead.id, {
+        metadata: {
+          ...leadMetadata,
+          ...buildBoundedResearchInProgressMetadataPatch(boundedGate.selection),
+        },
+      }).catch(() => undefined)
+    }
+  }
+
+  if (
+    !force &&
+    boundedGate.mode === "bounded" &&
+    input.trigger !== "manual" &&
+    input.trigger !== "drawer_opportunistic"
+  ) {
+    const requestedAction = String(leadMetadata.admission_requested_bounded_action ?? "").trim()
+    if (
+      requestedAction &&
+      (rejectGenericBoundedResearchAction(requestedAction) ||
+        !shouldQueueSpecificBoundedResearchActionByKey(leadMetadata, requestedAction))
+    ) {
+      return {
+        ok: false,
+        outcome: "skipped",
+        code: "bounded_action_unauthorized",
+        message: "Requested bounded research action is not authorized.",
+      }
     }
   }
 
@@ -261,8 +319,6 @@ export async function executeGrowthLeadProspectResearch(
     }
   }
 
-  const explicitOperatorRequest =
-    force || input.trigger === "manual" || input.trigger === "drawer_opportunistic"
   const generatedAt = input.generatedAt ?? new Date().toISOString()
   const lifecycle = await buildLeadLifecycleSnapshotForAuthority(input.admin, lead)
 
@@ -349,6 +405,8 @@ export async function executeGrowthLeadProspectResearch(
     admin: input.admin,
     leadId: lead.id,
     rebuild,
+    boundedActionKey,
+    boundedMissingEvidenceTarget,
   })
 
   if (!research.ok) {

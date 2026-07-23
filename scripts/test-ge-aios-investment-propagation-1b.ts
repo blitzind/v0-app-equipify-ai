@@ -342,8 +342,8 @@ runGate("Fixture I — duplicate action prevention", () => {
   const metadata = buildLeadMetadataFromSufficiency(
     sufficiencyFromResult(baseResult({ outreachAngles: [], sourceUrls: [] })),
     {
-      admission_targeted_research_missing_evidence: ["verified_company_identity"],
-      admission_bounded_actions_completed: ["verify official domain"],
+      admission_targeted_research_missing_evidence: ["verified_company_identity", "operational_fit"],
+      admission_bounded_actions_completed: ["verify_company_identity"],
     },
   )
   const auth = resolveBoundedResearchAuthorizationFromMetadata(metadata)

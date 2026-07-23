@@ -9,6 +9,13 @@ import {
   type GrowthResearchSufficiencyDecisionKind,
 } from "@/lib/growth/research/growth-research-sufficiency-1a"
 import { resolveLegacyAdmissionPolicyRead } from "@/lib/growth/revenue-workflow/growth-admission-policy-1a"
+import {
+  GROWTH_BOUNDED_RESEARCH_ACTION_ORDER,
+  readCompletedBoundedResearchActionKeys,
+  resolveBoundedResearchActionKeyFromEvidence,
+  resolveBoundedResearchActionKeyFromLabel,
+  type GrowthBoundedResearchActionKey,
+} from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-action-identity"
 
 export const GROWTH_INVESTMENT_PROPAGATION_1B_QA_MARKER =
   "ge-aios-investment-propagation-1b-v1" as const
@@ -26,6 +33,7 @@ export type GrowthBoundedResearchAuthorization = {
   decision: "targeted_research" | null
   missingRequiredEvidence: string[]
   authorizedActions: string[]
+  authorizedActionKeys: GrowthBoundedResearchActionKey[]
   maxAdditionalInvestment: number
   investmentConsumed: number
   investmentRemaining: number
@@ -178,24 +186,29 @@ export function resolveBoundedResearchAuthorizationFromMetadata(
   const persistedMax = readMetadataNumber(raw, ["admission_max_additional_investment"]) ?? 0
   const investmentRemaining = Math.max(0, persistedMax)
   const investmentConsumed = Math.max(0, passesUsed)
-  const completedActions = new Set(
-    readStringArray(raw.admission_bounded_actions_completed),
-  )
+  const completedActionKeys = new Set(readCompletedBoundedResearchActionKeys(raw))
   const missingRequiredEvidence = readStringArray(raw.admission_targeted_research_missing_evidence)
+  const authorizedActionKeys = [...new Set(
+    missingRequiredEvidence
+      .map((gap) => resolveBoundedResearchActionKeyFromEvidence(gap))
+      .filter((value): value is GrowthBoundedResearchActionKey => value != null),
+  )].filter((key) => !completedActionKeys.has(key))
   const mappedActions = mapMissingEvidenceToAuthorizedActions(missingRequiredEvidence)
   const persistedActions = filterSpecificAuthorizedActions(
     readStringArray(raw.admission_bounded_next_actions),
   )
-  const authorizedActions = [...new Set([...mappedActions, ...persistedActions])].filter(
-    (action) => !completedActions.has(action),
-  )
+  const authorizedActions = [...new Set([...mappedActions, ...persistedActions])].filter((action) => {
+    const actionKey = resolveBoundedResearchActionKeyFromLabel(action)
+    if (actionKey && completedActionKeys.has(actionKey)) return false
+    return !completedActionKeys.has(action as GrowthBoundedResearchActionKey)
+  })
 
   const stopConditions: string[] = []
   if (decision === "terminal_reject") stopConditions.push("terminal_reject")
   if (decision === "operator_review_required") stopConditions.push("operator_review_required")
   if (investmentRemaining <= 0) stopConditions.push("budget_exhausted")
   if (passesUsed >= maxAttempts) stopConditions.push("max_attempts_reached")
-  if (authorizedActions.length === 0 && decision === "targeted_research_required") {
+  if (authorizedActions.length === 0 && authorizedActionKeys.length === 0 && decision === "targeted_research_required") {
     stopConditions.push("no_authorized_actions_remaining")
   }
 
@@ -203,7 +216,7 @@ export function resolveBoundedResearchAuthorizationFromMetadata(
     policyRead.hasPolicyMetadata &&
     decision === "targeted_research_required" &&
     investmentRemaining > 0 &&
-    authorizedActions.length > 0 &&
+    (authorizedActions.length > 0 || authorizedActionKeys.length > 0) &&
     passesUsed < maxAttempts
 
   return {
@@ -211,6 +224,7 @@ export function resolveBoundedResearchAuthorizationFromMetadata(
     decision: authorized ? "targeted_research" : null,
     missingRequiredEvidence,
     authorizedActions,
+    authorizedActionKeys,
     maxAdditionalInvestment: investmentRemaining,
     investmentConsumed,
     investmentRemaining,
@@ -251,9 +265,23 @@ export function shouldQueueSpecificBoundedResearchAction(
   metadata: Record<string, unknown> | null | undefined,
   action: string,
 ): boolean {
+  const normalized = action.trim()
+  if (!normalized) return false
+  if (isGenericResearchAction(normalized)) return false
+  const actionKey = resolveBoundedResearchActionKeyFromLabel(normalized)
+  if (actionKey) {
+    const auth = resolveBoundedResearchAuthorizationFromMetadata(metadata)
+    if (!auth.authorized || !auth.authorizedActionKeys.includes(actionKey)) return false
+    const completed = readCompletedBoundedResearchActionKeys(metadata)
+    if (completed.includes(actionKey)) return false
+    const ordered = GROWTH_BOUNDED_RESEARCH_ACTION_ORDER.filter(
+      (key) => auth.authorizedActionKeys.includes(key) && !completed.includes(key),
+    )
+    return ordered[0] === actionKey
+  }
   const auth = resolveBoundedResearchAuthorizationFromMetadata(metadata)
   if (!auth.authorized) return false
-  return auth.authorizedActions.includes(action.trim())
+  return auth.authorizedActions.includes(normalized)
 }
 
 /** Fail-closed gate for autonomous research when canonical policy metadata is present. */

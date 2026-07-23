@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthLeadById, updateGrowthLeadFromImportMerge } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { collectProspectCompanyEvidence } from "@/lib/growth/research/company-evidence/company-evidence-collector"
@@ -22,6 +22,7 @@ import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons
 import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { reconcileExternalDiscoveryPostResearchAdmission } from "@/lib/growth/revenue-workflow/growth-operational-keyword-validation-server-1a"
+import { buildBoundedResearchCompletionMetadataPatchForRun } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-execution-closure"
 import { buildCompanySignals } from "@/lib/growth/research/company-signal-builder"
 import { classifyProspectIndustry } from "@/lib/growth/research/industry-classifier"
 import { detectProspectPainSignals } from "@/lib/growth/research/pain-signal-detector"
@@ -65,6 +66,8 @@ export type RunProspectResearchInput = {
   leadId: string
   rebuild?: boolean
   createdBy?: string | null
+  boundedActionKey?: string | null
+  boundedMissingEvidenceTarget?: string | null
 }
 
 export type RunProspectResearchResult =
@@ -128,6 +131,25 @@ async function finalizeProspectResearchCompletion(input: {
       cached: input.cached,
       qa_marker: GROWTH_RESEARCH_CACHE_HIT_POST_RECONCILE_7B_QA_MARKER,
     })
+  } else {
+    const existingMetadata =
+      input.lead.metadata && typeof input.lead.metadata === "object" ? input.lead.metadata : {}
+    const boundedCompletionPatch = buildBoundedResearchCompletionMetadataPatchForRun({
+      existingMetadata,
+      run: {
+        id: input.run.id,
+        status: input.run.status,
+        signals: input.run.signals ?? null,
+      },
+    })
+    if (boundedCompletionPatch) {
+      await updateGrowthLeadFromImportMerge(input.admin, input.lead.id, {
+        metadata: {
+          ...existingMetadata,
+          ...boundedCompletionPatch,
+        },
+      })
+    }
   }
 
   void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
@@ -484,6 +506,12 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
         companyEvidenceCollection_v22: companyEvidenceCollection,
         prospectKnowledgePack_v25c: prospectKnowledgePack,
         companyEvidencePromotion_v25c: companyEvidencePromotion,
+        ...(input.boundedActionKey
+          ? {
+              boundedResearchActionKey_1b: input.boundedActionKey,
+              boundedResearchMissingEvidenceTarget_1b: input.boundedMissingEvidenceTarget ?? null,
+            }
+          : {}),
       },
       competitors: companySignals.competitors,
       researchSummary,

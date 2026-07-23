@@ -30,6 +30,10 @@ import {
   buildResearchSufficiencyDecisionForPostResearchAdmission,
 } from "@/lib/growth/revenue-workflow/growth-admission-policy-1a"
 import {
+  buildBoundedResearchCompletionMetadataPatchForRun,
+  resolveTargetedResearchPassesUsedForReconcile,
+} from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-execution-closure"
+import {
   buildInvestmentChangedWakeSourceId,
   captureGrowthResourceAllocationInputSnapshot,
   hasMaterialResourceAllocationInputChange,
@@ -48,6 +52,8 @@ export type ReconcileExternalDiscoveryPostResearchAdmissionInput = {
   generatedAt?: string
   researchRun?: Pick<
     GrowthResearchRunPublicView,
+    | "id"
+    | "status"
     | "researchSummary"
     | "suggestedPitchAngle"
     | "suggestedSequence"
@@ -170,12 +176,21 @@ export async function reconcileExternalDiscoveryPostResearchAdmission(
 
   const existingMetadata =
     input.lead.metadata && typeof input.lead.metadata === "object" ? input.lead.metadata : {}
-  const priorPassesUsed =
-    typeof existingMetadata.admission_targeted_research_passes_used === "number" &&
-    Number.isFinite(existingMetadata.admission_targeted_research_passes_used)
-      ? Math.max(0, existingMetadata.admission_targeted_research_passes_used)
-      : 0
-  const targetedResearchPassesUsed = priorPassesUsed + 1
+  const boundedCompletionPatch =
+    input.researchRun?.id && input.researchRun.status
+      ? buildBoundedResearchCompletionMetadataPatchForRun({
+          existingMetadata,
+          run: {
+            id: input.researchRun.id,
+            status: input.researchRun.status,
+            signals: input.researchRun.signals ?? null,
+          },
+        })
+      : null
+  const targetedResearchPassesUsed = resolveTargetedResearchPassesUsedForReconcile({
+    existingMetadata,
+    researchRun: input.researchRun ?? null,
+  })
 
   const researchSufficiency = buildResearchSufficiencyDecisionForPostResearchAdmission({
     lead: input.lead,
@@ -198,6 +213,7 @@ export async function reconcileExternalDiscoveryPostResearchAdmission(
     ...buildLeadAdmissionMetadata(admission, generatedAt),
     ...buildOperationalKeywordValidationMetadata(keywordValidation, generatedAt),
     ...buildAdmissionPolicyMetadataFromSufficiency(researchSufficiency, generatedAt),
+    ...(boundedCompletionPatch ?? {}),
     admission_targeted_research_passes_used: targetedResearchPassesUsed,
     investment_propagation_1b_qa_marker: "ge-aios-investment-propagation-1b-v1",
     prospect_search_industry_gate_passed: industryGatePassed,

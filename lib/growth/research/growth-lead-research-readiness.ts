@@ -5,6 +5,7 @@ import {
   normalizeDomain,
 } from "@/lib/growth/company-identification/company-identification-normalize"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import { evaluateBoundedResearchExecutionGate } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b-execution-closure"
 import { shouldBlockAutonomousResearchForPolicyMetadata } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
 
 import type { GrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
@@ -150,6 +151,16 @@ export function shouldAutoQueueLeadResearch(lead: Pick<
   if (hasUsableLeadResearch(lead) && !isProspectResearchStale(lead.lastProspectResearchedAt)) {
     return false
   }
+
+  const metadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : {}
+  const boundedGate = evaluateBoundedResearchExecutionGate(metadata)
+  if (boundedGate.mode === "bounded") {
+    return boundedGate.authorized && boundedGate.selection != null
+  }
+
   return true
 }
 
