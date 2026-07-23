@@ -152,8 +152,8 @@ function buildCurrentActivityFromPresentation(
 
   return {
     companyName,
-    taskLabel: presentation.currentActivityLabel,
-    currentStepLabel: presentation.currentStepLabel,
+    taskLabel: humanizeOperatorFacingCopy(presentation.currentActivityLabel),
+    currentStepLabel: humanizeOperatorFacingCopy(presentation.currentStepLabel),
     startedAt,
     startedLabel: formatRuntimeExecutionStartedLabel(startedAt),
     expectedCompletionMinutes: presentation.expectedCompletionMinutes,
@@ -731,7 +731,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   switch (operatorState) {
     case "working":
       statusExplanation =
-        runtimePresentation.currentActivityLabel ??
+        humanizedActivityLabel ??
         (input.activeWork ? describeWorkItemStep(input.activeWork) : "Autonomous work is in progress.")
       break
     case "waiting":
@@ -765,6 +765,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
 
   const operatorFocusCompanyName = operatorFocus.operatorFocusCompanyName
   const primaryCompanyName = operatorFocusCompanyName
+  const humanizedActivityLabel = humanizeOperatorFacingCopy(runtimePresentation.currentActivityLabel)
 
   const nextSchedulerLabel =
     input.server?.nextSchedulerEstimateAt && autonomyEnabled
@@ -815,11 +816,14 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     nextMilestoneLabel,
     primaryMissionLabel: runtimePresentation.primaryMissionLabel,
     primaryMissionKind: runtimePresentation.primaryMissionKind,
-    currentActivityLabel: runtimePresentation.currentActivityLabel,
+    currentActivityLabel: humanizedActivityLabel,
     currentActivityScope: runtimePresentation.currentActivityScope,
     currentLeadCompanyName: runtimePresentation.currentLeadCompanyName,
     operatorFocusCompanyName,
     operatorFocusHref: operatorFocus.operatorFocusHref,
+    operatorFocusTitle: operatorFocus.operatorFocusTitle,
+    operatorFocusDetail: operatorFocus.operatorFocusDetail,
+    operatorFocusConfidenceLine: operatorFocus.operatorFocusConfidenceLine,
     primaryCompanyName,
     whatHappensNextLines,
     canCloseBrowserLine,

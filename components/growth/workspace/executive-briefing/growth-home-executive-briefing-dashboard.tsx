@@ -117,6 +117,7 @@ import {
   detectHomeSectionNarrativeOverlap,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER,
+  GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 
 function metricValueFromDashboard(
@@ -458,6 +459,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
       pendingApprovals: canonicalPendingApprovals,
       readyForOutreachReview: avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0,
       discoveryTarget: avaHero.discoveryNarrativeTarget ?? missionDiscovery?.audienceName ?? null,
+      portfolioOperator: workspaceSummary?.portfolioManager?.operator ?? null,
+      productionMissionAuthority: workspaceSummary?.productionMissionAuthority ?? null,
+      primaryMissionLabel: runtimeTrust.primaryMissionLabel,
+      currentActivityLabel: runtimeTrust.currentActivityLabel,
+      repliesToday: workspaceSummary?.kpis?.repliesToday,
+      canonicalOperatorFocus: workspaceSummary?.canonicalOperatorFocus ?? null,
     })
     const narrativeOverlap = detectHomeSectionNarrativeOverlap({
       heroNarrative: heroBriefing.narrative,
@@ -504,6 +511,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
     workspaceSummary?.missionDiscovery,
     workspaceSummary?.operatorTasks.leadsNeedingAction,
     workspaceSummary?.portfolioManager?.operator,
+    workspaceSummary?.productionMissionAuthority,
+    workspaceSummary?.canonicalOperatorFocus,
+    workspaceSummary?.kpis?.repliesToday,
     workspaceSummary?.avaActivation,
     workspaceSummary?.runtimeTrust,
     workspaceSummary?.salesOutcomes,
@@ -522,6 +532,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
       data-qa-marker-live-3b={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER}
       data-qa-marker-live-3c={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER}
+      data-qa-marker-live-2a={GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER}
       data-qa-marker-launch-1b={GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER}
       data-qa-marker-launch-1c={GROWTH_AVA_ACTIVATION_1C_QA_MARKER}
       data-qa-marker-closure-1a={GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER}
@@ -553,6 +564,15 @@ export function GrowthHomeExecutiveBriefingDashboard({
           />
         ) : null}
 
+        {operatorClosureMode ? (
+          <GrowthHomeAiOsWaitingOnYouSection
+            aiOsUx={aiOsUx}
+            relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+            waitingCompanyByLeadId={waitingCompanyByLeadId}
+            operatorClosureMode={operatorClosureMode}
+          />
+        ) : null}
+
         <GrowthHomeAvaRuntimeTrustSection
           runtimeTrust={operatorExperience.runtimeTrust}
           operatorClosureMode={operatorClosureMode}
@@ -562,12 +582,14 @@ export function GrowthHomeExecutiveBriefingDashboard({
           }}
         />
 
-        <GrowthHomeAiOsWaitingOnYouSection
-          aiOsUx={aiOsUx}
-          relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
-          waitingCompanyByLeadId={waitingCompanyByLeadId}
-          operatorClosureMode={operatorClosureMode}
-        />
+        {!operatorClosureMode ? (
+          <GrowthHomeAiOsWaitingOnYouSection
+            aiOsUx={aiOsUx}
+            relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+            waitingCompanyByLeadId={waitingCompanyByLeadId}
+            operatorClosureMode={operatorClosureMode}
+          />
+        ) : null}
 
         {!operatorClosureMode && avaHero.recommendationExperience ? (
           <GrowthHomeAvaRecommendationExperienceSection

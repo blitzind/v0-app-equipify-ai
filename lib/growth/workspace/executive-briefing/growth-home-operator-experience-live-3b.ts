@@ -3,8 +3,10 @@
  */
 
 import type { GrowthCanonicalOperatorProgressProjection } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a"
+import type { GrowthCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import type { GrowthHomeRuntimeTrustPipelineStep } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
+import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
 import type { GrowthPortfolioManagerOperatorProjection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import type { SalesOutcome, SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import type { AvaDailyActivityNarrative } from "@/lib/growth/ava-home/narrative/narrative-types"
@@ -20,6 +22,9 @@ export const GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER =
 
 export const GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER =
   "ge-aios-live-3c-human-centered-home-language-v1" as const
+
+export const GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER =
+  "ge-aios-home-operator-experience-2a-v1" as const
 
 export const GROWTH_HOME_SECTION_HERO_TITLE = "Current Work" as const
 export const GROWTH_HOME_SECTION_OBJECTIVE_TITLE = "Why I'm Doing This" as const
@@ -60,9 +65,23 @@ function packageReviewPhrase(count: number): string {
   return `I have ${count} outreach packages ready for your review`
 }
 
+function humanizePortfolioActivityStatus(text: string): string {
+  const nextBatch = text.match(/^Next batch:\s*(\d+)\s*$/i)
+  if (nextBatch?.[1]) {
+    return `Running discovery batch (${nextBatch[1]} companies)`
+  }
+  const runningNextBatch = text.match(/^Running Next batch:\s*(\d+)\s*$/i)
+  if (runningNextBatch?.[1]) {
+    return `Running discovery batch (${runningNextBatch[1]} companies)`
+  }
+  if (/^Searching$/i.test(text)) return "Running discovery batch"
+  if (/^Running DataMoon Discovery$/i.test(text)) return "Running discovery batch"
+  return text
+}
+
 export function humanizeOperatorFacingCopy(text: string | null | undefined): string {
   if (!text?.trim()) return ""
-  let copy = text.trim()
+  let copy = humanizePortfolioActivityStatus(text.trim())
   copy = copy.replace(/^Run Prospect Search\s*[—-]\s*/i, "Searching for companies that match ")
   copy = copy.replace(/^Run Prospect Search$/i, "Searching for matching companies")
   copy = copy.replace(/Equipify supported service verticals audience/gi, "your Growth Profile")
@@ -74,6 +93,28 @@ export function humanizeOperatorFacingCopy(text: string | null | undefined): str
   copy = copy.replace(INTERNAL_OPERATOR_TERMS, "")
   copy = copy.replace(/\s{2,}/g, " ").replace(/\s+([,.])/g, "$1").trim()
   return copy
+}
+
+export function parseOperatorFocusConfidenceLine(detail: string | null | undefined): {
+  confidenceLine: string | null
+  explanation: string | null
+} {
+  const raw = detail?.trim()
+  if (!raw) return { confidenceLine: null, explanation: null }
+  const percentMatch = raw.match(/(\d{1,3})%/i)
+  if (!percentMatch) return { confidenceLine: null, explanation: humanizeOperatorFacingCopy(raw) }
+  const confidenceLine = `${percentMatch[1]}% confidence`
+  const explanation = humanizeOperatorFacingCopy(
+    raw
+      .replace(new RegExp(`${percentMatch[1]}%\\s*confidence`, "i"), "")
+      .replace(/^[\s—–-]+/, "")
+      .replace(/[\s—–-]+$/, "")
+      .trim(),
+  )
+  return {
+    confidenceLine,
+    explanation: explanation || null,
+  }
 }
 
 function discoveryActive(input: {
@@ -90,6 +131,257 @@ function discoveryActive(input: {
   )
 }
 
+function portfolioBelowTarget(input: {
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
+}): boolean {
+  if (input.productionMissionAuthority?.portfolioBelowTarget === true) return true
+  const portfolio = input.portfolioOperator
+  if (!portfolio) return false
+  return portfolio.currentActiveCompanies < portfolio.targetActiveCompanies
+}
+
+function portfolioBelowTargetReason(input: {
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
+}): string | null {
+  if (!portfolioBelowTarget(input)) return null
+  const authorityLine = input.productionMissionAuthority?.operatorSummaryLines?.[0]?.trim()
+  if (authorityLine) {
+    const humanized = humanizeOperatorFacingCopy(authorityLine)
+    if (/below target|needs more|replenish|prioritizing discovery/i.test(humanized)) {
+      return "our active portfolio is still below target"
+    }
+    return humanized.charAt(0).toLowerCase() + humanized.slice(1)
+  }
+  return "our active portfolio is still below target"
+}
+
+function extractCompanyFromActivityLabel(label: string | null | undefined): string | null {
+  const activity = humanizeOperatorFacingCopy(label)
+  if (!activity) return null
+  const match =
+    activity.match(/^Researching\s+(.+)$/i) ??
+    activity.match(/^Qualifying\s+(.+)$/i) ??
+    activity.match(/^Preparing outreach for\s+(.+)$/i) ??
+    activity.match(/^Following up with\s+(.+)$/i)
+  return match?.[1]?.trim() ?? null
+}
+
+function isLeadExecutionActivity(label: string | null | undefined): boolean {
+  const activity = humanizeOperatorFacingCopy(label)
+  if (!activity) return false
+  return /^(Researching|Qualifying|Preparing outreach|Following up with)\s+/i.test(activity)
+}
+
+function isDiscoveryExecution(input: {
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
+  primaryMissionLabel?: string | null
+}): boolean {
+  if (input.portfolioOperator?.discoveryRunning) return true
+  if (input.productionMissionAuthority?.discoveryActive) return true
+  if (input.primaryMissionLabel === "Portfolio Replenishment") return true
+  const action = input.missionDiscovery?.discoveryAction
+  return action === "run_prospect_search" || action === "refresh_audience"
+}
+
+function pipelineGrowthOutcomeLine(): string {
+  return "I'm building the next group of qualified companies for outreach to keep our sales pipeline growing."
+}
+
+function buildDiscoveryExecutiveParagraph(input: {
+  batchSize: number | null | undefined
+  belowTargetReason: string | null
+  monitoringReplies: boolean
+  currentActivityLabel?: string | null
+}): string {
+  const outcome = pipelineGrowthOutcomeLine()
+  const prospectCount = input.batchSize && input.batchSize > 0 ? input.batchSize : null
+  const rawActivity = humanizeOperatorFacingCopy(input.currentActivityLabel)
+  const activity = prospectCount
+    ? `Right now I'm researching ${prospectCount} new prospects`
+    : ensureFirstPerson(rawActivity || "I'm searching for matching companies")
+  const reason = input.belowTargetReason ? ` because ${input.belowTargetReason}` : ""
+  const parallel = input.monitoringReplies ? ", and I'm monitoring replies from earlier outreach in parallel" : ""
+  return `${outcome} ${activity}${reason}${parallel}.`
+}
+
+function buildExecutiveOpeningParagraph(input: {
+  statusLabel: string
+  dailyActivityNarrative?: AvaDailyActivityNarrative | null
+  missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
+  primaryMissionLabel?: string | null
+  currentActivityLabel?: string | null
+  repliesToday?: number
+  pendingPackages: number
+  preparingOutreach: number
+}): string {
+  const monitoringReplies = (input.repliesToday ?? 0) > 0
+  const replySuffix = monitoringReplies ? " I'm also monitoring replies from earlier outreach." : ""
+  const batchSize = input.portfolioOperator?.nextBatchSize
+  const belowTargetReason = portfolioBelowTargetReason(input)
+
+  if (input.pendingPackages > 0) {
+    const packagePhrase =
+      input.pendingPackages === 1
+        ? "the next outreach package is ready for your review"
+        : `${input.pendingPackages} outreach packages are ready for your review`
+    return `I've prepared qualified outreach so we can keep sales momentum, and ${packagePhrase}, so we only contact companies you've approved.`
+  }
+
+  if (
+    (input.statusLabel === "Idle" || input.primaryMissionLabel === "Portfolio Maintenance") &&
+    !portfolioBelowTarget(input) &&
+    input.portfolioOperator?.discoveryRunning !== true
+  ) {
+    return `Your active portfolio is healthy. I'll continue monitoring the pipeline and let you know as soon as a review-ready opportunity needs your attention.${replySuffix}`
+  }
+
+  if (isLeadExecutionActivity(input.currentActivityLabel)) {
+    const company =
+      extractCompanyFromActivityLabel(input.currentActivityLabel) ??
+      humanizeOperatorFacingCopy(input.currentActivityLabel)
+    const activity = ensureFirstPerson(humanizeOperatorFacingCopy(input.currentActivityLabel) || "")
+    const activitySuffix = activity ? ` ${activity}${replySuffix || "."}` : replySuffix || "."
+    return `I'm advancing ${company} toward a review-ready outreach package that can become a sales opportunity.${activitySuffix}`
+  }
+
+  if (input.preparingOutreach > 0) {
+    const countPhrase =
+      input.preparingOutreach === 1
+        ? "one outreach package"
+        : `${input.preparingOutreach} outreach packages`
+    return `I'm strengthening the sales pipeline by finishing ${countPhrase} for your review${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+  }
+
+  if (isDiscoveryExecution(input)) {
+    return buildDiscoveryExecutiveParagraph({
+      batchSize,
+      belowTargetReason,
+      monitoringReplies,
+      currentActivityLabel: input.currentActivityLabel,
+    })
+  }
+
+  if (input.statusLabel === "Researching companies" || input.primaryMissionLabel === "Prospect Research") {
+    return `I'm advancing the next qualified company toward a review-ready outreach package that can become a sales opportunity${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+  }
+
+  if (input.statusLabel === "Preparing outreach" || input.primaryMissionLabel === "Draft Factory") {
+    return `I'm preparing the next outreach package so you can review it before anything is sent, keeping sales momentum under your control${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+  }
+
+  if (discoveryActive(input)) {
+    return buildDiscoveryExecutiveParagraph({
+      batchSize,
+      belowTargetReason,
+      monitoringReplies,
+      currentActivityLabel: input.currentActivityLabel,
+    })
+  }
+
+  if (input.statusLabel && input.statusLabel !== "Idle") {
+    return `I'm keeping today's sales pipeline moving on ${input.statusLabel.charAt(0).toLowerCase()}${input.statusLabel.slice(1)}${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+  }
+
+  const fallback = buildNarrativeIntelligenceOpeningLine({
+    focus: input.dailyActivityNarrative?.focus ?? "idle",
+    packageCount: input.pendingPackages,
+    waitingCount: input.dailyActivityNarrative?.waiting_on_you.length ?? 0,
+    completedCount: input.dailyActivityNarrative?.completed_today.length ?? 0,
+    setupIncomplete: false,
+    discoveryTarget: input.missionDiscovery?.audienceName ?? null,
+  })
+  return (
+    humanizeOperatorFacingCopy(fallback) ||
+    `I'm monitoring the pipeline and will advance the next highest-value sales opportunity${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+  )
+}
+
+function operatorNeedLine(pendingPackages: number): string {
+  if (pendingPackages <= 0) {
+    return "I don't currently need anything from you."
+  }
+  if (pendingPackages === 1) {
+    return "I need your review on one outreach package before I continue."
+  }
+  return `I need your review on ${pendingPackages} outreach packages before I continue.`
+}
+
+function executiveNextMilestoneLine(input: {
+  pendingPackages: number
+  preparingOutreach: number
+  canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
+  primaryMissionLabel?: string | null
+  currentActivityLabel?: string | null
+  portfolioBelowTarget: boolean
+  statusLabel: string
+}): string {
+  if (input.pendingPackages > 0) {
+    return input.pendingPackages === 1
+      ? "After your review, I'll continue progressing the next highest-value opportunity."
+      : "After your review, I'll continue progressing the next highest-value opportunities."
+  }
+
+  if (input.preparingOutreach > 0) {
+    return input.preparingOutreach === 1
+      ? "I'll let you know as soon as that outreach package is ready for your review."
+      : "I'll let you know as soon as those outreach packages are ready for your review."
+  }
+
+  const focus = input.canonicalOperatorFocus
+  const company = focus?.companyName?.trim()
+  const detail = humanizeOperatorFacingCopy(focus?.detail)?.toLowerCase() ?? ""
+
+  if (/buying committee/.test(detail)) {
+    return company
+      ? `Once buying committee verification is complete at ${company}, I'll prepare the outreach package for your approval.`
+      : "Once buying committee verification is complete, I'll prepare the outreach package for your approval."
+  }
+
+  if (/^waiting on\s+/i.test(detail)) {
+    const blocker = detail.replace(/^waiting on\s+/i, "").replace(/\.$/, "")
+    if (blocker) {
+      return `Once ${blocker} is complete, I'll prepare the outreach package for your approval.`
+    }
+  }
+
+  if (isLeadExecutionActivity(input.currentActivityLabel)) {
+    const leadCompany = extractCompanyFromActivityLabel(input.currentActivityLabel)
+    if (/researching/i.test(input.currentActivityLabel ?? "")) {
+      return leadCompany
+        ? `Once research is complete, I'll prepare a review-ready outreach package for ${leadCompany}.`
+        : "Once research is complete, I'll prepare the next review-ready outreach package for your approval."
+    }
+    return "My next step is preparing a review-ready outreach package for your approval."
+  }
+
+  if (input.portfolioBelowTarget || isDiscoveryExecution({ primaryMissionLabel: input.primaryMissionLabel })) {
+    return "I'll continue qualifying companies until the next review-ready opportunity is available."
+  }
+
+  if (input.statusLabel === "Idle" || input.primaryMissionLabel === "Portfolio Maintenance") {
+    return "I'll continue qualifying companies until the next review-ready opportunity is available."
+  }
+
+  return "My next objective is preparing the next review-ready opportunity for your approval."
+}
+
+function ensureFirstPerson(line: string): string {
+  const trimmed = line.trim()
+  if (/^I['’]?m\b/i.test(trimmed) || /^I['’]?ve\b/i.test(trimmed) || /^I\b/i.test(trimmed)) return trimmed
+  if (/^Running\b/i.test(trimmed)) return `I'm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+  if (/^Searching\b/i.test(trimmed)) return `I'm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+  if (/^Researching\b/i.test(trimmed)) return `I'm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+  if (/^Building\b/i.test(trimmed)) return `I'm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+  if (/^Waiting\b/i.test(trimmed)) return `I'm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+  return trimmed
+}
+
 export function buildHeroExecutiveBriefing(input: {
   statusLabel: string
   dailyActivityNarrative?: AvaDailyActivityNarrative | null
@@ -97,6 +389,12 @@ export function buildHeroExecutiveBriefing(input: {
   pendingApprovals?: number
   readyForOutreachReview?: number
   discoveryTarget?: string | null
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
+  primaryMissionLabel?: string | null
+  currentActivityLabel?: string | null
+  repliesToday?: number
+  canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
 }): GrowthHomeHeroExecutiveBriefing {
   /** Canonical approval queue — sole authority for "ready for your review" language. */
   const pendingPackages = Math.max(0, input.pendingApprovals ?? 0)
@@ -116,66 +414,39 @@ export function buildHeroExecutiveBriefing(input: {
     }
   }
 
-  if (discoveryActive(input)) {
-    const lead =
-      pendingPackages > 0 || preparingOutreach > 0
-        ? "I'm actively searching for companies that match your Growth Profile"
-        : "I'm searching for companies that match your Growth Profile"
-    if (pendingPackages > 0) {
-      paragraphs.push(
-        `${lead}. ${packageReviewPhrase(pendingPackages)}, and after that I'll continue building the rest of your pipeline.`,
-      )
-    } else if (preparingOutreach > 0) {
-      paragraphs.push(
-        `${lead}. I'm preparing ${preparingOutreach === 1 ? "one outreach package" : `${preparingOutreach} outreach packages`} and will send ${preparingOutreach === 1 ? "it" : "them"} for your review when ready.`,
-      )
-    } else {
-      paragraphs.push(
-        `${lead} and will begin researching the strongest matches as they enter the pipeline.`,
-      )
-    }
-  } else if (pendingPackages > 0) {
-    paragraphs.push(
-      `${packageReviewPhrase(pendingPackages)}, and after that I'll continue with the next highest-value work in your pipeline.`,
-    )
-  } else if (preparingOutreach > 0) {
-    paragraphs.push(
-      preparingOutreach === 1
-        ? "I'm finishing an outreach package and will send it for your review shortly."
-        : `I'm finishing ${preparingOutreach} outreach packages and will send them for your review shortly.`,
-    )
-  } else if (input.statusLabel === "Researching companies") {
-    paragraphs.push(
-      "I'm researching companies just enough to start conversations, then drafting personalized outreach for your approval.",
-    )
-  } else if (input.statusLabel === "Preparing outreach") {
-    paragraphs.push(
-      "I'm building your pipeline — drafting personalized outreach for your review as soon as each company is good enough to contact.",
-    )
-  } else if (input.statusLabel === "Finding Leads") {
-    paragraphs.push(
-      "I'm searching for companies that match your Growth Profile and will begin researching the strongest matches as they enter the pipeline.",
-    )
-  } else if (input.statusLabel && input.statusLabel !== "Idle") {
-    paragraphs.push(
-      `I'm ${input.statusLabel.charAt(0).toLowerCase()}${input.statusLabel.slice(1)} and keeping today's pipeline moving.`,
-    )
-  } else {
-    const fallback = buildNarrativeIntelligenceOpeningLine({
-      focus: input.dailyActivityNarrative?.focus ?? "idle",
-      packageCount: pendingPackages,
-      waitingCount: input.dailyActivityNarrative?.waiting_on_you.length ?? 0,
-      completedCount: input.dailyActivityNarrative?.completed_today.length ?? 0,
-      setupIncomplete: false,
-      discoveryTarget: input.discoveryTarget ?? input.missionDiscovery?.audienceName ?? null,
-    })
-    paragraphs.push(humanizeOperatorFacingCopy(fallback) || "I'm keeping an eye on your pipeline and will pick up the next step shortly.")
-  }
+  paragraphs.push(
+    buildExecutiveOpeningParagraph({
+      statusLabel: input.statusLabel,
+      dailyActivityNarrative: input.dailyActivityNarrative,
+      missionDiscovery: input.missionDiscovery,
+      portfolioOperator: input.portfolioOperator,
+      productionMissionAuthority: input.productionMissionAuthority,
+      primaryMissionLabel: input.primaryMissionLabel,
+      currentActivityLabel: input.currentActivityLabel,
+      repliesToday: input.repliesToday,
+      pendingPackages,
+      preparingOutreach,
+    }),
+  )
+
+  paragraphs.push(operatorNeedLine(pendingPackages))
+
+  paragraphs.push(
+    executiveNextMilestoneLine({
+      pendingPackages,
+      preparingOutreach,
+      canonicalOperatorFocus: input.canonicalOperatorFocus,
+      primaryMissionLabel: input.primaryMissionLabel,
+      currentActivityLabel: input.currentActivityLabel,
+      portfolioBelowTarget: portfolioBelowTarget(input),
+      statusLabel: input.statusLabel,
+    }),
+  )
 
   const sanitized = paragraphs
     .map((paragraph) => humanizeOperatorFacingCopy(paragraph))
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, 3)
 
   return {
     qaMarker: GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,

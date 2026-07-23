@@ -202,7 +202,7 @@ async function main(): Promise<void> {
     id: "hero_summarizes_without_full_section_duplication",
     status:
       heroBriefing.paragraphs.length > 0 &&
-      heroBriefing.paragraphs.length <= 2 &&
+      heroBriefing.paragraphs.length <= 3 &&
       overlap.length === 0
         ? "pass"
         : "fail",

@@ -91,9 +91,9 @@ function main(): void {
       pendingApprovals: 0,
       readyForOutreachReview: 0,
     })
-    assert.match(withoutAction.narrative, /Growth Profile/i)
-    assert.match(withoutAction.narrative, /researching the strongest matches/i)
-    assert.ok(withoutAction.paragraphs.length <= 2)
+    assert.match(withoutAction.narrative, /sales pipeline growing|qualified companies/i)
+    assert.match(withoutAction.narrative, /don't currently need anything from you/i)
+    assert.ok(withoutAction.paragraphs.length <= 3)
 
     const withAction = buildHeroExecutiveBriefing({
       statusLabel: "Preparing outreach",
@@ -101,8 +101,9 @@ function main(): void {
       pendingApprovals: 0,
       readyForOutreachReview: 1,
     })
-    assert.match(withAction.narrative, /preparing one outreach package/i)
-    assert.match(withAction.narrative, /send it for your review when ready/i)
+    assert.match(withAction.narrative, /strengthening the sales pipeline|sales pipeline growing|qualified companies/i)
+    assert.match(withAction.narrative, /don't currently need anything from you/i)
+    assert.match(withAction.narrative, /ready for your review/i)
 
     const withPendingReview = buildHeroExecutiveBriefing({
       statusLabel: "Preparing outreach",
@@ -110,8 +111,7 @@ function main(): void {
       pendingApprovals: 1,
       readyForOutreachReview: 0,
     })
-    assert.match(withPendingReview.narrative, /one outreach package ready for your review/i)
-    assert.match(withPendingReview.narrative, /continue building the rest of your pipeline/i)
+    assert.match(withPendingReview.narrative, /need your review on one outreach package/i)
   })
 
   runGate("Hero avoids internal architecture terminology", () => {

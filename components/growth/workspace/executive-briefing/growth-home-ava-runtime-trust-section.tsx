@@ -83,21 +83,7 @@ export function GrowthHomeAvaRuntimeTrustSection({
             muted={!runtimeTrust.currentLeadCompanyName}
           />
           {runtimeTrust.operatorFocusCompanyName ? (
-            runtimeTrust.operatorFocusHref ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                  Operator focus
-                </p>
-                <Link
-                  href={runtimeTrust.operatorFocusHref}
-                  className="mt-1 inline-block text-lg font-semibold text-foreground hover:underline"
-                >
-                  {runtimeTrust.operatorFocusCompanyName}
-                </Link>
-              </div>
-            ) : (
-              <AuthorityRow label="Operator focus" value={runtimeTrust.operatorFocusCompanyName} />
-            )
+            <OperatorFocusBlock runtimeTrust={runtimeTrust} />
           ) : null}
         </div>
       ) : null}
@@ -197,21 +183,12 @@ export function GrowthHomeAvaRuntimeTrustSection({
         </div>
       ) : null}
 
-      {currentActivity ? (
+      {currentActivity && !closureMode ? (
         <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 px-4 py-4 space-y-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-              {employeeMode ? "Current assignment" : "Current activity"}
+              Pipeline progress
             </p>
-            {currentActivity.companyName && currentActivity.taskLabel ? (
-              <p className="mt-1 text-base font-medium text-foreground">
-                {currentActivity.taskLabel} — {currentActivity.companyName}
-              </p>
-            ) : currentActivity.taskLabel ? (
-              <p className="mt-1 text-base font-medium text-foreground">{currentActivity.taskLabel}</p>
-            ) : currentActivity.companyName ? (
-              <p className="mt-1 text-base font-medium text-foreground">{currentActivity.companyName}</p>
-            ) : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 text-sm">
@@ -335,6 +312,40 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function OperatorFocusBlock({ runtimeTrust }: { runtimeTrust: GrowthHomeRuntimeTrustViewModel }) {
+  const company = runtimeTrust.operatorFocusCompanyName
+  if (!company) return null
+
+  const companyNode = runtimeTrust.operatorFocusHref ? (
+    <Link
+      href={runtimeTrust.operatorFocusHref}
+      className="mt-1 inline-block text-lg font-semibold text-foreground hover:underline"
+    >
+      {company}
+    </Link>
+  ) : (
+    <p className="mt-1 text-lg font-semibold text-foreground">{company}</p>
+  )
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+        Operator focus
+      </p>
+      {companyNode}
+      {runtimeTrust.operatorFocusTitle ? (
+        <p className="text-sm font-medium text-foreground">{runtimeTrust.operatorFocusTitle}</p>
+      ) : null}
+      {runtimeTrust.operatorFocusConfidenceLine ? (
+        <p className="text-sm text-muted-foreground">{runtimeTrust.operatorFocusConfidenceLine}</p>
+      ) : null}
+      {runtimeTrust.operatorFocusDetail ? (
+        <p className="text-sm text-muted-foreground">{runtimeTrust.operatorFocusDetail}</p>
+      ) : null}
     </div>
   )
 }

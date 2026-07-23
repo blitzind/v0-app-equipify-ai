@@ -27,6 +27,7 @@ import {
   buildHeroExecutiveBriefing,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER,
+  GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER,
   type GrowthHomeHeroExecutiveBriefing,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 
@@ -100,6 +101,7 @@ export function GrowthHomeAvaHeroSection({
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
       data-qa-marker-live-3b={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER}
       data-qa-marker-live-3c={GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER}
+      data-qa-marker-live-2a={GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER}
       className="space-y-4 rounded-2xl border border-border/50 bg-card/70 p-5 backdrop-blur-sm dark:border-border/40 dark:bg-card/60 sm:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/50 pb-4">
@@ -126,13 +128,11 @@ export function GrowthHomeAvaHeroSection({
       </div>
 
       <div className="space-y-2" data-qa-field="home-hero-executive-briefing">
-        {!compact
-          ? executiveBriefing.paragraphs.map((paragraph, index) => (
-              <p key={`hero-briefing:${index}`} className="text-sm leading-relaxed text-foreground">
-                {paragraph}
-              </p>
-            ))
-          : null}
+        {executiveBriefing.paragraphs.map((paragraph, index) => (
+          <p key={`hero-briefing:${index}`} className="text-sm leading-relaxed text-foreground">
+            {paragraph}
+          </p>
+        ))}
       </div>
 
       {!compact && hero.continuousExecutiveBriefing ? (

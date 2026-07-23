@@ -170,6 +170,10 @@ export type GrowthHomeRuntimeTrustViewModel = {
   /** GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — operator navigation (where to click) */
   operatorFocusCompanyName: string | null
   operatorFocusHref: string | null
+  /** GE-AIOS-HOME-OPERATOR-EXPERIENCE-2A — presentation passthrough from canonicalOperatorFocus */
+  operatorFocusTitle: string | null
+  operatorFocusDetail: string | null
+  operatorFocusConfidenceLine: string | null
   /**
    * @deprecated GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — alias for operatorFocusCompanyName only.
    * Do not use for runtime assignment.

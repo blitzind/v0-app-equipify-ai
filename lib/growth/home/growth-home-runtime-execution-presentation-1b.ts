@@ -16,7 +16,7 @@ import type {
   GrowthHomeCanonicalRuntimeActivityPayload,
   GrowthHomeRuntimeTrustPipelineStep,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
-import { humanizeOperatorFacingCopy } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
+import { humanizeOperatorFacingCopy, parseOperatorFocusConfidenceLine } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 export const GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER =
@@ -221,14 +221,15 @@ function portfolioActivityLabel(input: {
 }): string {
   const status = input.portfolioOperator?.discoveryStatusDisplay?.trim()
   if (status && status !== "Idle") {
-    if (/datamoon|discovery|search/i.test(status)) return status
-    return `Running ${status}`
+    const humanized = humanizeOperatorFacingCopy(status)
+    if (/discovery|search|batch|researching|building/i.test(humanized)) return humanized
+    return humanizeOperatorFacingCopy(`Running ${status}`)
   }
   const missionLine = buildLeadDiscoveryWorkingNowLine(input.missionDiscovery)
-  if (missionLine) return missionLine.replace(/\.$/, "")
+  if (missionLine) return humanizeOperatorFacingCopy(missionLine.replace(/\.$/, ""))
   const activity = input.missionDiscovery?.activityLabel?.trim()
-  if (activity) return activity
-  return "Running DataMoon Discovery"
+  if (activity) return humanizeOperatorFacingCopy(activity)
+  return "Running discovery batch"
 }
 
 function portfolioStepLabel(input: {
@@ -278,14 +279,28 @@ export function resolveOperatorFocusPresentation(input: {
 }): {
   operatorFocusCompanyName: string | null
   operatorFocusHref: string | null
+  operatorFocusTitle: string | null
+  operatorFocusDetail: string | null
+  operatorFocusConfidenceLine: string | null
 } {
   const company = input.canonicalOperatorFocus?.companyName?.trim()
   if (!company || company === "Account") {
-    return { operatorFocusCompanyName: null, operatorFocusHref: null }
+    return {
+      operatorFocusCompanyName: null,
+      operatorFocusHref: null,
+      operatorFocusTitle: null,
+      operatorFocusDetail: null,
+      operatorFocusConfidenceLine: null,
+    }
   }
+  const title = humanizeOperatorFacingCopy(input.canonicalOperatorFocus?.title)
+  const parsed = parseOperatorFocusConfidenceLine(input.canonicalOperatorFocus?.detail)
   return {
     operatorFocusCompanyName: company,
     operatorFocusHref: input.canonicalOperatorFocus?.href ?? null,
+    operatorFocusTitle: title || null,
+    operatorFocusDetail: parsed.explanation,
+    operatorFocusConfidenceLine: parsed.confidenceLine,
   }
 }
 
