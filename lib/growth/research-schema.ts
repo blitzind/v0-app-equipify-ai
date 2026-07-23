@@ -2,8 +2,20 @@ import "server-only"
 
 import { z } from "zod"
 import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
+import {
+  GROWTH_PROSPECT_RESEARCH_AI_FIT_SCORE_KEY,
+  GROWTH_PROSPECT_RESEARCH_AI_PAIN_POINTS_KEY,
+  GROWTH_PROSPECT_RESEARCH_LEGACY_FIT_SCORE_KEY,
+  GROWTH_PROSPECT_RESEARCH_LEGACY_PAIN_POINTS_KEY,
+} from "@/lib/growth/research/growth-prospect-research-organization-context"
 
 export const GROWTH_LEAD_FIT_MODEL_VERSION = "v1" as const
+
+/**
+ * Canonical semantic: organization fit score for the selling tenant's offering.
+ * AI prompts use `organization_fit_score`; persisted rows/API remain `equipify_fit_score`.
+ */
+export const GROWTH_LEAD_ORGANIZATION_FIT_SCORE_SEMANTIC = "organization_fit_score" as const
 
 const MAX_STRING_LIST_ITEMS = 12
 
@@ -71,6 +83,23 @@ const fitModelVersion = z.preprocess(
   z.string().min(1),
 )
 
+/** Map neutral AI JSON keys onto legacy persisted contract fields. */
+export function normalizeGrowthLeadResearchModelFieldNames(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value
+
+  const row = value as Record<string, unknown>
+  const organizationFitScore = row[GROWTH_PROSPECT_RESEARCH_AI_FIT_SCORE_KEY]
+  const organizationPainPoints = row[GROWTH_PROSPECT_RESEARCH_AI_PAIN_POINTS_KEY]
+
+  return {
+    ...row,
+    [GROWTH_PROSPECT_RESEARCH_LEGACY_FIT_SCORE_KEY]:
+      row[GROWTH_PROSPECT_RESEARCH_LEGACY_FIT_SCORE_KEY] ?? organizationFitScore,
+    [GROWTH_PROSPECT_RESEARCH_LEGACY_PAIN_POINTS_KEY]:
+      row[GROWTH_PROSPECT_RESEARCH_LEGACY_PAIN_POINTS_KEY] ?? organizationPainPoints,
+  }
+}
+
 const decisionMakerCandidateSchema = z.object({
   full_name: z.string(),
   title: z.string().nullable().optional(),
@@ -81,8 +110,10 @@ const decisionMakerCandidateSchema = z.object({
   evidence_excerpt: z.string().nullable().optional(),
 })
 
-/** Snake_case schema matching the LLM JSON contract. */
-export const growthLeadResearchModelSchema = z.object({
+/** Snake_case schema matching the LLM JSON contract (legacy persisted keys). */
+export const growthLeadResearchModelSchema = z.preprocess(
+  normalizeGrowthLeadResearchModelFieldNames,
+  z.object({
   company_summary: z.string(),
   website_summary: z.string().nullable().optional(),
   likely_service_category: z.string().nullable().optional(),
@@ -103,7 +134,8 @@ export const growthLeadResearchModelSchema = z.object({
   fleet_size_estimate: z.string().nullable().optional(),
   crm_detected: z.string().nullable().optional(),
   field_service_stack_detected: z.string().nullable().optional(),
-})
+  }),
+)
 
 export type GrowthLeadResearchModelResult = z.infer<typeof growthLeadResearchModelSchema>
 

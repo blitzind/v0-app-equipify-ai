@@ -1,6 +1,9 @@
 /** GE-AIOS-3A — Context Package → provider prompt (client-safe). */
 
 import type { AiContextPackage } from "@/lib/growth/aios/ai-context-assembly-types"
+import type { GrowthProspectResearchOrganizationContext } from "@/lib/growth/research/growth-prospect-research-organization-context"
+import { buildGrowthProspectResearchOrganizationContextFallback } from "@/lib/growth/research/growth-prospect-research-organization-context"
+import { buildGrowthProspectResearchSystemPrompt } from "@/lib/growth/research/growth-prospect-research-prompt-builder"
 import type { AiChatMessage } from "@/lib/ai/types"
 
 const DEFAULT_SYSTEM_PROMPT = [
@@ -10,25 +13,28 @@ const DEFAULT_SYSTEM_PROMPT = [
   "Return concise, actionable output.",
 ].join(" ")
 
-const RESEARCH_COMPANY_SYSTEM_PROMPT = [
-  "You are an internal Equipify Growth Engine research assistant.",
-  "Use only facts from the supplied Context Package (lead, website excerpt, evidence).",
-  "Return JSON only with snake_case keys:",
-  "company_summary, website_summary, likely_service_category, service_area_clues, company_size_estimate,",
-  "equipment_service_indicators, equipify_pain_points, equipify_fit_score (0-100 integer),",
-  "outreach_angles, recommended_next_action, research_confidence (0-1 number), source_urls, caveats,",
-  "decision_maker_candidates, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate,",
-  "crm_detected, field_service_stack_detected.",
-  "Do not return markdown or prose outside the JSON object.",
-].join(" ")
+function resolveSystemPrompt(input: {
+  purpose: string
+  organizationContext?: GrowthProspectResearchOrganizationContext
+}): string {
+  if (input.purpose !== "research_company") return DEFAULT_SYSTEM_PROMPT
 
-function resolveSystemPrompt(purpose: string): string {
-  return purpose === "research_company" ? RESEARCH_COMPANY_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT
+  return buildGrowthProspectResearchSystemPrompt({
+    websiteContext: {
+      fetchStatus: "skipped",
+      normalizedUrl: null,
+      excerpt: null,
+      websiteEnabled: true,
+    },
+    organizationContext:
+      input.organizationContext ?? buildGrowthProspectResearchOrganizationContextFallback(),
+  })
 }
 
 export function buildAiOsProviderMessagesFromContextPackage(input: {
   contextPackage: AiContextPackage
   purpose: string
+  organizationContext?: GrowthProspectResearchOrganizationContext
 }): AiChatMessage[] {
   const contextPayload = {
     purpose: input.purpose,
@@ -45,7 +51,13 @@ export function buildAiOsProviderMessagesFromContextPackage(input: {
   }
 
   return [
-    { role: "system", content: resolveSystemPrompt(input.purpose) },
+    {
+      role: "system",
+      content: resolveSystemPrompt({
+        purpose: input.purpose,
+        organizationContext: input.organizationContext,
+      }),
+    },
     {
       role: "user",
       content: JSON.stringify(contextPayload, null, 2),

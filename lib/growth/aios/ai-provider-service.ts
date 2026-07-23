@@ -4,6 +4,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAiOsProviderMessagesFromContextPackage } from "@/lib/growth/aios/ai-provider-context-prompt"
+import { loadGrowthProspectResearchOrganizationContextForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { invokeAiOsProviderWithFailover } from "@/lib/growth/aios/ai-provider-failover"
 import { lookupAiOsModelCapability } from "@/lib/growth/aios/ai-provider-model-registry"
 import {
@@ -47,9 +48,25 @@ export async function invokeAiOsProviderWithContextPackage(
 ): Promise<AiOsProviderInvokeResult> {
   const contextPackage = input.contextPackage
   const modelTier = input.modelTier ?? "balanced"
+  const organizationContext =
+    input.purpose === "research_company"
+      ? await loadGrowthProspectResearchOrganizationContextForOrganization(admin, {
+          organizationId: input.organizationId,
+          preparedAt: new Date().toISOString(),
+          prospectCompanyName:
+            typeof contextPackage.entityMetadata?.company_name === "string"
+              ? contextPackage.entityMetadata.company_name
+              : null,
+          leadId:
+            typeof contextPackage.entityMetadata?.lead_id === "string"
+              ? contextPackage.entityMetadata.lead_id
+              : null,
+        })
+      : undefined
   const messages = buildAiOsProviderMessagesFromContextPackage({
     contextPackage,
     purpose: input.purpose,
+    organizationContext,
   })
 
   const candidates = selectAiOsProviderCandidates({
