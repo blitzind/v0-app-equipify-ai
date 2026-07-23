@@ -1251,7 +1251,6 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     portfolioTargetGoal: input.portfolioTargetGoal ?? null,
     portfolioOperator: input.portfolioOperator ?? null,
     productionMissionAuthority: input.productionMissionAuthority ?? null,
-    pendingApprovals: approveItemsCount,
   })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)

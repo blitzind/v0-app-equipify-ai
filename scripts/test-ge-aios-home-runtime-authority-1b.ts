@@ -19,6 +19,12 @@ import {
 } from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 import { GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import { GROWTH_AVA_ACTIVATION_1C_QA_MARKER } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
+import { emptyCanonicalOperatorApprovalSnapshot } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import { resolveCanonicalApprovalQueueCount } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
+import {
+  buildGrowthHomeExecutiveBriefingCertDashboard,
+  synthesizeGrowthHomeExecutiveBriefing,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 const PHASE = "GE-AIOS-HOME-RUNTIME-AUTHORITY-1B"
@@ -139,8 +145,33 @@ assert.match(
 )
 assert.match(readSource("lib/growth/aios/operator-experience/growth-canonical-operator-progress-1a.ts"), /resolveRuntimeExecutionPresentation/)
 assert.match(readSource("lib/growth/home/growth-home-runtime-trust-presenter-1b.ts"), /resolveRuntimeExecutionPresentation/)
+assert.doesNotMatch(
+  readSource("lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer.ts"),
+  /pendingApprovals:\s*approveItemsCount/,
+)
 
 const slussFocus = operatorFocus("Sluss Padgett")
+
+// 0. Runtime Authority 1B wiring must not reference undefined approval count locals.
+{
+  const approvalSnapshot = emptyCanonicalOperatorApprovalSnapshot()
+  const briefing = synthesizeGrowthHomeExecutiveBriefing({
+    dashboard: buildGrowthHomeExecutiveBriefingCertDashboard(),
+    missionDiscovery: missionDiscovery({ discoveryAction: "run_prospect_search" }),
+    portfolioBelowTarget: true,
+    portfolioTargetCurrent: 8,
+    portfolioTargetGoal: 25,
+    portfolioOperator: portfolioOperator(),
+    productionMissionAuthority: productionAuthority(),
+    canonicalOperatorApproval: approvalSnapshot,
+    canonicalOperatorFocus: slussFocus,
+  })
+  assert.equal(
+    briefing.aiOsUx.approveItemsCount,
+    resolveCanonicalApprovalQueueCount(approvalSnapshot, 0),
+  )
+}
+
 
 // 1. Portfolio discovery active
 {
