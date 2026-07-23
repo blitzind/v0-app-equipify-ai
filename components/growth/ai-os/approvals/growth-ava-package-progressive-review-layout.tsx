@@ -718,6 +718,8 @@ export function GrowthAvaPackageProgressiveReviewLayout({
           </GrowthCollapsibleEngineCard>
         </div>
       </GrowthCollapsibleEngineCard>
+        </div>
+      </GrowthCollapsibleEngineCard>
     </div>
   )
 }
