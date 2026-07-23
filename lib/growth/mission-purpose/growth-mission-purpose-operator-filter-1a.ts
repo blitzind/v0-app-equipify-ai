@@ -99,7 +99,7 @@ export function filterProductionCanonicalOperatorTask(input: {
   purposeByLeadId: ReadonlyMap<string, GrowthMissionPurposeResolution>
 }): GrowthCanonicalOperatorTask | null {
   if (!input.task?.leadId) return input.task
-  const purpose = purposeByLeadId.get(input.task.leadId)?.purpose ?? "production"
+  const purpose = input.purposeByLeadId.get(input.task.leadId)?.purpose ?? "production"
   return isProductionMissionPurpose(purpose) ? input.task : null
 }
 
