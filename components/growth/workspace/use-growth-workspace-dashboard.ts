@@ -33,12 +33,19 @@ const EMPTY_SOURCES: GrowthWorkspaceDashboardSourcePayload = {
   dailyRevenueWorkQueueDisplay: null,
 }
 
+const GROWTH_HOME_WORKSPACE_SUMMARY_FETCH_TIMEOUT_MS = 45_000
+
 async function fetchGrowthHomeWorkspaceSummary(): Promise<{
   payload: GrowthHomeWorkspaceSummaryPayload | null
   errorMessage: string | null
 }> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), GROWTH_HOME_WORKSPACE_SUMMARY_FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH, { cache: "no-store" })
+    const res = await fetch(GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
     const payload = (await res.json().catch(() => ({}))) as Partial<GrowthHomeWorkspaceSummaryPayload>
     if (!res.ok || payload.ok !== true) {
       const message =
@@ -49,10 +56,17 @@ async function fetchGrowthHomeWorkspaceSummary(): Promise<{
     }
     return { payload: normalizeGrowthHomeWorkspaceSummaryPayload(payload), errorMessage: null }
   } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError"
     return {
       payload: null,
-      errorMessage: error instanceof Error ? error.message : "Could not load workspace dashboard.",
+      errorMessage: timedOut
+        ? "Home is taking longer than expected. Please retry in a moment."
+        : error instanceof Error
+          ? error.message
+          : "Could not load workspace dashboard.",
     }
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 

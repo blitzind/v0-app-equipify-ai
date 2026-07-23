@@ -30,6 +30,7 @@ export async function loadCanonicalOperatorApprovalSnapshotForHome(
     commandCenter: commandCenterSlice,
     topLimit: GROWTH_HOME_HAC_TOP_LIMIT,
     totalLimit: GROWTH_HOME_HAC_TOTAL_LIMIT,
+    skipPortfolioAuthorityHydration: true,
   })
 
   const packages =

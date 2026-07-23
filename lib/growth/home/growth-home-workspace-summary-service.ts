@@ -7,6 +7,8 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
 import {
+  GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS,
+  GROWTH_HOME_PORTFOLIO_AUTHORITY_LOADER_BUDGET_MS,
   GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS,
   GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS,
   GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS,
@@ -674,20 +676,18 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     ReturnType<typeof loadCanonicalOperatorApprovalSnapshotForHome>
   > | null = null
   if (organizationId) {
-    const approvalStart = Date.now()
-    try {
-      canonicalOperatorApprovalLoaded = await loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
-        organizationId,
-        generatedAt,
-      })
-    } catch {
-      canonicalOperatorApprovalLoaded = null
-    }
-    stageTimings.push({
+    const approvalStep = await withGrowthHomeLoaderBudget({
       label: "canonical_operator_approval",
-      durationMs: Date.now() - approvalStart,
-      timedOut: false,
+      budgetMs: GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS,
+      fn: () =>
+        loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
+          organizationId,
+          generatedAt,
+        }),
+      fallback: null,
     })
+    canonicalOperatorApprovalLoaded = approvalStep.value
+    stageTimings.push(approvalStep.timing)
   }
 
   const canonicalOperatorApprovalRaw = organizationId
@@ -959,114 +959,125 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       })
     : null
 
-  const runtimeTrust = organizationId
-    ? await (async () => {
-        const startedAt = Date.now()
-        const value = await loadGrowthHomeRuntimeTrustPayload({
-          admin: input.admin,
-          organizationId,
-          generatedAt,
-        })
-        stageTimings.push({
+  const [
+    runtimeTrustStep,
+    avaActivationStep,
+    executiveGrowthIntelligenceStep,
+    canonicalPortfolioAuthorityStep,
+  ] = await Promise.all([
+    organizationId
+      ? withGrowthHomeLoaderBudget({
           label: "runtime_trust",
-          durationMs: Date.now() - startedAt,
-          timedOut: false,
+          budgetMs: runtimeCriticalLoaderBudgetMs,
+          fn: () =>
+            loadGrowthHomeRuntimeTrustPayload({
+              admin: input.admin,
+              organizationId,
+              generatedAt,
+            }),
+          fallback: null,
         })
-        return value
-      })()
-    : null
-
-  const avaActivation =
+      : Promise.resolve({
+          value: null,
+          timing: { label: "runtime_trust", durationMs: 0, timedOut: false },
+        }),
     organizationId && input.actorUserId?.trim() && input.actorUserId !== "undefined"
-      ? await (async () => {
-          const startedAt = Date.now()
-          const value = await loadGrowthAvaActivationState({
-            admin: input.admin,
-            organizationId,
-            actorUserId: input.actorUserId,
-            generatedAt,
-            salesOutcomes,
-            missionDiscovery: productionMissionDiscovery,
-          })
-          if (value.activated) {
-            await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId)
-          }
-          stageTimings.push({
-            label: "ava_activation",
-            durationMs: Date.now() - startedAt,
-            timedOut: false,
-          })
-          return value
-        })()
-      : null
-
-  const executiveGrowthIntelligence = organizationId
-    ? await (async () => {
-        const startedAt = Date.now()
-        try {
-          const value = await buildGrowthExecutiveGrowthIntelligenceReadModel({
-            admin: input.admin,
-            organizationId,
-            generatedAt,
-            approvedProfile: approvedBusinessProfile?.profile ?? null,
-            validatedLearnings: organizationalKnowledge?.store.items ?? [],
-            portfolioLeads: productionLeadsForOperations,
-            salesOutcomes,
-            portfolioManager: productionPortfolioManager,
-            missionDiscovery: productionMissionDiscovery,
-            organizationalEvidence: organizationalEvidenceCompleteness,
-          })
-          stageTimings.push({
+      ? withGrowthHomeLoaderBudget({
+          label: "ava_activation",
+          budgetMs: runtimeCriticalLoaderBudgetMs,
+          fn: async () => {
+            const value = await loadGrowthAvaActivationState({
+              admin: input.admin,
+              organizationId,
+              actorUserId: input.actorUserId,
+              generatedAt,
+              salesOutcomes,
+              missionDiscovery: productionMissionDiscovery,
+            })
+            if (value.activated) {
+              await ensureScaleResearchBudgetForActivatedOrg(input.admin, organizationId)
+            }
+            return value
+          },
+          fallback: null,
+        })
+      : Promise.resolve({
+          value: null,
+          timing: { label: "ava_activation", durationMs: 0, timedOut: false },
+        }),
+    organizationId
+      ? withGrowthHomeLoaderBudget({
+          label: "executive_growth_intelligence",
+          budgetMs: loaderBudgetMs,
+          fn: () =>
+            buildGrowthExecutiveGrowthIntelligenceReadModel({
+              admin: input.admin,
+              organizationId,
+              generatedAt,
+              approvedProfile: approvedBusinessProfile?.profile ?? null,
+              validatedLearnings: organizationalKnowledge?.store.items ?? [],
+              portfolioLeads: productionLeadsForOperations,
+              salesOutcomes,
+              portfolioManager: productionPortfolioManager,
+              missionDiscovery: productionMissionDiscovery,
+              organizationalEvidence: organizationalEvidenceCompleteness,
+            }),
+          fallback: null,
+        })
+      : Promise.resolve({
+          value: null,
+          timing: {
             label: "executive_growth_intelligence",
-            durationMs: Date.now() - startedAt,
+            durationMs: 0,
             timedOut: false,
-          })
-          return value
-        } catch {
-          stageTimings.push({
-            label: "executive_growth_intelligence",
-            durationMs: Date.now() - startedAt,
+          },
+        }),
+    organizationId
+      ? withGrowthHomeLoaderBudget({
+          label: "canonical_portfolio_authority",
+          budgetMs: GROWTH_HOME_PORTFOLIO_AUTHORITY_LOADER_BUDGET_MS,
+          fn: async () => {
+            const leadIds = productionLeadsForOperations.map((lead) => lead.id).filter(Boolean)
+            const hydration = await hydrateCanonicalPortfolioAuthority(input.admin, {
+              organizationId,
+              leadIds,
+              generatedAt,
+              maxLeads: 32,
+              portfolioLeads: productionLeadsForOperations,
+            })
+            return {
+              qaMarker: GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER,
+              generatedAt,
+              authorityByLeadId: hydration.authorityByLeadId,
+              escalationTelemetry: hydration.telemetry,
+              hydratedLeadCount: leadIds.length,
+            }
+          },
+          fallback: null,
+        })
+      : Promise.resolve({
+          value: null,
+          timing: {
+            label: "canonical_portfolio_authority",
+            durationMs: 0,
             timedOut: false,
-          })
-          return null
-        }
-      })()
-    : null
+          },
+        }),
+  ])
 
-  const canonicalPortfolioAuthority = organizationId
-    ? await (async () => {
-        const startedAt = Date.now()
-        try {
-          const leadIds = productionLeadsForOperations.map((lead) => lead.id).filter(Boolean)
-          const hydration = await hydrateCanonicalPortfolioAuthority(input.admin, {
-            organizationId,
-            leadIds,
-            generatedAt,
-            maxLeads: 32,
-            portfolioLeads: productionLeadsForOperations,
-          })
-          stageTimings.push({
-            label: "canonical_portfolio_authority",
-            durationMs: Date.now() - startedAt,
-            timedOut: false,
-          })
-          return {
-            qaMarker: GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER,
-            generatedAt,
-            authorityByLeadId: hydration.authorityByLeadId,
-            escalationTelemetry: hydration.telemetry,
-            hydratedLeadCount: leadIds.length,
-          }
-        } catch {
-          stageTimings.push({
-            label: "canonical_portfolio_authority",
-            durationMs: Date.now() - startedAt,
-            timedOut: false,
-          })
-          return null
-        }
-      })()
-    : null
+  for (const step of [
+    runtimeTrustStep,
+    avaActivationStep,
+    executiveGrowthIntelligenceStep,
+    canonicalPortfolioAuthorityStep,
+  ]) {
+    stageTimings.push(step.timing)
+  }
+
+  const runtimeTrust = runtimeTrustStep.value
+  const avaActivation = avaActivationStep.value
+  const executiveGrowthIntelligence = executiveGrowthIntelligenceStep.value
+  const canonicalPortfolioAuthority = canonicalPortfolioAuthorityStep.value
 
   return {
     ok: true,

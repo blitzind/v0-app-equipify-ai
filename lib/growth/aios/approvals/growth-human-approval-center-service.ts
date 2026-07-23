@@ -138,6 +138,8 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
     adaptiveCalibrationProposals?: GrowthHumanApprovalCenterInput["adaptiveCalibrationProposals"]
     topLimit?: number
     totalLimit?: number
+    /** Home defers portfolio hydration to workspace summary — avoids duplicate 32-lead resolution. */
+    skipPortfolioAuthorityHydration?: boolean
   },
 ): Promise<GrowthHumanApprovalCenterReadModel> {
   const [geV15Result, automationResult, sequenceResult, voiceResult, humanExecResult] =
@@ -196,7 +198,7 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
   })
 
   let canonicalAuthorityByLeadId: GrowthCanonicalOpportunityAuthorityMap | null = null
-  if (leadIds.length > 0) {
+  if (!input.skipPortfolioAuthorityHydration && leadIds.length > 0) {
     try {
       const hydration = await hydrateCanonicalPortfolioAuthority(admin, {
         organizationId: input.organizationId,

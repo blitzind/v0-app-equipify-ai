@@ -13,6 +13,12 @@ export const GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS = 6_000
 /** Sales outcomes fan-in can exceed generic critical budget under production load. */
 export const GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS = 8_000
 
+/** Home approval snapshot (HAC slice) — must not block core briefing indefinitely. */
+export const GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS = 8_000
+
+/** Portfolio authority hydration — bounded; degrades to null snapshot on timeout. */
+export const GROWTH_HOME_PORTFOLIO_AUTHORITY_LOADER_BUDGET_MS = 6_000
+
 export type GrowthHomeLoaderTiming = {
   label: string
   durationMs: number

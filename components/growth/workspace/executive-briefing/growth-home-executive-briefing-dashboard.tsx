@@ -147,6 +147,7 @@ function buildEngineWorkspaceSummary(
     portfolioLeads: payload.portfolioLeads,
     eligibleLeadCount: payload.eligibleLeadCount,
     businessObjectiveLeadership: payload.businessObjectiveLeadership ?? null,
+    canonicalPortfolioAuthority: payload.canonicalPortfolioAuthority ?? null,
   }
 }
 
@@ -164,6 +165,7 @@ type BuildAvaHomeHeroEngineSummary = Pick<
   | "portfolioLeads"
   | "eligibleLeadCount"
   | "businessObjectiveLeadership"
+  | "canonicalPortfolioAuthority"
 >
 
 type Props = {

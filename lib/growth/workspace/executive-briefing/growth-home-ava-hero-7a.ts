@@ -159,6 +159,7 @@ export type BuildAvaHomeHeroInput = {
     | "portfolioLeads"
     | "eligibleLeadCount"
     | "businessObjectiveLeadership"
+    | "canonicalPortfolioAuthority"
   >
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
