@@ -25,6 +25,9 @@ import {
   buildGrowthHomeExecutiveBriefingCertDashboard,
   synthesizeGrowthHomeExecutiveBriefing,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
+import { filterProductionCanonicalOperatorTask } from "@/lib/growth/mission-purpose/growth-mission-purpose-operator-filter-1a"
+import type { GrowthMissionPurposeResolution } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
+import type { GrowthCanonicalOperatorTask } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 const PHASE = "GE-AIOS-HOME-RUNTIME-AUTHORITY-1B"
@@ -296,6 +299,59 @@ const slussFocus = operatorFocus("Sluss Padgett")
     focusLeadId: slussFocus.leadId,
   })
   assert.match(progress.activeLabel ?? "", /Discovery|discovery|DataMoon|Running/i)
+}
+
+{
+  const operatorTask = (leadId: string): GrowthCanonicalOperatorTask => ({
+    id: `task:${leadId}`,
+    kind: "decision",
+    title: "Review lead",
+    detail: "Operator task",
+    why: "Certification",
+    whatHappensNext: "Continue",
+    confidenceLabel: null,
+    href: `/growth/leads/${leadId}`,
+    companyName: "Test Co",
+    leadId,
+    draftCount: 0,
+    packageCount: 0,
+  })
+  const purposeResolution = (purpose: GrowthMissionPurposeResolution["purpose"]): GrowthMissionPurposeResolution => ({
+    qaMarker: GROWTH_MISSION_PURPOSE_1A_QA_MARKER,
+    purpose,
+    source: "explicit_metadata",
+    reason: "test",
+  })
+  const certificationMap = new Map<string, GrowthMissionPurposeResolution>([
+    ["lead-cert", purposeResolution("certification")],
+  ])
+  assert.equal(
+    filterProductionCanonicalOperatorTask({
+      task: operatorTask("lead-cert"),
+      purposeByLeadId: certificationMap,
+    }),
+    null,
+  )
+  assert.notEqual(
+    filterProductionCanonicalOperatorTask({
+      task: operatorTask("lead-production"),
+      purposeByLeadId: certificationMap,
+    }),
+    null,
+  )
+  assert.notEqual(
+    filterProductionCanonicalOperatorTask({
+      task: operatorTask("lead-missing-purpose"),
+      purposeByLeadId: new Map(),
+    }),
+    null,
+  )
+  const operatorFilterSource = readSource("lib/growth/mission-purpose/growth-mission-purpose-operator-filter-1a.ts")
+  assert.match(operatorFilterSource, /input\.purposeByLeadId\.get\(input\.task\.leadId\)/)
+  assert.doesNotMatch(
+    operatorFilterSource,
+    /filterProductionCanonicalOperatorTask[\s\S]{0,220}[^.]purposeByLeadId\.get\(input\.task\.leadId\)/,
+  )
 }
 
 console.log(`${PHASE} runtime authority precedence tests passed`)
