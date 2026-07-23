@@ -15,6 +15,7 @@ import {
   GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER,
   type GrowthHomeRuntimeTrustViewModel,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
+import { GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 
 type Props = {
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
@@ -66,14 +67,38 @@ export function GrowthHomeAvaRuntimeTrustSection({
       data-qa-marker-closure-1a={GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER}
       data-operator-closure-mode={closureMode ? "true" : "false"}
       data-employee-mode={employeeMode ? "true" : "false"}
+      data-qa-marker-runtime-authority-1b={GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm space-y-5"
     >
-      {closureMode && runtimeTrust.primaryCompanyName ? (
-        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-            Primary assignment
-          </p>
-          <p className="mt-1 text-lg font-semibold text-foreground">{runtimeTrust.primaryCompanyName}</p>
+      {closureMode && runtimeTrust.primaryMissionLabel ? (
+        <div
+          className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 px-4 py-4 space-y-4 dark:border-indigo-900/40 dark:bg-indigo-950/20"
+          data-home-runtime-authority-grid="true"
+        >
+          <AuthorityRow label="Primary mission" value={runtimeTrust.primaryMissionLabel} />
+          <AuthorityRow label="Current activity" value={runtimeTrust.currentActivityLabel} />
+          <AuthorityRow
+            label="Current lead"
+            value={runtimeTrust.currentLeadCompanyName ?? "None"}
+            muted={!runtimeTrust.currentLeadCompanyName}
+          />
+          {runtimeTrust.operatorFocusCompanyName ? (
+            runtimeTrust.operatorFocusHref ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                  Operator focus
+                </p>
+                <Link
+                  href={runtimeTrust.operatorFocusHref}
+                  className="mt-1 inline-block text-lg font-semibold text-foreground hover:underline"
+                >
+                  {runtimeTrust.operatorFocusCompanyName}
+                </Link>
+              </div>
+            ) : (
+              <AuthorityRow label="Operator focus" value={runtimeTrust.operatorFocusCompanyName} />
+            )
+          ) : null}
         </div>
       ) : null}
 
@@ -310,6 +335,28 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function AuthorityRow({
+  label,
+  value,
+  muted = false,
+}: {
+  label: string
+  value: string | null
+  muted?: boolean
+}) {
+  if (!value) return null
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+        {label}
+      </p>
+      <p className={`mt-1 text-lg font-semibold ${muted ? "text-muted-foreground" : "text-foreground"}`}>
+        {value}
+      </p>
     </div>
   )
 }

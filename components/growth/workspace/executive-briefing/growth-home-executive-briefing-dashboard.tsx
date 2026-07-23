@@ -78,6 +78,7 @@ import { GrowthHomeAvaActivationSection } from "@/components/growth/workspace/ex
 import { GrowthHomeAvaRuntimeTrustSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-runtime-trust-section"
 import { GROWTH_AVA_ACTIVATION_1C_QA_MARKER } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import { buildGrowthHomeRuntimeTrustViewModel } from "@/lib/growth/home/growth-home-runtime-trust-presenter-1b"
+import { GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 import { GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import {
   GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER,
@@ -199,6 +200,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
         portfolioBelowTarget: (workspaceSummary?.portfolioManager?.health.needsCount ?? 0) > 0,
         portfolioTargetCurrent: workspaceSummary?.portfolioManager?.health.counts.activeCompanies ?? null,
         portfolioTargetGoal: workspaceSummary?.portfolioManager?.target.targetActiveCompanies ?? null,
+        portfolioOperator: workspaceSummary?.portfolioManager?.operator ?? null,
+        productionMissionAuthority: workspaceSummary?.productionMissionAuthority ?? null,
         canonicalOperatorApproval: workspaceSummary?.canonicalOperatorApproval ?? null,
         canonicalOperatorTask: workspaceSummary?.canonicalOperatorTask ?? null,
         canonicalActiveMissions: workspaceSummary?.canonicalActiveMissions ?? null,
@@ -413,7 +416,10 @@ export function GrowthHomeExecutiveBriefingDashboard({
       missionDiscovery,
       activation: workspaceSummary?.avaActivation ?? null,
       generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
-      canonicalFocusCompanyName: workspaceSummary?.canonicalOperatorFocus?.companyName ?? null,
+      canonicalOperatorFocus: workspaceSummary?.canonicalOperatorFocus ?? null,
+      operatorApprovalCompanyName: workspaceSummary?.canonicalOperatorApproval?.topPackage?.companyName ?? null,
+      portfolioOperator: workspaceSummary?.portfolioManager?.operator ?? null,
+      productionMissionAuthority: workspaceSummary?.productionMissionAuthority ?? null,
       emailsSentToday: workspaceSummary?.kpis?.emailsSentToday,
       repliesToday: workspaceSummary?.kpis?.repliesToday,
       meetingsToday: workspaceSummary?.meetings?.today,
@@ -519,6 +525,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-launch-1b={GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER}
       data-qa-marker-launch-1c={GROWTH_AVA_ACTIVATION_1C_QA_MARKER}
       data-qa-marker-closure-1a={GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER}
+      data-qa-marker-runtime-authority-1b={GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER}
       data-employee-mode={employeeMode ? "true" : "false"}
       data-operator-closure-mode={operatorClosureMode ? "true" : "false"}
       data-home-narrative-overlap={operatorExperience.narrativeOverlap.join(",") || "none"}

@@ -587,6 +587,9 @@ export function buildAiOsUxViewModel(input: {
   missionDiscovery?: import("@/lib/growth/mission-center/growth-home-mission-discovery-snapshot").GrowthHomeMissionDiscoverySnapshot | null
   portfolioTargetCurrent?: number | null
   portfolioTargetGoal?: number | null
+  portfolioOperator?: import("@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types").GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthProductionMissionAuthority | null
+  pendingApprovals?: number
 }): GrowthHomeAiOsUxViewModel {
   const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
 
@@ -622,6 +625,10 @@ export function buildAiOsUxViewModel(input: {
     missionDiscovery: input.missionDiscovery ?? null,
     portfolioTargetCurrent: input.portfolioTargetCurrent ?? null,
     portfolioTargetGoal: input.portfolioTargetGoal ?? null,
+    pendingApprovals: approveItemsCount,
+    operatorApprovalCompanyName: input.canonicalOperatorApproval?.topPackage?.companyName ?? null,
+    portfolioOperator: input.portfolioOperator ?? null,
+    productionMissionAuthority: input.productionMissionAuthority ?? null,
   })
 
   return {

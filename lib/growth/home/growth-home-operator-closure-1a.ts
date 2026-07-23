@@ -18,11 +18,13 @@ export function resolvePrimaryOperatorCompanyName(input: {
   canonicalFocusCompanyName?: string | null
   activeWorkCompanyName?: string | null
 }): string | null {
+  /**
+   * @deprecated GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — operator focus only.
+   * Runtime assignment must come from resolveRuntimeExecutionPresentation().
+   */
   const focus = input.canonicalFocusCompanyName?.trim()
   if (focus && focus !== "Account") return focus
-  const active = input.activeWorkCompanyName?.trim()
-  if (active && active !== "Account") return active
-  return focus ?? active ?? null
+  return focus ?? null
 }
 
 export function buildOperatorWhatHappensNextLines(input: {

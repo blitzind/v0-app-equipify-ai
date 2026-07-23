@@ -14,6 +14,12 @@ export type GrowthOperatorStoryRetirementEntry = {
 
 export const GROWTH_OPERATOR_STORY_RETIREMENT_LIST: GrowthOperatorStoryRetirementEntry[] = [
   {
+    retiredPresentation: "Primary assignment = canonicalOperatorFocus company (runtime conflation)",
+    canonicalReplacement:
+      "resolveRuntimeExecutionPresentation + operatorFocusCompanyName (GE-AIOS-HOME-RUNTIME-AUTHORITY-1B)",
+    migrationCompleted: true,
+  },
+  {
     retiredPresentation: "Home hero lead from DRQ top item (parallel priority)",
     canonicalReplacement: "buildCanonicalOperatorFocus (approval → blocker → decision → queue)",
     migrationCompleted: true,

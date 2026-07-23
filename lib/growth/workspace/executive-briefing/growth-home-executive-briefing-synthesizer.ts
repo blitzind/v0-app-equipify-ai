@@ -157,6 +157,8 @@ export type GrowthHomeExecutiveBriefingInput = {
   portfolioBelowTarget?: boolean
   portfolioTargetCurrent?: number | null
   portfolioTargetGoal?: number | null
+  portfolioOperator?: import("@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types").GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthProductionMissionAuthority | null
   canonicalOperatorApproval?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
   canonicalOperatorTask?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
   canonicalActiveMissions?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
@@ -1247,6 +1249,9 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     missionDiscovery: input.missionDiscovery ?? null,
     portfolioTargetCurrent: input.portfolioTargetCurrent ?? null,
     portfolioTargetGoal: input.portfolioTargetGoal ?? null,
+    portfolioOperator: input.portfolioOperator ?? null,
+    productionMissionAuthority: input.productionMissionAuthority ?? null,
+    pendingApprovals: approveItemsCount,
   })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)

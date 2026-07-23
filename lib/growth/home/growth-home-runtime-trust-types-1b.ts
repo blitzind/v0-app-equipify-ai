@@ -1,7 +1,14 @@
 /** GE-AIOS-LAUNCH-1B — Runtime trust payload types (client-safe). */
 
 import type { GrowthAvaActivationState, GrowthAvaEmploymentStats } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
+import type { GrowthAiosAutonomyTickHealthSnapshot } from "@/lib/growth/aios/runtime/growth-aios-autonomy-tick-health-1a-types"
+import type {
+  GrowthHomePrimaryMissionKind,
+  GrowthHomeRuntimeExecutionScope,
+} from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 import type { GrowthRuntimeKillSwitchKey } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
+
+export type { GrowthHomePrimaryMissionKind, GrowthHomeRuntimeExecutionScope }
 
 export const GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER = "ge-aios-launch-1b-runtime-trust-v1" as const
 
@@ -126,6 +133,16 @@ export type GrowthHomeRuntimeTrustStartStatus = {
   lastAutonomousActionLabel: string | null
 }
 
+export type GrowthHomeRuntimeExecutionScope = "lead" | "portfolio" | "operator_wait" | "idle"
+
+export type GrowthHomePrimaryMissionKind =
+  | "operator_review"
+  | "prospect_research"
+  | "draft_factory"
+  | "portfolio_replenishment"
+  | "portfolio_maintenance"
+  | "idle"
+
 export type GrowthHomeRuntimeTrustViewModel = {
   qaMarker: typeof GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER
   operatorState: GrowthHomeRuntimeTrustOperatorState
@@ -144,7 +161,19 @@ export type GrowthHomeRuntimeTrustViewModel = {
   employment: GrowthAvaEmploymentStats | null
   employeePresenceLine: string | null
   nextMilestoneLabel: string | null
-  /** GE-AIOS-HOME-UX-CLOSURE-1A — single primary assignment company */
+  /** GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — runtime execution (what Ava is doing) */
+  primaryMissionLabel: string | null
+  primaryMissionKind: GrowthHomePrimaryMissionKind | null
+  currentActivityLabel: string | null
+  currentActivityScope: GrowthHomeRuntimeExecutionScope
+  currentLeadCompanyName: string | null
+  /** GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — operator navigation (where to click) */
+  operatorFocusCompanyName: string | null
+  operatorFocusHref: string | null
+  /**
+   * @deprecated GE-AIOS-HOME-RUNTIME-AUTHORITY-1B — alias for operatorFocusCompanyName only.
+   * Do not use for runtime assignment.
+   */
   primaryCompanyName: string | null
   whatHappensNextLines: string[]
   canCloseBrowserLine: string | null

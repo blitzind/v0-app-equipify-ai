@@ -4,18 +4,26 @@
  */
 
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import type { GrowthCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types"
+import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purpose/growth-mission-purpose-1a-types"
+import type { GrowthPortfolioManagerOperatorProjection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import {
   GROWTH_AVA_ACTIVATION_CTA,
   type GrowthAvaActivationState,
 } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
 import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
+import {
+  describeWorkItemStep,
+  formatRuntimeExecutionStartedLabel,
+  resolveOperatorFocusPresentation,
+  resolveRuntimeExecutionPresentation,
+} from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 import {
   buildOperatorCanCloseBrowserLine,
   buildOperatorWhatHappensNextLines,
-  resolvePrimaryOperatorCompanyName,
 } from "@/lib/growth/home/growth-home-operator-closure-1a"
 import {
   GROWTH_HOME_RECENT_AUTONOMOUS_ACTIVITY_MS,
@@ -29,7 +37,6 @@ import {
   type GrowthHomeRuntimeTrustCurrentActivity,
   type GrowthHomeRuntimeTrustHeartbeatLine,
   type GrowthHomeRuntimeTrustOperatorState,
-  type GrowthHomeRuntimeTrustPipelineStep,
   type GrowthHomeRuntimeTrustServerPayload,
   type GrowthHomeRuntimeTrustStartStatus,
   type GrowthHomeRuntimeTrustViewModel,
@@ -132,81 +139,29 @@ function mapOutcomeToActivity(outcome: GrowthHomeSalesOutcomesPayload["outcomes"
   }
 }
 
-function buildPipelineSteps(activeWork: AvaWorkItem | null): GrowthHomeRuntimeTrustPipelineStep[] {
-  const type = activeWork?.type ?? null
-  const stepOrder = [
-    { id: "discovery", label: "Discovery", types: ["mission"] as AvaWorkItem["type"][] },
-    { id: "research", label: "Research", types: ["research"] },
-    { id: "qualification", label: "Qualification", types: ["qualification"] },
-    { id: "decision_maker", label: "Decision maker", types: [] as AvaWorkItem["type"][] },
-    { id: "buying_committee", label: "Buying committee", types: [] as AvaWorkItem["type"][] },
-    { id: "package", label: "Package", types: ["outreach", "approval"] },
-    { id: "operator_review", label: "Operator review", types: [] as AvaWorkItem["type"][] },
-  ]
-
-  let activeIndex = -1
-  if (type === "research") activeIndex = 1
-  else if (type === "qualification") activeIndex = 2
-  else if (type === "outreach" || type === "approval") activeIndex = 5
-  else if (type === "mission") activeIndex = 0
-  else if (type === "reply" || type === "meeting") activeIndex = 6
-
-  return stepOrder.map((step, index) => ({
-    id: step.id,
-    label: step.label,
-    complete: activeIndex >= 0 && index < activeIndex,
-    active: index === activeIndex,
-  }))
-}
-
-function describeCurrentStep(activeWork: AvaWorkItem | null): string | null {
-  if (!activeWork) return null
-  const company = activeWork.company_name?.trim()
-  switch (activeWork.type) {
-    case "research":
-      return company ? `Researching ${company}` : "Researching company"
-    case "qualification":
-      return company ? `Qualifying ${company}` : "Qualifying company"
-    case "outreach":
-      return company ? `Drafting personalized outreach for ${company}` : "Drafting personalized outreach"
-    case "approval":
-      return company ? `Outreach ready for your review — ${company}` : "Outreach waiting for your approval"
-    case "reply":
-      return company ? `Following up with ${company}` : "Following up"
-    case "meeting":
-      return company ? `Preparing for meeting with ${company}` : "Preparing for meeting"
-    case "mission":
-      return humanizeOperatorFacingCopy(activeWork.title)
-    default:
-      return humanizeOperatorFacingCopy(activeWork.title)
-  }
-}
-
-function buildCurrentActivity(
-  activeWork: AvaWorkItem | null,
-  canonicalClaim: {
-    companyName: string | null
-    claimedAt: string
-  } | null,
+function buildCurrentActivityFromPresentation(
+  presentation: ReturnType<typeof resolveRuntimeExecutionPresentation>,
 ): GrowthHomeRuntimeTrustCurrentActivity | null {
-  if (!activeWork && !canonicalClaim) return null
+  if (presentation.currentActivityScope === "idle" && !presentation.currentActivityLabel) {
+    return null
+  }
 
-  const startedAt =
-    canonicalClaim?.claimedAt ?? activeWork?.updated_at ?? activeWork?.created_at ?? null
-  const companyName = canonicalClaim?.companyName ?? activeWork?.company_name?.trim() ?? null
+  const startedAt = presentation.startedAt
+  const companyName =
+    presentation.currentActivityScope === "lead" ? presentation.currentLeadCompanyName : null
 
   return {
     companyName,
-    taskLabel: activeWork ? describeCurrentStep(activeWork) : companyName ? `Researching ${companyName}` : null,
-    currentStepLabel: activeWork ? describeCurrentStep(activeWork) : companyName ? `Researching ${companyName}` : null,
+    taskLabel: presentation.currentActivityLabel,
+    currentStepLabel: presentation.currentStepLabel,
     startedAt,
-    startedLabel: startedAt ? formatClockTime(startedAt) : null,
-    expectedCompletionMinutes: activeWork?.estimated_minutes ?? null,
+    startedLabel: formatRuntimeExecutionStartedLabel(startedAt),
+    expectedCompletionMinutes: presentation.expectedCompletionMinutes,
     expectedCompletionLabel:
-      activeWork?.estimated_minutes != null && activeWork.estimated_minutes > 0
-        ? `~${activeWork.estimated_minutes} minute${activeWork.estimated_minutes === 1 ? "" : "s"}`
+      presentation.expectedCompletionMinutes != null && presentation.expectedCompletionMinutes > 0
+        ? `~${presentation.expectedCompletionMinutes} minute${presentation.expectedCompletionMinutes === 1 ? "" : "s"}`
         : null,
-    pipelineSteps: buildPipelineSteps(activeWork),
+    pipelineSteps: presentation.showLeadPipeline ? presentation.pipelineSteps : [],
   }
 }
 
@@ -331,13 +286,10 @@ function resolveOperatorState(input: {
   return "idle"
 }
 
-function resolveNextMilestoneLabel(activeWork: AvaWorkItem | null): string | null {
-  const steps = buildPipelineSteps(activeWork)
-  const activeIndex = steps.findIndex((step) => step.active)
-  if (activeIndex >= 0 && activeIndex + 1 < steps.length) {
-    return steps[activeIndex + 1]?.label ?? null
-  }
-  return null
+function resolveNextMilestoneLabel(
+  presentation: ReturnType<typeof resolveRuntimeExecutionPresentation>,
+): string | null {
+  return presentation.nextMilestoneLabel
 }
 
 function buildEmployeePresenceLine(input: {
@@ -346,9 +298,10 @@ function buildEmployeePresenceLine(input: {
   pendingApprovals: number
   idleReason: string | null
   employment: GrowthAvaActivationState["employment"]
+  runtimePresentation: ReturnType<typeof resolveRuntimeExecutionPresentation>
 }): string | null {
-  if (input.operatorState === "working" && input.activeWork) {
-    return describeCurrentStep(input.activeWork)
+  if (input.operatorState === "working") {
+    return input.runtimePresentation.currentActivityLabel ?? describeWorkItemStep(input.activeWork)
   }
   if (input.operatorState === "waiting" && input.pendingApprovals > 0) {
     return `I'm waiting for your approval on ${input.pendingApprovals} outreach ${input.pendingApprovals === 1 ? "package" : "packages"}.`
@@ -550,10 +503,15 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   activation?: GrowthAvaActivationState | null
   generatedAt?: string
-  canonicalFocusCompanyName?: string | null
+  canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
+  operatorApprovalCompanyName?: string | null
+  portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
+  productionMissionAuthority?: GrowthProductionMissionAuthority | null
   emailsSentToday?: number
   repliesToday?: number
   meetingsToday?: number
+  /** @deprecated pass canonicalOperatorFocus instead */
+  canonicalFocusCompanyName?: string | null
 }): GrowthHomeRuntimeTrustViewModel {
   const nowMs = Date.parse(input.generatedAt ?? input.server?.generatedAt ?? new Date().toISOString())
   const killSwitches = input.server?.killSwitches ?? {}
@@ -572,6 +530,38 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   const lastAutonomousActivitySource = lastActivity.source
   const canonicalClaim = input.server?.canonicalActivity?.activeClaim ?? null
   const hasActiveCanonicalClaim = canonicalClaim != null
+
+  const runtimePresentation = resolveRuntimeExecutionPresentation({
+    pendingApprovals: input.pendingApprovals,
+    operatorApprovalCompanyName:
+      input.operatorApprovalCompanyName ??
+      input.canonicalOperatorFocus?.source === "approval"
+        ? input.canonicalOperatorFocus.companyName
+        : null,
+    activeClaim: canonicalClaim,
+    activeWork: input.activeWork,
+    portfolioOperator: input.portfolioOperator ?? null,
+    missionDiscovery: input.missionDiscovery ?? null,
+    productionMissionAuthority: input.productionMissionAuthority ?? null,
+    autonomyTickHealth: tick,
+  })
+
+  const operatorFocus = resolveOperatorFocusPresentation({
+    canonicalOperatorFocus:
+      input.canonicalOperatorFocus ??
+      (input.canonicalFocusCompanyName
+        ? {
+            qaMarker: "ge-aios-operator-story-implementation-1a-v1",
+            leadId: "",
+            companyName: input.canonicalFocusCompanyName,
+            source: "revenue_queue",
+            title: "",
+            detail: null,
+            href: "",
+            priorityRank: 4,
+          }
+        : null),
+  })
 
   const activityAgeMs = lastAutonomousActionAt
     ? nowMs - Date.parse(lastAutonomousActionAt)
@@ -641,7 +631,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   const employeeMode = activation?.activated === true
   const showActivationScreen = Boolean(activation?.readiness.ready && !activation?.activated)
   const employment = activation?.employment ?? null
-  const nextMilestoneLabel = resolveNextMilestoneLabel(input.activeWork)
+  const nextMilestoneLabel = resolveNextMilestoneLabel(runtimePresentation)
 
   const researchPace: GrowthHomeRuntimeResearchPaceSnapshot | null =
     input.server?.canonicalActivity?.pace ?? null
@@ -740,9 +730,9 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
   let statusExplanation = ""
   switch (operatorState) {
     case "working":
-      statusExplanation = input.activeWork
-        ? describeCurrentStep(input.activeWork) ?? "I'm actively working."
-        : "Autonomous work is in progress."
+      statusExplanation =
+        runtimePresentation.currentActivityLabel ??
+        (input.activeWork ? describeWorkItemStep(input.activeWork) : "Autonomous work is in progress.")
       break
     case "waiting":
       statusExplanation = idleReason ?? "I'm waiting on you before continuing."
@@ -766,16 +756,15 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     pendingApprovals: input.pendingApprovals,
     idleReason,
     employment,
+    runtimePresentation,
   })
 
   if (employeePresenceLine) {
     statusExplanation = employeePresenceLine
   }
 
-  const primaryCompanyName = resolvePrimaryOperatorCompanyName({
-    canonicalFocusCompanyName: input.canonicalFocusCompanyName,
-    activeWorkCompanyName: input.activeWork?.company_name,
-  })
+  const operatorFocusCompanyName = operatorFocus.operatorFocusCompanyName
+  const primaryCompanyName = operatorFocusCompanyName
 
   const nextSchedulerLabel =
     input.server?.nextSchedulerEstimateAt && autonomyEnabled
@@ -805,12 +794,7 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     idleReason,
     blockedReason,
     heartbeat,
-    currentActivity: buildCurrentActivity(
-      input.activeWork,
-      canonicalClaim
-        ? { companyName: canonicalClaim.companyName, claimedAt: canonicalClaim.claimedAt }
-        : null,
-    ),
+    currentActivity: buildCurrentActivityFromPresentation(runtimePresentation),
     activityFeed,
     startStatus: buildStartStatus({
       autonomyEnabled,
@@ -829,6 +813,13 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     employment,
     employeePresenceLine,
     nextMilestoneLabel,
+    primaryMissionLabel: runtimePresentation.primaryMissionLabel,
+    primaryMissionKind: runtimePresentation.primaryMissionKind,
+    currentActivityLabel: runtimePresentation.currentActivityLabel,
+    currentActivityScope: runtimePresentation.currentActivityScope,
+    currentLeadCompanyName: runtimePresentation.currentLeadCompanyName,
+    operatorFocusCompanyName,
+    operatorFocusHref: operatorFocus.operatorFocusHref,
     primaryCompanyName,
     whatHappensNextLines,
     canCloseBrowserLine,

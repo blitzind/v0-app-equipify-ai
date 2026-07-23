@@ -781,6 +781,15 @@
     "test:fuzor-adoption-1d-configuration-constant-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node --import tsx scripts/test-fuzor-adoption-1d-configuration-constant-parity.ts",
     "test:fuzor-adoption-1e-knowledge-service-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1e-knowledge-service-parity.ts",
     "test:fuzor-adoption-1e-production-bootstrap-fix-1a": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1e-production-bootstrap-fix-1a.ts",
+    "test:fuzor-adoption-1f-persona-repository-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1f-persona-repository-parity.ts",
+    "test:fuzor-adoption-1g-runtime-profile-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1g-runtime-profile-parity.ts",
+    "test:fuzor-adoption-1h-memory-platform-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1h-memory-platform-parity.ts",
+    "test:fuzor-adoption-1i-context-platform-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1i-context-platform-parity.ts",
+    "test:fuzor-adoption-1j-decision-records-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1j-decision-records-parity.ts",
+    "test:fuzor-adoption-1k-event-bus-parity": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-adoption-1k-event-bus-parity.ts",
+    "test:fuzor-production-certification-1a-integrated-platform": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-production-certification-1a-integrated-platform.ts",
+    "test:fuzor-production-certification-1a-integrated-platform:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-production-certification-1a-integrated-platform.ts --production",
+    "test:fuzor-sdk-1a-validation": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-sdk-1a-validation.ts",
     "test:fuzor-distribution-1a-package-portability": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-fuzor-distribution-1a-package-portability.ts",
     "test:ge-aios-2b-ai-event-foundation": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-2b-ai-event-foundation.ts",
     "test:ge-aios-2c-ai-agent-runtime-foundation": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-2c-ai-agent-runtime-foundation.ts",
@@ -904,6 +913,7 @@
     "test:ge-aios-launch-1d-runtime-completion": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-launch-1d-runtime-completion.ts",
     "validate:ge-aios-launch-1d-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-launch-1d-production.ts",
     "test:ge-aios-home-ux-closure-1a-operator-surface": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-home-ux-closure-1a-operator-surface.ts",
+    "test:ge-aios-home-runtime-authority-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-home-runtime-authority-1b.ts",
     "validate:ge-aios-home-ux-closure-1a-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-home-ux-closure-1a-production.ts",
     "test:ge-aios-runtime-throughput-1a-wiring": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-runtime-throughput-1a-wiring.ts",
     "validate:ge-aios-runtime-throughput-1a-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-runtime-throughput-1a-production.ts",
@@ -1610,6 +1620,11 @@
     "@fuzor/observability": "file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz",
     "@fuzor/configuration": "file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz",
     "@fuzor/knowledge": "file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz",
+    "@fuzor/memory": "file:../../fuzor/packages/memory",
+    "@fuzor/event-bus": "file:../../fuzor/packages/event-bus",
+    "@fuzor/decision-records": "file:../../fuzor/packages/decision-records",
+    "@fuzor/context": "file:../../fuzor/packages/context",
+    "@fuzor/sdk": "file:../../fuzor/packages/sdk",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -1659,5 +1674,18 @@
     "tsx": "^4.21.0",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@fuzor/identity": "file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz",
+      "@fuzor/observability": "file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz",
+      "@fuzor/configuration": "file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz",
+      "@fuzor/knowledge": "file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz",
+      "@fuzor/event-bus": "file:../../fuzor/packages/event-bus",
+      "@fuzor/decision-records": "file:../../fuzor/packages/decision-records",
+      "@fuzor/memory": "file:../../fuzor/packages/memory",
+      "@fuzor/context": "file:../../fuzor/packages/context",
+      "@fuzor/sdk": "file:../../fuzor/packages/sdk"
+    }
   }
 }
