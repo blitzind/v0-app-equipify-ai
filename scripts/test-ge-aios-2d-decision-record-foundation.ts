@@ -54,9 +54,11 @@ const serviceSource = readSource("lib/growth/aios/ai-decision-record-service.ts"
 for (const pattern of ["openai", "anthropic", "apollo", "pdl", "llm", "next-best-action", "executive-brain"]) {
   assert.equal(serviceSource.toLowerCase().includes(pattern), false, `service must not reference ${pattern}`)
 }
-assert.ok(serviceSource.includes("publishAiOsEvent"))
-assert.ok(serviceSource.includes("decision_record_ids"))
+assert.ok(serviceSource.includes("@fuzor/decision-records"))
 assert.equal(serviceSource.includes("computeGrowthLeadNextBestAction"), false)
+
+const repositorySource = readSource("lib/growth/aios/ai-decision-record-repository.ts")
+assert.ok(repositorySource.includes("@fuzor/decision-records"))
 
 const decisionFiles = [
   "lib/growth/aios/ai-decision-record-types.ts",

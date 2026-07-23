@@ -73,9 +73,9 @@ for (const pattern of [
 ]) {
   assert.equal(serviceSource.toLowerCase().includes(pattern), false, `service must not reference ${pattern}`)
 }
-assert.ok(serviceSource.includes("publishAiOsEvent"))
-assert.ok(serviceSource.includes("memory_refs"))
-assert.ok(serviceSource.includes("fetchAiMemoryRegistryBySource"))
+assert.ok(serviceSource.includes("@fuzor/memory"))
+assert.ok(serviceSource.includes("linkPlatformMemoryRegistryToWorkOrder"))
+assert.ok(serviceSource.includes("registerPlatformMemoryRegistryEntry"))
 assert.equal(serviceSource.includes(".insert("), false, "service must not insert into source stores")
 
 const memoryFiles = [

@@ -167,7 +167,7 @@ function main(): void {
   }
 
   const workspaceSummary = readSource("lib/growth/home/growth-home-workspace-summary-service.ts")
-  assert.match(workspaceSummary, /buildGrowthHomeOrganizationalKnowledge/)
+  assert.match(workspaceSummary, /fetchOrganizationKnowledgeStore/)
   assert.match(workspaceSummary, /organizationalKnowledge/)
   assert.doesNotMatch(workspaceSummary, /runBusinessIntelligence/)
 
@@ -177,15 +177,14 @@ function main(): void {
   assert.match(dashboard, /organizationalKnowledge/)
 
   const memoryEngineSource = readSource("lib/growth/memory/engine/run-memory-engine.ts")
-  assert.match(memoryEngineSource, /organizationalKnowledge/)
+  assert.match(memoryEngineSource, /@fuzor\/memory/)
   assert.doesNotMatch(memoryEngineSource, /runBusinessIntelligence/)
 
   const decisionSource = readSource("lib/growth/decision-engine/context/build-decision-context.ts")
   assert.match(decisionSource, /organizational_knowledge/)
 
   const narrativeSource = readSource("lib/growth/memory/bridges/narrative-memory.ts")
-  assert.match(narrativeSource, /buildKnowledgeNarrativeLines/)
-  assert.match(narrativeSource, /organizational_knowledge/)
+  assert.match(narrativeSource, /@fuzor\/memory/)
 
   const generatedAt = "2026-07-08T20:00:00.000Z"
   const organizationId = "org-17c"

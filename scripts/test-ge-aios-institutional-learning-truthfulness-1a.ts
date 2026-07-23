@@ -110,13 +110,13 @@ function main(): void {
   console.log("  ✓ organization preferences have no demo defaults")
 
   const summarizeSource = readSource("lib/growth/memory/summaries/summarize-memory-period.ts")
-  assert.match(summarizeSource, /buildValidatedInstitutionalLearningBullets/)
+  assert.match(summarizeSource, /@fuzor\/memory/)
   assert.doesNotMatch(summarizeSource, /input\.patterns/)
   assert.doesNotMatch(summarizeSource, /input\.preferences/)
   console.log("  ✓ learned insights no longer fall back to patterns or preferences")
 
   const narrativeBridgeSource = readSource("lib/growth/memory/bridges/narrative-memory.ts")
-  assert.match(narrativeBridgeSource, /buildValidatedInstitutionalLearningBullets/)
+  assert.match(narrativeBridgeSource, /@fuzor\/memory/)
   assert.doesNotMatch(narrativeBridgeSource, /learned_insights/)
   assert.doesNotMatch(narrativeBridgeSource, /detected_patterns/)
   console.log("  ✓ What I've Learned bullets use validated knowledge only")

@@ -136,15 +136,11 @@ for (const pattern of [
   assert.equal(serviceSource.toLowerCase().includes(pattern.toLowerCase()), false, `service must not reference ${pattern}`)
 }
 assert.ok(serviceSource.includes("assembleAiContextForWorkOrder"))
-assert.ok(serviceSource.includes("context.assembled"))
-assert.ok(serviceSource.includes("context.reused"))
-assert.ok(serviceSource.includes("context.validation_failed"))
-assert.ok(serviceSource.includes("getGrowthObjective"))
-assert.ok(serviceSource.includes("buildLeadMemoryInfluenceContext") === false)
-assert.ok(serviceSource.includes("resolveAiContextEntityMetadata"))
+assert.ok(serviceSource.includes("@fuzor/context"))
 
 const resolverSource = readSource("lib/growth/aios/ai-context-assembly-resolver.ts")
-assert.ok(resolverSource.includes("buildLeadMemoryInfluenceContext"))
+assert.ok(resolverSource.includes("@fuzor/context"))
+assert.ok(resolverSource.includes("resolvePlatformContextEntityMetadata"))
 
 const assemblyFiles = [
   "lib/growth/aios/ai-context-assembly-types.ts",

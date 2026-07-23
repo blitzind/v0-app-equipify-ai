@@ -77,10 +77,13 @@ assert.equal(migration.includes("grant delete on table growth.ai_os_events"), fa
 
 const serviceSource = readSource("lib/growth/aios/ai-event-service.ts")
 const bridgeSource = readSource("lib/growth/aios/ai-event-bridge.ts")
+const repositorySource = readSource("lib/growth/aios/ai-event-repository.ts")
 for (const pattern of ["openai", "anthropic", "apollo", "pdl", "websocket", "executive-brain"]) {
   assert.equal(serviceSource.toLowerCase().includes(pattern), false, `service must not reference ${pattern}`)
   assert.equal(bridgeSource.toLowerCase().includes(pattern), false, `bridge must not reference ${pattern}`)
 }
+assert.ok(serviceSource.includes("@fuzor/event-bus"))
+assert.ok(repositorySource.includes("@fuzor/event-bus"))
 
 const aiosEventFiles = [
   "lib/growth/aios/ai-event-types.ts",

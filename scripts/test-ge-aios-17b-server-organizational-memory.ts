@@ -69,7 +69,7 @@ function main(): void {
   }
 
   const workspaceSummary = readSource("lib/growth/home/growth-home-workspace-summary-service.ts")
-  assert.match(workspaceSummary, /buildGrowthHomeOrganizationMemory/)
+  assert.match(workspaceSummary, /fetchOrganizationMemoryStore/)
   assert.match(workspaceSummary, /organizationalMemory/)
   assert.doesNotMatch(workspaceSummary, /fetchAidenDailyBriefing/)
 
@@ -80,6 +80,7 @@ function main(): void {
   assert.match(dashboard, /organizationalMemory/)
 
   const repositorySource = readSource("lib/growth/memory/storage/organization-memory-repository.ts")
+  assert.match(repositorySource, /@fuzor\/memory/)
   assert.match(repositorySource, /persistValidatedSalesOutcomeMemoryEvents/)
   assert.doesNotMatch(repositorySource, /growth\.workflow\.status_changed/)
 
@@ -108,6 +109,7 @@ function main(): void {
   ]
 
   const resolved = resolvePersistedOrganizationalMemoryStore({
+    organizationId: "org-17b",
     serverMemory: {
       qaMarker: GROWTH_SERVER_ORG_MEMORY_QA_MARKER,
       store: serverStore,
