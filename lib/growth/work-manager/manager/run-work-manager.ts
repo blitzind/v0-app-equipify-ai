@@ -1,5 +1,10 @@
 /** GE-AIOS-11A — Canonical Work Manager orchestrator (deterministic, no execution). */
 
+import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
+import {
+  buildConstitutionalEscalationMapFromPortfolioLeads,
+  shouldSuppressOperatorInterruptForLead,
+} from "@/lib/growth/aios/authority/growth-constitutional-portfolio-escalation-1c"
 import { runDecisionEngine, type RunDecisionEngineInput } from "@/lib/growth/decision-engine/engine/run-decision-engine"
 import { nextBestActionsToWorkItems } from "@/lib/growth/work-manager/bridges/decision-engine-bridge"
 import {
@@ -20,6 +25,8 @@ export type RunWorkManagerInput = BuildWorkContextInput & {
   memorySummary?: AvaMemorySummary | null
   organizationId?: string | null
   portfolioLeads?: import("@/lib/growth/types").GrowthLead[] | null
+  /** AVA-GROWTH-OPERATOR-1B — per-lead canonical authority from Decision Engine 1A. */
+  canonicalAuthorityByLeadId?: GrowthCanonicalOpportunityAuthorityMap | null
 }
 
 export type ExecuteReadyWorkItemsResult =
@@ -58,14 +65,35 @@ export function runWorkManager(input: RunWorkManagerInput): AvaWorkManagerResult
     input.organizationId && input.portfolioLeads
       ? buildPortfolioEligibilityContext(input.organizationId, input.portfolioLeads)
       : null
+
+  const constitutionalEscalation = buildConstitutionalEscalationMapFromPortfolioLeads(
+    input.portfolioLeads ?? null,
+  )
+  const authorityByLeadId = input.canonicalAuthorityByLeadId ?? null
+
   const decisionResult = runDecisionEngine({
     ...input,
     memorySummary: input.memorySummary ?? null,
     portfolioEligibility,
     portfolioLeads: input.portfolioLeads ?? null,
+    canonicalAuthorityByLeadId: authorityByLeadId,
   })
   const workItems = filterPortfolioEligibleWorkItems(
-    nextBestActionsToWorkItems(decisionResult.next_best_actions, timestamp),
+    nextBestActionsToWorkItems(
+      decisionResult.next_best_actions,
+      timestamp,
+      authorityByLeadId,
+    ).filter((item) => {
+      const leadId =
+        item.href?.match(/\/growth\/leads\/([0-9a-f-]{36})/i)?.[1] ??
+        (/^[0-9a-f-]{36}$/i.test(item.decision_source_id) ? item.decision_source_id : null)
+      if (!leadId) return true
+      return !shouldSuppressOperatorInterruptForLead({
+        leadId,
+        constitutionalMap: constitutionalEscalation,
+        authorityByLeadId,
+      })
+    }),
     portfolioEligibility,
   )
   const completedToday = buildCompletedWorkItems(

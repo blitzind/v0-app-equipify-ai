@@ -28,6 +28,8 @@ import {
   type GrowthHumanApprovalSource,
   type GrowthHumanApprovalStatus,
 } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import { filterHumanApprovalItemsThroughCanonicalEscalation } from "@/lib/growth/aios/approvals/growth-hac-escalation-gate-1f"
+import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
 import {
   buildGrowthReviewHref,
   resolveOperatorPackageReviewHref,
@@ -69,6 +71,8 @@ export type GrowthHumanApprovalCenterInput = {
   meetingPreparationRuns: GrowthAutonomousMeetingRunRecord[]
   boundedAutonomousOutbound?: GrowthBoundedAutonomousOutboundReadModel | null
   adaptiveCalibrationProposals?: GrowthAdaptiveCalibrationProposal[]
+  /** AVA-GROWTH-OPERATOR-1F — portfolio authority for escalation deferral */
+  canonicalAuthorityByLeadId?: GrowthCanonicalOpportunityAuthorityMap | null
   topLimit?: number
   totalLimit?: number
 }
@@ -859,7 +863,12 @@ export function synthesizeGrowthHumanApprovalCenterReadModel(
     }
   }
 
-  const ranked = rankHumanApprovalItems([...deduped.values()], input.generatedAt)
+  const escalated = filterHumanApprovalItemsThroughCanonicalEscalation({
+    items: [...deduped.values()],
+    canonicalAuthorityByLeadId: input.canonicalAuthorityByLeadId ?? null,
+  })
+
+  const ranked = rankHumanApprovalItems(escalated, input.generatedAt)
   const items = ranked.slice(0, totalLimit)
   const topItems = items.slice(0, topLimit)
   const summary = buildHumanApprovalCenterSummary(items)

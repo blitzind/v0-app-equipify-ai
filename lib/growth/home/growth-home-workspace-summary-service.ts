@@ -104,6 +104,9 @@ import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experien
 import { loadGrowthOrganizationalEvidenceCompletenessFromProduction } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-production-loader-next-3b"
 import { loadGrowthHomeRuntimeTrustPayload } from "@/lib/growth/home/growth-home-runtime-trust-loader-1b"
 import { ensureScaleResearchBudgetForActivatedOrg, loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
+import { buildGrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-server-1e"
+import { hydrateCanonicalPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
+import { GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-snapshot-1f-types"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -997,6 +1000,74 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         })()
       : null
 
+  const executiveGrowthIntelligence = organizationId
+    ? await (async () => {
+        const startedAt = Date.now()
+        try {
+          const value = await buildGrowthExecutiveGrowthIntelligenceReadModel({
+            admin: input.admin,
+            organizationId,
+            generatedAt,
+            approvedProfile: approvedBusinessProfile?.profile ?? null,
+            validatedLearnings: organizationalKnowledge?.store.items ?? [],
+            portfolioLeads: productionLeadsForOperations,
+            salesOutcomes,
+            portfolioManager: productionPortfolioManager,
+            missionDiscovery: productionMissionDiscovery,
+            organizationalEvidence: organizationalEvidenceCompleteness,
+          })
+          stageTimings.push({
+            label: "executive_growth_intelligence",
+            durationMs: Date.now() - startedAt,
+            timedOut: false,
+          })
+          return value
+        } catch {
+          stageTimings.push({
+            label: "executive_growth_intelligence",
+            durationMs: Date.now() - startedAt,
+            timedOut: false,
+          })
+          return null
+        }
+      })()
+    : null
+
+  const canonicalPortfolioAuthority = organizationId
+    ? await (async () => {
+        const startedAt = Date.now()
+        try {
+          const leadIds = productionLeadsForOperations.map((lead) => lead.id).filter(Boolean)
+          const hydration = await hydrateCanonicalPortfolioAuthority(input.admin, {
+            organizationId,
+            leadIds,
+            generatedAt,
+            maxLeads: 32,
+            portfolioLeads: productionLeadsForOperations,
+          })
+          stageTimings.push({
+            label: "canonical_portfolio_authority",
+            durationMs: Date.now() - startedAt,
+            timedOut: false,
+          })
+          return {
+            qaMarker: GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER,
+            generatedAt,
+            authorityByLeadId: hydration.authorityByLeadId,
+            escalationTelemetry: hydration.telemetry,
+            hydratedLeadCount: leadIds.length,
+          }
+        } catch {
+          stageTimings.push({
+            label: "canonical_portfolio_authority",
+            durationMs: Date.now() - startedAt,
+            timedOut: false,
+          })
+          return null
+        }
+      })()
+    : null
+
   return {
     ok: true,
     qaMarker: GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER,
@@ -1043,6 +1114,8 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     organizationalEvidenceCompleteness,
     runtimeTrust,
     avaActivation,
+    executiveGrowthIntelligence,
+    canonicalPortfolioAuthority,
   }
 }
 

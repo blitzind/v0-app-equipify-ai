@@ -411,6 +411,8 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     pendingApprovalCount: input.aiOsUx.approveItemsCount,
     organizationalKnowledge: input.organizationalKnowledge ?? null,
     portfolioLeads: input.workspaceSummary.portfolioLeads ?? null,
+    canonicalAuthorityByLeadId:
+      input.workspaceSummary.canonicalPortfolioAuthority?.authorityByLeadId ?? null,
   })
 
   assertDailyBriefing(dailyBriefing)
@@ -498,6 +500,8 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     primaryDecision: decision.primaryDecision,
     canonicalOperatorTask: input.aiOsUx.canonicalOperatorTask,
     canonicalHeroDecision: input.canonicalHeroDecision ?? null,
+    canonicalAuthorityByLeadId:
+      input.workspaceSummary.canonicalPortfolioAuthority?.authorityByLeadId ?? null,
     canonicalOperatorFocus: input.aiOsUx.canonicalOperatorFocus,
     workManager,
     waitingOnYou: input.waitingOnYou ?? input.aiOsUx.waitingOnYou,

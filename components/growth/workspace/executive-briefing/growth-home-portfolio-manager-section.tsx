@@ -11,6 +11,7 @@ import {
 import { GROWTH_OPERATOR_PORTFOLIO_EXPLANATION } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
 import { GrowthHomeProgressBar } from "@/components/growth/workspace/executive-briefing/growth-home-progress-bar"
+import { GROWTH_EXECUTIVE_PORTFOLIO_METRIC_LABELS } from "@/lib/growth/aios/operator-experience/growth-executive-experience-1d"
 import {
   GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
   GROWTH_HOME_SECTION_PORTFOLIO_SUBTITLE,
@@ -63,21 +64,23 @@ export function GrowthHomePortfolioManagerSection({ portfolio }: Props) {
 
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg border border-border/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Needs</p>
+            <p className="text-xs text-muted-foreground">{GROWTH_EXECUTIVE_PORTFOLIO_METRIC_LABELS.growthPipeline}</p>
             <p className="text-sm font-medium tabular-nums text-foreground">{portfolio.needsCount}</p>
           </div>
           <div className="rounded-lg border border-border/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Research</p>
+            <p className="text-xs text-muted-foreground">{GROWTH_EXECUTIVE_PORTFOLIO_METRIC_LABELS.activelyResearching}</p>
             <p className="text-sm font-medium text-foreground">
-              {portfolio.researchRunning ? `Running (${portfolio.researchRunningCount})` : "Idle"}
+              {portfolio.researchRunning
+                ? `${portfolio.researchRunningCount} in progress`
+                : "None active"}
             </p>
           </div>
           <div className="rounded-lg border border-border/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Discovery</p>
+            <p className="text-xs text-muted-foreground">{GROWTH_EXECUTIVE_PORTFOLIO_METRIC_LABELS.discovery}</p>
             <p className="text-sm font-medium text-foreground">{portfolio.discoveryStatusDisplay}</p>
           </div>
           <div className="rounded-lg border border-border/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Admissions pending</p>
+            <p className="text-xs text-muted-foreground">{GROWTH_EXECUTIVE_PORTFOLIO_METRIC_LABELS.admissionsReview}</p>
             <p className="text-sm font-medium tabular-nums text-foreground">{portfolio.admissionsPending}</p>
           </div>
         </div>

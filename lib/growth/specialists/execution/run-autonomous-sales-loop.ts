@@ -37,9 +37,9 @@ import type {
 import type { SalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import {
   executeReadyWorkItems,
-  runWorkManager,
   type RunWorkManagerInput,
 } from "@/lib/growth/work-manager/manager/run-work-manager"
+import { runWorkManagerWithPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import { withSchedulerWorkTimeout } from "@/lib/growth/runtime-guardrails/growth-scheduler-runtime-budget-1a"
 import {
@@ -156,7 +156,8 @@ async function loadAutonomousSalesLoopContext(
   }
 }
 
-function buildWorkManagerState(input: {
+async function buildWorkManagerState(input: {
+  admin: SupabaseClient
   workManagerInput: RunWorkManagerInput
   salesOutcomes: SalesOutcome[]
   organizationalKnowledge: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[]
@@ -164,7 +165,7 @@ function buildWorkManagerState(input: {
   organizationId: string
   generatedAt: string
   portfolioLeads?: import("@/lib/growth/types").GrowthLead[]
-}): { workResult: AvaWorkManagerResult; salesOutcomes: SalesOutcome[] } {
+}): Promise<{ workResult: AvaWorkManagerResult; salesOutcomes: SalesOutcome[] }> {
   const { summary: memorySummary } = runMemoryEngine({
     organizationId: input.organizationId,
     generatedAt: input.generatedAt,
@@ -178,14 +179,16 @@ function buildWorkManagerState(input: {
     organizationalKnowledge: input.organizationalKnowledge,
   })
 
-  const workResult = runWorkManager({
+  const hydrated = await runWorkManagerWithPortfolioAuthority(input.admin, {
     ...input.workManagerInput,
     memorySummary,
     organizationId: input.organizationId,
     portfolioLeads: input.portfolioLeads ?? null,
+    generatedAt: input.generatedAt,
+    maxHydrationLeads: 32,
   })
 
-  return { workResult, salesOutcomes: input.salesOutcomes }
+  return { workResult: hydrated.workResult, salesOutcomes: input.salesOutcomes }
 }
 
 type ResearchWorkBatchEntry = {
@@ -276,7 +279,8 @@ export async function runAutonomousSalesLoop(
     return buildLoopFailureResult({ reason: "context_unavailable", dryRun })
   }
 
-  let { workResult, salesOutcomes } = buildWorkManagerState({
+  let { workResult, salesOutcomes } = await buildWorkManagerState({
+    admin: input.admin,
     ...loadedContext,
     organizationId: input.organizationId,
     generatedAt,
@@ -392,13 +396,15 @@ export async function runAutonomousSalesLoop(
           })
         }
 
-        const nextState = buildWorkManagerState({
+        const nextState = await buildWorkManagerState({
+          admin: input.admin,
           workManagerInput: loadedContext.workManagerInput,
           salesOutcomes,
           organizationalKnowledge: loadedContext.organizationalKnowledge,
           persistedMemoryStore: loadedContext.persistedMemoryStore,
           organizationId: input.organizationId,
           generatedAt,
+          portfolioLeads: loadedContext.portfolioLeads,
         })
         workResult = nextState.workResult
 
@@ -604,13 +610,15 @@ export async function runAutonomousSalesLoop(
         outcome_type: execution.outcome.outcome_type,
       })
 
-      const nextState = buildWorkManagerState({
+      const nextState = await buildWorkManagerState({
+        admin: input.admin,
         workManagerInput: loadedContext.workManagerInput,
         salesOutcomes,
         organizationalKnowledge: knowledge?.store.items ?? loadedContext.organizationalKnowledge,
         persistedMemoryStore: loadedContext.persistedMemoryStore,
         organizationId: input.organizationId,
         generatedAt,
+        portfolioLeads: loadedContext.portfolioLeads,
       })
       workResult = nextState.workResult
 

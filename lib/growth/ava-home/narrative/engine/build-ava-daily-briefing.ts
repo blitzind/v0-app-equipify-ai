@@ -79,6 +79,8 @@ export type BuildAvaDailyBriefingInput = {
   salesOutcomes?: GrowthHomeSalesOutcomesPayload | null
   /** GE-AIOS-17C — Server-hydrated organizational knowledge */
   portfolioLeads?: import("@/lib/growth/types").GrowthLead[] | null
+  /** AVA-GROWTH-OPERATOR-1F — hydrated canonical authority map from workspace summary */
+  canonicalAuthorityByLeadId?: import("@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b").GrowthCanonicalOpportunityAuthorityMap | null
 }
 
 function appendScaleStoryBlock(
@@ -149,6 +151,7 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     memorySummary,
     organizationId: input.organizationId ?? null,
     portfolioLeads: input.portfolioLeads ?? input.workspaceSummary.portfolioLeads ?? null,
+    canonicalAuthorityByLeadId: input.canonicalAuthorityByLeadId ?? null,
   })
   const eligibleLeadCount =
     input.workspaceSummary.eligibleLeadCount ??

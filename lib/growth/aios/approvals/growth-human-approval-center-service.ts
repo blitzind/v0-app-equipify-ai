@@ -17,12 +17,64 @@ import {
   fetchCompletedWorkLeadLifecycleMap,
 } from "@/lib/growth/aios/approvals/completed-work-lead-lifecycle"
 import { filterActiveCompletedWorkItems } from "@/lib/growth/aios/approvals/completed-work-operator-ux"
+import { hydrateCanonicalPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
+import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
 import { fetchBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-service"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 import { listPendingAutomationApprovals } from "@/lib/growth/automation/growth-automation-approval-service"
 import { listHumanExecutionApprovals } from "@/lib/growth/human-execution/human-execution-repository"
 import { listSequenceExecutionJobs } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { listPendingApprovalOutboundSessions } from "@/lib/voice/repository/voice-ai-outbound-repository"
+
+function collectLeadIdsFromHumanApprovalCenterCommandCenter(input: {
+  commandCenter: Parameters<typeof buildGrowthHumanApprovalCenterReadModel>[0]["commandCenter"]
+  geV15Inbox?: GeV15ApprovalInboxSnapshotItem[]
+  automationApprovals?: GrowthHumanApprovalCenterInput["automationApprovals"]
+  sequenceJobs?: GrowthHumanApprovalCenterInput["sequenceJobs"]
+  aiVoiceSessions?: AiVoiceApprovalSnapshotItem[]
+  humanExecutionApprovals?: GrowthHumanApprovalCenterInput["humanExecutionApprovals"]
+}): string[] {
+  const ids = new Set<string>()
+
+  for (const row of input.commandCenter.revenueOperator.orchestrations) {
+    if (row.leadId) ids.add(row.leadId)
+  }
+  for (const rec of input.commandCenter.metaRecommender.recommendations) {
+    if (rec.subjectType === "lead" && rec.subjectId) ids.add(rec.subjectId)
+  }
+  for (const binding of input.commandCenter.priorityBinding.bindings) {
+    if (binding.leadId) ids.add(binding.leadId)
+  }
+  for (const item of input.commandCenter.needsAttention) {
+    if (item.leadId) ids.add(item.leadId)
+  }
+  for (const item of input.commandCenter.executionPlanReviewQueue) {
+    if (item.leadId) ids.add(item.leadId)
+  }
+  for (const row of input.geV15Inbox ?? []) {
+    if (row.leadId) ids.add(row.leadId)
+  }
+  for (const approval of input.automationApprovals ?? []) {
+    if (approval.leadId) ids.add(approval.leadId)
+  }
+  for (const job of input.sequenceJobs ?? []) {
+    if (job.leadId) ids.add(job.leadId)
+  }
+  for (const session of input.aiVoiceSessions ?? []) {
+    if (session.leadId) ids.add(session.leadId)
+  }
+  for (const approval of input.humanExecutionApprovals ?? []) {
+    if (approval.leadId) ids.add(approval.leadId)
+  }
+  for (const run of input.commandCenter.autonomousOutreachPreparationPilot.recentRuns) {
+    if (run.leadId) ids.add(run.leadId)
+  }
+  for (const run of input.commandCenter.autonomousMeetingPilot.recentRuns) {
+    if (run.leadId) ids.add(run.leadId)
+  }
+
+  return [...ids]
+}
 
 export function buildGrowthHumanApprovalCenterReadModel(input: {
   organizationId: string
@@ -47,6 +99,7 @@ export function buildGrowthHumanApprovalCenterReadModel(input: {
   adaptiveCalibrationProposals?: GrowthHumanApprovalCenterInput["adaptiveCalibrationProposals"]
   topLimit?: number
   totalLimit?: number
+  canonicalAuthorityByLeadId?: GrowthCanonicalOpportunityAuthorityMap | null
 }): GrowthHumanApprovalCenterReadModel {
   const engineInput: GrowthHumanApprovalCenterInput = {
     organizationId: input.organizationId,
@@ -70,6 +123,7 @@ export function buildGrowthHumanApprovalCenterReadModel(input: {
     adaptiveCalibrationProposals: input.adaptiveCalibrationProposals ?? [],
     topLimit: input.topLimit,
     totalLimit: input.totalLimit,
+    canonicalAuthorityByLeadId: input.canonicalAuthorityByLeadId ?? null,
   }
 
   return synthesizeGrowthHumanApprovalCenterReadModel(engineInput)
@@ -132,6 +186,30 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
     generatedAt: input.generatedAt,
   })
 
+  const leadIds = collectLeadIdsFromHumanApprovalCenterCommandCenter({
+    commandCenter: input.commandCenter,
+    geV15Inbox,
+    automationApprovals,
+    sequenceJobs,
+    aiVoiceSessions,
+    humanExecutionApprovals,
+  })
+
+  let canonicalAuthorityByLeadId: GrowthCanonicalOpportunityAuthorityMap | null = null
+  if (leadIds.length > 0) {
+    try {
+      const hydration = await hydrateCanonicalPortfolioAuthority(admin, {
+        organizationId: input.organizationId,
+        leadIds,
+        generatedAt: input.generatedAt,
+        maxLeads: 32,
+      })
+      canonicalAuthorityByLeadId = hydration.authorityByLeadId
+    } catch {
+      canonicalAuthorityByLeadId = null
+    }
+  }
+
   const readModel = buildGrowthHumanApprovalCenterReadModel({
     organizationId: input.organizationId,
     generatedAt: input.generatedAt,
@@ -145,6 +223,7 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
     adaptiveCalibrationProposals: input.adaptiveCalibrationProposals,
     topLimit: input.topLimit,
     totalLimit: input.totalLimit,
+    canonicalAuthorityByLeadId,
   })
 
   // OPERATOR-UX-1A — exclude archived/disqualified leads from active Completed Work.

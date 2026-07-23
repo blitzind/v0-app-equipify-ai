@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthAvaMemoryReviewSection } from "@/components/growth/ai-os/approvals/growth-ava-memory-review-section"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import type { Approvals2AOperatorReviewPacket } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
-import { GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 import {
   GROWTH_OPERATOR_PACKAGE_PROGRESSIVE_REVIEW_2A_QA_MARKER,
   type OperatorPackageChannelReadinessRow,
@@ -18,6 +17,11 @@ import {
   GROWTH_OPERATOR_PACKAGE_RECOMMENDATION_2D_QA_MARKER,
   type OperatorPackageRecommendation,
 } from "@/lib/growth/workspace/ux-2d/review/growth-operator-package-recommendation-2d"
+import {
+  GROWTH_EXECUTIVE_APPROVAL_PACKAGE_1D_QA_MARKER,
+  projectExecutiveApprovalPackage1D,
+} from "@/lib/growth/workspace/ux-1d/review/growth-executive-approval-package-1d"
+import { GROWTH_EXECUTIVE_SHOW_AVA_WORK_LABEL, formatExecutiveConfidenceLabel } from "@/lib/growth/aios/operator-experience/growth-executive-experience-1d"
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -80,8 +84,8 @@ function qualityBadgeTone(state: OperatorPackageRecommendation["qualityState"]):
 }
 
 function qualityBadgeLabel(state: OperatorPackageRecommendation["qualityState"]): string {
-  if (state === "ready") return "Recommendation ready"
-  if (state === "needs_attention") return "Needs attention"
+  if (state === "ready") return "Ready for your decision"
+  if (state === "needs_attention") return "Review assumptions"
   return "Limited evidence"
 }
 
@@ -187,6 +191,12 @@ export function GrowthAvaPackageProgressiveReviewLayout({
   onSaveDrafts,
   onMemoryUpdated,
 }: Props) {
+  const executivePackage = projectExecutiveApprovalPackage1D({
+    packet: view,
+    summary,
+    recommendation,
+  })
+
   const visibleChannelRows = summary.channelReadiness.filter((row) => {
     if (row.content === "prepared") return true
     if (row.content === "missing" && row.contact === "contact_missing") {
@@ -200,46 +210,150 @@ export function GrowthAvaPackageProgressiveReviewLayout({
       className="mt-5 space-y-4"
       data-qa-marker={GROWTH_OPERATOR_PACKAGE_PROGRESSIVE_REVIEW_2A_QA_MARKER}
       data-qa-marker-recommendation-2d={GROWTH_OPERATOR_PACKAGE_RECOMMENDATION_2D_QA_MARKER}
+      data-qa-marker-executive-1d={GROWTH_EXECUTIVE_APPROVAL_PACKAGE_1D_QA_MARKER}
       data-qa-section="package-review-level-1"
     >
-      <SummaryBlock title="60-second decision summary">
+      <SummaryBlock title="Executive recommendation">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <GrowthBadge
-              label={qualityBadgeLabel(recommendation.qualityState)}
+              label={executivePackage.qualityLabel}
               tone={qualityBadgeTone(recommendation.qualityState)}
             />
-            <span className="text-xs text-muted-foreground">{summary.confidenceLabel}</span>
+            <span className="text-xs text-muted-foreground">{executivePackage.confidenceLabel}</span>
           </div>
 
-          {recommendation.weakEvidenceIntro ? (
+          {executivePackage.weakEvidenceIntro ? (
             <div className="rounded-md border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
-              {recommendation.weakEvidenceIntro}
+              {executivePackage.weakEvidenceIntro}
             </div>
           ) : null}
 
           <div>
-            <p className="text-lg font-semibold text-foreground">{summary.companyName}</p>
-            {summary.companyContext ? (
-              <p className="mt-1 text-sm text-muted-foreground">{summary.companyContext}</p>
+            <p className="text-lg font-semibold text-foreground">{executivePackage.company.name}</p>
+            {executivePackage.company.context ? (
+              <p className="mt-1 text-sm text-muted-foreground">{executivePackage.company.context}</p>
             ) : null}
-            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Executive recommendation
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-foreground">
-              {recommendation.executiveRecommendation}
+            <p className="mt-2 text-sm leading-relaxed text-foreground">
+              {executivePackage.executiveRecommendation}
             </p>
           </div>
 
-          {recommendation.whyThisAccount.length ? (
+          {executivePackage.company.icpFitSummary.length ? (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Why this account
+                Why this company fits your ICP
               </p>
-              <BulletList lines={recommendation.whyThisAccount} />
+              <BulletList lines={executivePackage.company.icpFitSummary} />
             </div>
           ) : null}
 
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Decision maker
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {executivePackage.decisionMaker.name
+                ? `${executivePackage.decisionMaker.name}${executivePackage.decisionMaker.title ? ` · ${executivePackage.decisionMaker.title}` : ""}`
+                : "No verified contact on file yet."}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{executivePackage.decisionMaker.contactSummary}</p>
+            {recommendation.recommendedBuyer.weakContact ? (
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                Contact confidence is limited — verify the buyer before approving outreach.
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Recommended outreach strategy
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {executivePackage.outreachStrategyDetail.angle}
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {executivePackage.outreachStrategyDetail.angleRationale}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Recommended action
+            </p>
+            <p className="mt-1 text-sm text-foreground">{executivePackage.recommendedAction}</p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Prepared outreach messages
+            </p>
+            {executivePackage.preparedMessages.length ? (
+              <div className="flex flex-wrap gap-2">
+                {executivePackage.preparedMessages.map((message) => (
+                  <GrowthBadge key={message.channel} label={message.label} tone="healthy" />
+                ))}
+              </div>
+            ) : (
+              <GrowthBadge label="No drafts prepared" tone="attention" />
+            )}
+          </div>
+
+          {summary.primaryEmailDraft ? (
+            <div className="space-y-2">
+              <DraftEditorBlock
+                draft={summary.primaryEmailDraft}
+                draftEdits={draftEdits}
+                onDraftChange={onDraftChange}
+              />
+            </div>
+          ) : null}
+
+          {summary.secondaryPreparedDrafts.length ? (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Other prepared messages
+              </p>
+              <div className="space-y-2">
+                {summary.secondaryPreparedDrafts.map((draft) => (
+                  <GrowthCollapsibleEngineCard
+                    key={draft.channel}
+                    title={draft.label}
+                    defaultOpen={false}
+                    compact
+                    persistKey={`ava-outreach-draft-${packageId}-${draft.channel}`}
+                    headerAside={<GrowthBadge label="Prepared" tone="healthy" />}
+                  >
+                    <DraftEditorBlock
+                      draft={draft}
+                      draftEdits={draftEdits}
+                      onDraftChange={onDraftChange}
+                    />
+                  </GrowthCollapsibleEngineCard>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={busy || !leadId} onClick={onSaveDrafts}>
+              {busy ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
+              Save draft edits
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Save edits before you approve — I will use the saved version when sending is enabled.
+            </span>
+          </div>
+        </div>
+      </SummaryBlock>
+
+      <GrowthCollapsibleEngineCard
+        title={GROWTH_EXECUTIVE_SHOW_AVA_WORK_LABEL}
+        defaultOpen={false}
+        compact
+        persistKey={`ava-outreach-executive-work-${packageId}`}
+      >
+        <div className="space-y-4" data-qa-section="package-review-show-ava-work">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Why now
@@ -247,63 +361,22 @@ export function GrowthAvaPackageProgressiveReviewLayout({
             <p className="mt-1 text-sm text-foreground">{recommendation.whyNow}</p>
           </div>
 
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Recommended buyer
-            </p>
-            <p className="mt-1 text-sm text-foreground">
-              {recommendation.recommendedBuyer.name
-                ? `${recommendation.recommendedBuyer.name}${recommendation.recommendedBuyer.title ? ` · ${recommendation.recommendedBuyer.title}` : ""}`
-                : "No verified contact on file yet."}
-            </p>
-            {recommendation.recommendedBuyer.confidenceLabel ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {recommendation.recommendedBuyer.confidenceLabel}
-              </p>
-            ) : null}
-            <p className="mt-1 text-sm text-foreground">{recommendation.recommendedBuyer.roleRationale}</p>
-            {recommendation.recommendedBuyer.weakContact ? (
-              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
-                Contact confidence is limited — verify the buyer before authorizing outreach.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Recommended angle
-            </p>
-            <p className="mt-1 text-sm font-medium text-foreground">{recommendation.primaryAngle.label}</p>
-            <p className="mt-1 text-sm text-foreground">{recommendation.primaryAngle.rationale}</p>
-            {recommendation.primaryAngle.equipifyValue ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Equipify fit: {recommendation.primaryAngle.equipifyValue}
-              </p>
-            ) : null}
-          </div>
-
-          <div>
+          <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               First-conversation strategy
             </p>
             <div className="mt-1 space-y-1 text-sm text-foreground">
               <p>
                 <span className="font-medium">Opening premise:</span>{" "}
-                {recommendation.firstConversation.openingPremise}
+                {executivePackage.outreachStrategyDetail.openingPremise}
               </p>
               <p>
                 <span className="font-medium">Discovery question:</span>{" "}
-                {recommendation.firstConversation.discoveryQuestion}
+                {executivePackage.outreachStrategyDetail.discoveryQuestion}
               </p>
-              {recommendation.firstConversation.proofPoint ? (
-                <p>
-                  <span className="font-medium">Proof point:</span>{" "}
-                  {recommendation.firstConversation.proofPoint}
-                </p>
-              ) : null}
               <p>
                 <span className="font-medium">Desired next step:</span>{" "}
-                {recommendation.firstConversation.desiredNextStep}
+                {executivePackage.outreachStrategyDetail.desiredNextStep}
               </p>
             </div>
           </div>
@@ -345,92 +418,35 @@ export function GrowthAvaPackageProgressiveReviewLayout({
             )}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Prepared outreach
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {visibleChannelRows.length ? (
-                visibleChannelRows.map((row) => (
-                  <GrowthBadge key={row.channel} label={row.operatorLabel} tone={channelBadgeTone(row)} />
-                ))
-              ) : (
-                <GrowthBadge label="No drafts prepared" tone="attention" />
-              )}
+          <div className="grid gap-2 rounded-md border border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground sm:grid-cols-2">
+            <div>
+              <p className="font-medium text-foreground">Content readiness</p>
+              <p className="mt-1">{summary.contentReadySummary}</p>
             </div>
-            <div className="grid gap-2 rounded-md border border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground sm:grid-cols-3">
-              <div>
-                <p className="font-medium text-foreground">Content readiness</p>
-                <p className="mt-1">{summary.contentReadySummary}</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Contact readiness</p>
-                <p className="mt-1">{summary.contactReadySummary}</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Transport readiness</p>
-                <p className="mt-1">{summary.transportSummary}</p>
-              </div>
+            <div>
+              <p className="font-medium text-foreground">Contact readiness</p>
+              <p className="mt-1">{summary.contactReadySummary}</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Sending readiness</p>
+              <p className="mt-1">{summary.transportSummary}</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Prepared channels</p>
+              <p className="mt-1">
+                {visibleChannelRows.length
+                  ? visibleChannelRows.map((row) => row.operatorLabel).join(" · ")
+                  : "None prepared"}
+              </p>
             </div>
           </div>
 
-          {summary.primaryEmailDraft ? (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Primary email draft
-              </p>
-              <DraftEditorBlock
-                draft={summary.primaryEmailDraft}
-                draftEdits={draftEdits}
-                onDraftChange={onDraftChange}
-              />
-            </div>
-          ) : null}
-
-          {summary.secondaryPreparedDrafts.length ? (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Other prepared drafts
-              </p>
-              <div className="space-y-2">
-                {summary.secondaryPreparedDrafts.map((draft) => (
-                  <GrowthCollapsibleEngineCard
-                    key={draft.channel}
-                    title={draft.label}
-                    defaultOpen={false}
-                    compact
-                    persistKey={`ava-outreach-draft-${packageId}-${draft.channel}`}
-                    headerAside={<GrowthBadge label="Prepared" tone="healthy" />}
-                  >
-                    <DraftEditorBlock
-                      draft={draft}
-                      draftEdits={draftEdits}
-                      onDraftChange={onDraftChange}
-                    />
-                  </GrowthCollapsibleEngineCard>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={busy || !leadId} onClick={onSaveDrafts}>
-              {busy ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
-              Save draft edits
-            </Button>
-            <span className="text-xs text-muted-foreground" data-qa={GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER}>
-              Save edits before authorize — transport sends the saved version when enabled.
-            </span>
-          </div>
-        </div>
-      </SummaryBlock>
-
-      <GrowthCollapsibleEngineCard
-        title="View supporting research"
-        defaultOpen={false}
-        compact
-        persistKey={`ava-outreach-l2-research-${packageId}`}
-      >
+          <GrowthCollapsibleEngineCard
+            title="Supporting research"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-l2-research-${packageId}`}
+          >
         <div className="space-y-4" data-qa-section="package-review-level-2-research">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Field label="Company" value={view.company.name} />
@@ -553,13 +569,13 @@ export function GrowthAvaPackageProgressiveReviewLayout({
           ) : null}
 
           {view.operatorReviewLayout.canonicalDecisionEssentials.length ? (
-            <SummaryBlock title="Why this package exists">
+            <SummaryBlock title="Why I prepared this package">
               <BulletList lines={view.operatorReviewLayout.canonicalDecisionEssentials} />
             </SummaryBlock>
           ) : null}
 
           {view.operatorReviewLayout.canonicalDecisionEnforcementEssentials.length ? (
-            <SummaryBlock title="Enforcement status">
+            <SummaryBlock title="Execution status">
               <BulletList lines={view.operatorReviewLayout.canonicalDecisionEnforcementEssentials} />
             </SummaryBlock>
           ) : null}
@@ -693,7 +709,7 @@ export function GrowthAvaPackageProgressiveReviewLayout({
                 label="Research confidence"
                 value={
                   view.company.researchConfidence != null
-                    ? `${Math.round(view.company.researchConfidence * 100)}%`
+                    ? formatExecutiveConfidenceLabel(view.company.researchConfidence)
                     : "Not prepared"
                 }
               />

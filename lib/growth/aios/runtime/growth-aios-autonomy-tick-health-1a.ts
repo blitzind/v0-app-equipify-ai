@@ -17,6 +17,7 @@ import { inspectAutonomousSalesLoopDryRun } from "@/lib/growth/specialists/execu
 import { selectNextExecutableWorkItem } from "@/lib/growth/specialists/execution/select-next-executable-work-item"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { runWorkManagerWithPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
 import { runWorkManager } from "@/lib/growth/work-manager/manager/run-work-manager"
 import { isExecutableWorkItem } from "@/lib/growth/work-manager/state/work-item-state"
 import {
@@ -150,12 +151,13 @@ export async function buildGrowthAiosAutonomyTickHealthSnapshot(
     })
 
     stage = "work_manager"
-    const workResult = runWorkManager({
+    const hydratedWork = await runWorkManagerWithPortfolioAuthority(admin, {
       ...portfolioSnapshot.workManagerInput,
       memorySummary,
       organizationId,
       portfolioLeads: portfolioSnapshot.portfolioLeads,
     })
+    const workResult = hydratedWork.workResult
 
     const candidateCount = workResult.all_work_items.length
     const selectedItem = selectNextExecutableWorkItem(workResult)

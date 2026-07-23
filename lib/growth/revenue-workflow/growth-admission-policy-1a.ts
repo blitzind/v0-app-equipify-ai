@@ -19,6 +19,7 @@ import type {
   GrowthLeadAdmissionEvaluation,
   GrowthLeadAdmissionState,
 } from "@/lib/growth/revenue-workflow/growth-lead-admission-types"
+import { isAutonomousTerminalRejectReason } from "@/lib/growth/aios/authority/growth-canonical-escalation-authority-1c"
 
 export const GROWTH_ADMISSION_POLICY_1A_QA_MARKER = "ge-aios-admission-policy-1a-v1" as const
 
@@ -156,13 +157,16 @@ export function applyResearchSufficiencyAdmissionPolicy(
       state = "rejected"
       reasons.push(...mapSufficiencyDisqualifiersToAdmissionReasons(sufficiency))
     }
+    const autonomousReject =
+      sufficiency.decision === "terminal_reject" ||
+      (reasons.length > 0 && reasons.every(isAutonomousTerminalRejectReason))
     return {
       ...base,
       state,
       reasons: uniqueReasons(reasons),
       leadStatus: resolveLeadStatus(state),
-      requiresHumanReview: true,
-      blockers: resolveBlockersForState(state),
+      requiresHumanReview: !autonomousReject,
+      blockers: autonomousReject ? [] : resolveBlockersForState(state),
     }
   }
 
@@ -240,8 +244,13 @@ export function applyResearchSufficiencyAdmissionPolicy(
     }
   }
 
+  const autonomousTerminalReject =
+    sufficiency.decision === "terminal_reject" ||
+    (state === "rejected" && reasons.length > 0 && reasons.every(isAutonomousTerminalRejectReason))
+
   const requiresHumanReview =
-    state === "review" || state === "invalid" || state === "rejected" || base.requiresHumanReview
+    !autonomousTerminalReject &&
+    (state === "review" || (state === "invalid" && !autonomousTerminalReject) || base.requiresHumanReview)
 
   return {
     ...base,

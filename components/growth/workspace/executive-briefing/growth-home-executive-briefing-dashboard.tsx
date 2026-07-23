@@ -57,6 +57,7 @@ import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { GrowthHomeAvaHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-hero-section"
 import { GrowthHomeAvaRecommendationExperienceSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-recommendation-experience-section"
 import { GrowthHomeAvaStrategicInsightSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-strategic-insight-section"
+import { GrowthHomeExecutiveGrowthReportSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-growth-report-section"
 import { GrowthHomeAvaBusinessObjectiveSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-business-objective-section"
 import { GrowthHomeAvaWorkingNowSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-working-now-section"
 import { GrowthHomeCompletedTodayTimelineSection } from "@/components/growth/workspace/executive-briefing/growth-home-completed-today-timeline-section"
@@ -605,6 +606,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
         {!operatorClosureMode && avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
           <GrowthHomeAvaStrategicInsightSection leadership={avaHero.strategicLeadership} />
+        ) : null}
+
+        {!operatorClosureMode ? (
+          <GrowthHomeExecutiveGrowthReportSection
+            intelligence={workspaceSummary?.executiveGrowthIntelligence ?? null}
+          />
         ) : null}
 
         {!operatorClosureMode ? (

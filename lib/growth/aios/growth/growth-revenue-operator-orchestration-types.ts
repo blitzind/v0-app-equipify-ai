@@ -20,7 +20,7 @@ export const GROWTH_REVENUE_OPERATOR_ORCHESTRATION_QA_MARKER =
   "growth-aios-growth-4b-revenue-operator-orchestration-v1" as const
 
 export const GROWTH_REVENUE_OPERATOR_ORCHESTRATION_RULE =
-  "Revenue Operator orchestration is recommendation-only in 4B — it evaluates system state and assigns agent ownership without executing agents, runtime, outbound, providers, Work Orders, or Core mutations." as const
+  "Revenue Operator orchestration supervises agent handoffs and monitors gates — it evaluates system state and assigns agent ownership without executing agents, runtime, outbound, providers, Work Orders, or Core mutations. Per-opportunity next action defers to Canonical Decision Engine 1A when bound (AVA-GROWTH-OPERATOR-1B)." as const
 
 export const REVENUE_OPERATOR_LIFECYCLE_STAGES = [
   "research",
@@ -117,6 +117,8 @@ export type RevenueOperatorOrchestrationRecord = {
     status: string | null
     recommendedNextStep: string | null
   }
+  /** AVA-GROWTH-OPERATOR-1B — canonical decision authority deferral. */
+  canonicalAuthorityBinding?: import("@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b").GrowthCanonicalAuthorityBinding
 }
 
 export type RevenueOperatorOrchestrationPlanContext = {

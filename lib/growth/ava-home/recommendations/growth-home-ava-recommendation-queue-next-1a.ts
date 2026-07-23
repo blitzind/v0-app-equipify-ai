@@ -5,6 +5,14 @@
 
 import type { GrowthCanonicalDecisionResolution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
 import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import {
+  buildCanonicalRecommendationAuthorityContext,
+  shouldSuppressDailyQueueItem,
+  shouldSuppressWorkManagerQueueItem,
+} from "@/lib/growth/aios/authority/growth-recommendation-authority-gate-1b"
+import {
+  evaluateCanonicalEscalation,
+} from "@/lib/growth/aios/authority/growth-canonical-escalation-authority-1c"
 import type { GrowthCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types"
 import type { GrowthCanonicalOperatorTask } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import type { GrowthSupervisedSalesProgressNarrative } from "@/lib/growth/aios/operator-experience/growth-supervised-sales-progress-narrative-1b"
@@ -35,6 +43,11 @@ import type {
   GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import type { GrowthHomeAvaHeroDecision } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
+import {
+  alignExecutiveHomeRecommendations,
+  buildExecutiveResearchProgressLine,
+  humanizeExecutiveCopy,
+} from "@/lib/growth/aios/operator-experience/growth-executive-experience-1d"
 
 const GROWTH_OBJECTIVES_WORKSPACE_HREF = "/growth/objectives" as const
 
@@ -49,14 +62,7 @@ function buildResearchProgressLine(input: {
   confidencePercent?: number | null
   detail?: string | null
 }): string | null {
-  const percent = input.confidencePercent
-  if (typeof percent === "number" && percent > 0 && percent < 100) {
-    return `Research is already ${Math.round(percent)}% complete.`
-  }
-  if (input.detail && /research|qualif|progress|complete/i.test(input.detail)) {
-    return input.detail
-  }
-  return null
+  return buildExecutiveResearchProgressLine(input)
 }
 
 function buildOutcomeLine(kind: GrowthHomeAvaRecommendationKind, detail: string | null): string | null {
@@ -108,6 +114,7 @@ export type BuildGrowthHomeAvaRecommendationExperienceInput = {
   primaryDecision: GrowthHomeAvaHeroDecision | null
   canonicalOperatorTask?: GrowthCanonicalOperatorTask | null
   canonicalHeroDecision?: GrowthCanonicalDecisionResolution | null
+  canonicalAuthorityByLeadId?: import("@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b").GrowthCanonicalOpportunityAuthorityMap | null
   canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
   workManager?: AvaWorkManagerResult | null
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
@@ -124,14 +131,18 @@ export function buildGrowthHomeAvaRecommendationExperience(
   const recommendations: GrowthHomeAvaRecommendationItem[] = []
   const waitingOnYou = input.waitingOnYou ?? input.aiOsUx.waitingOnYou
   const dailyWorkQueue = input.dailyWorkQueue ?? input.aiOsUx.dailyWorkQueue
+  const recommendationAuthority = buildCanonicalRecommendationAuthorityContext({
+    canonicalHeroDecision: input.canonicalHeroDecision ?? null,
+    canonicalAuthorityByLeadId: input.canonicalAuthorityByLeadId ?? null,
+  })
 
   const canonicalTask = input.canonicalOperatorTask ?? input.aiOsUx.canonicalOperatorTask ?? null
   if (canonicalTask) {
     pushRecommendation(recommendations, {
       id: canonicalTask.id,
       kind: "approval_package",
-      title: canonicalTask.title,
-      headline: canonicalTask.title,
+      title: humanizeExecutiveCopy(canonicalTask.title) || canonicalTask.title,
+      headline: humanizeExecutiveCopy(canonicalTask.title) || canonicalTask.title,
       detail: canonicalTask.detail || null,
       supportingLine: canonicalTask.why || null,
       outcomeLine: canonicalTask.whatHappensNext || buildOutcomeLine("approval_package", null),
@@ -145,8 +156,10 @@ export function buildGrowthHomeAvaRecommendationExperience(
     })
   }
 
+  const authoritativeLeadId = canonicalTask?.leadId ?? null
+
   const heroDecision = input.canonicalHeroDecision
-  if (heroDecision?.decision) {
+  if (heroDecision?.decision && heroDecision.leadId !== authoritativeLeadId) {
     const projection = projectGrowthCanonicalOperatorDecision({
       decision: heroDecision.decision,
       freshness: heroDecision.freshness,
@@ -191,7 +204,7 @@ export function buildGrowthHomeAvaRecommendationExperience(
   }
 
   const focus = input.canonicalOperatorFocus ?? input.aiOsUx.canonicalOperatorFocus ?? null
-  if (focus) {
+  if (focus && focus.leadId !== authoritativeLeadId) {
     pushRecommendation(recommendations, {
       id: `focus:${focus.leadId}`,
       kind: "operator_focus",
@@ -214,6 +227,7 @@ export function buildGrowthHomeAvaRecommendationExperience(
   if (workManager) {
     for (const [index, row] of workManager.operator_queue.entries()) {
       if (row.type === "approval" && canonicalTask) continue
+      if (shouldSuppressWorkManagerQueueItem(row, recommendationAuthority.authoritativeLeadIds)) continue
       pushRecommendation(recommendations, {
         id: row.id,
         kind: "work_manager",
@@ -235,6 +249,14 @@ export function buildGrowthHomeAvaRecommendationExperience(
 
   for (const [index, row] of waitingOnYou.entries()) {
     if (canonicalTask && row.id.startsWith("approval:")) continue
+    const leadId = row.href?.match(/\/growth\/leads\/([0-9a-f-]{36})/i)?.[1] ?? null
+    const escalation = evaluateCanonicalEscalation({
+      requestKind: /reply|inbox/i.test(row.label) ? "material_reply_response" : "waiting_on_you_item",
+      leadId,
+      opportunityAuthority: recommendationAuthority.authority,
+      signals: { sendReady: /approve|send|ready/i.test(row.label) },
+    })
+    if (!escalation.interruptOperator) continue
     pushRecommendation(recommendations, {
       id: row.id,
       kind: "waiting_on_you",
@@ -254,6 +276,7 @@ export function buildGrowthHomeAvaRecommendationExperience(
   }
 
   for (const [index, row] of dailyWorkQueue.entries()) {
+    if (shouldSuppressDailyQueueItem(row, recommendationAuthority.authoritativeLeadIds)) continue
     pushRecommendation(recommendations, {
       id: row.id,
       kind: "daily_queue",
@@ -337,7 +360,7 @@ export function buildGrowthHomeAvaRecommendationExperience(
     })
   }
 
-  const deduped = dedupeRecommendations(recommendations)
+  const deduped = alignExecutiveHomeRecommendations(dedupeRecommendations(recommendations))
   const ranked = applyGrowthHomeAvaRecommendationPreferenceBoost(
     deduped,
     input.preferenceRecords ?? [],

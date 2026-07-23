@@ -26,6 +26,10 @@ import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purp
 import type { GrowthOrganizationalEvidenceCompletenessSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-next-3b-types"
 import type { GrowthHomeRuntimeTrustServerPayload } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import type { GrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
+import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
+import type { GrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-types-1e"
+import type { GrowthCanonicalPortfolioAuthoritySnapshot } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-snapshot-1f-types"
+import { buildGrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-server-1e"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -165,4 +169,8 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   runtimeTrust?: GrowthHomeRuntimeTrustServerPayload | null
   /** GE-AIOS-LAUNCH-1C — Ava one-time activation + employment history */
   avaActivation?: GrowthAvaActivationState | null
+  /** AVA-GROWTH-OPERATOR-1E — Executive growth intelligence + strategic recommendations */
+  executiveGrowthIntelligence?: GrowthExecutiveGrowthIntelligenceReadModel | null
+  /** AVA-GROWTH-OPERATOR-1F — Portfolio-wide canonical authority hydration (shared read model) */
+  canonicalPortfolioAuthority?: GrowthCanonicalPortfolioAuthoritySnapshot | null
 }

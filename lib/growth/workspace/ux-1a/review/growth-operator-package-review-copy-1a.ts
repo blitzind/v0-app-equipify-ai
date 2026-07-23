@@ -5,19 +5,19 @@ export const GROWTH_OPERATOR_PACKAGE_REVIEW_ENTRY_1A_QA_MARKER =
 
 /** Home priority decision — concise authorization promise. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_HOME =
-  "Authorize the prepared outreach package. Sending remains separately gated." as const
+  "Approve the prepared outreach package. I will not send anything until you separately authorize sending." as const
 
 /** Canonical operator task — full authorization promise. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK =
-  "Authorize this package to approve Ava's outreach plan and drafts. Nothing will be sent until transport is separately approved." as const
+  "Approve this package to authorize my outreach plan and drafts. I will not send anything until you separately approve sending." as const
 
 /** Post-authorize success on the canonical package card. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS =
-  "Package authorized. Outreach remains blocked until transport is separately approved." as const
+  "Package approved. I will not send outreach until you separately approve sending." as const
 
 /** Canonical package card — pre-action reassurance. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PRE_ACTION =
-  "Authorizing approves the strategy and prepared content only. Nothing sends until transport is separately approved." as const
+  "Approving authorizes my strategy and prepared content only. Nothing sends until you separately approve sending." as const
 
 export const GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_TITLE =
   "Two-step approval" as const
@@ -25,34 +25,34 @@ export const GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_TITLE =
 export const GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS = [
   {
     id: "authorize_package",
-    label: "Authorize package",
-    detail: "Approve Ava's outreach plan and prepared drafts.",
+    label: "Approve package",
+    detail: "Approve my outreach plan and prepared drafts.",
   },
   {
     id: "transport_approval",
-    label: "Transport approval",
-    detail: "When sending is enabled, approve outbound transport separately before anything sends.",
+    label: "Approve sending",
+    detail: "When sending is enabled, approve outbound delivery separately before anything sends.",
   },
 ] as const
 
 /** GE-AIOS-OPERATOR-UX-1C — Package authorization vs transport execution readiness. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_HEADLINE =
-  "Package ready for authorization" as const
+  "Ready for your approval" as const
 
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_DETAIL =
-  "Ava's strategy and drafts are ready for your decision." as const
+  "I've prepared my strategy and drafts for your decision." as const
 
 export const GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_TITLE =
-  "Transport setup incomplete" as const
+  "Sending setup incomplete" as const
 
 export const GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_DETAIL =
-  "This package can be authorized, but it cannot be sent until a sequence pattern and transport approval are available." as const
+  "You can approve this package, but I cannot send outreach until sending setup is complete and you separately approve delivery." as const
 
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS_PENDING_EXECUTION =
-  "Package authorized. Transport remains blocked until execution setup is complete and sending is separately approved." as const
+  "Package approved. I will not send until sending setup is complete and you separately approve delivery." as const
 
 export const GROWTH_OPERATOR_PACKAGE_INCOMPLETE_BLOCK_PREFIX =
-  "Authorize is unavailable until the package is complete:" as const
+  "Approval is unavailable until the package is complete:" as const
 
 export function resolvePackageAuthorizationReadiness(input: {
   packageId?: string | null

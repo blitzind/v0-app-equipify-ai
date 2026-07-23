@@ -8,6 +8,7 @@ import {
   sanitizeOperatorReviewCopy,
   type OperatorPackageDecisionSummary,
 } from "@/lib/growth/workspace/ux-2a/review/growth-operator-package-progressive-review-2a"
+import { formatExecutiveConfidenceLabel } from "@/lib/growth/aios/operator-experience/growth-executive-experience-1d"
 
 export const GROWTH_OPERATOR_PACKAGE_RECOMMENDATION_2D_QA_MARKER =
   "ge-aios-operator-ux-2d-package-recommendation-quality-v1" as const
@@ -381,6 +382,13 @@ function buildWhyNow(packet: Approvals2AOperatorReviewPacket): { text: string; h
   }
 }
 
+function humanizeExecutiveBuyerVerification(status: string): string {
+  const normalized = status.trim().toLowerCase()
+  if (normalized.includes("verified")) return "Verified contact"
+  if (normalized.includes("partial")) return "Partially verified contact"
+  return "Contact verification in progress"
+}
+
 function buildRecommendedBuyer(packet: Approvals2AOperatorReviewPacket): OperatorPackageRecommendation["recommendedBuyer"] {
   const strategy = packet.salesStrategy
   const dm = packet.decisionMaker
@@ -401,8 +409,10 @@ function buildRecommendedBuyer(packet: Approvals2AOperatorReviewPacket): Operato
 
   const confidenceLabel =
     dm.contactConfidence != null
-      ? `${Math.round(dm.contactConfidence * 100)}% buyer confidence`
-      : dm.verificationStatus?.trim() || null
+      ? formatExecutiveConfidenceLabel(dm.contactConfidence)
+      : dm.verificationStatus?.trim()
+        ? humanizeExecutiveBuyerVerification(dm.verificationStatus)
+        : null
 
   return {
     name: dm.name,

@@ -20,6 +20,14 @@ export {
 } from "@/lib/growth/work-manager/bridges/decision-engine-bridge"
 
 export {
+  applyCanonicalAuthorityToWorkItem,
+  applyCanonicalAuthorityToWorkItems,
+  applyCanonicalAuthorityToNextBestAction,
+  detectCanonicalAuthorityConflicts,
+  GROWTH_WORK_MANAGER_CANONICAL_AUTHORITY_BRIDGE_1B_QA_MARKER,
+} from "@/lib/growth/work-manager/bridges/canonical-authority-work-manager-bridge-1b"
+
+export {
   resolveWorkItemStatus,
   applyWorkItemStatus,
   isExecutableWorkItem,

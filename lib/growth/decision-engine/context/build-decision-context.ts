@@ -29,6 +29,15 @@ import {
   selectRevenueQueueReviewResearchCandidates,
 } from "@/lib/growth/research/growth-revenue-queue-research-selection"
 import type { GrowthLead } from "@/lib/growth/types"
+import {
+  evaluateCanonicalEscalation,
+  type GrowthCanonicalEscalationRequestKind,
+} from "@/lib/growth/aios/authority/growth-canonical-escalation-authority-1c"
+import {
+  buildConstitutionalEscalationMapFromPortfolioLeads,
+  shouldSuppressOperatorInterruptForLead,
+} from "@/lib/growth/aios/authority/growth-constitutional-portfolio-escalation-1c"
+import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
 
 export type BuildDecisionContextInput = {
   workspaceSummary: Pick<
@@ -44,6 +53,7 @@ export type BuildDecisionContextInput = {
   leadSnapshotsById?: RelationshipLeadSnapshotMap
   portfolioEligibility?: GrowthPortfolioEligibilityContext | null
   portfolioLeads?: GrowthLead[] | null
+  canonicalAuthorityByLeadId?: GrowthCanonicalOpportunityAuthorityMap | null
 }
 
 function inferActionKind(actionLabel: string): DecisionCandidate["kind"] {
@@ -57,7 +67,63 @@ function inferActionKind(actionLabel: string): DecisionCandidate["kind"] {
   return "continue_mission"
 }
 
-function candidateFromWaiting(item: GrowthHomeWaitingOnYouItem): DecisionCandidate {
+function mapKindToEscalationRequest(kind: DecisionCandidate["kind"]): GrowthCanonicalEscalationRequestKind {
+  switch (kind) {
+    case "review_approval":
+      return "outbound_send_ready"
+    case "review_reply":
+      return "material_reply_response"
+    case "prepare_outreach":
+      return "prepare_outreach"
+    case "research_company":
+      return "continue_research"
+    case "continue_qualification":
+      return "qualification_complete"
+    case "meeting_prep":
+      return "personalization_complete"
+    default:
+      return "generic_operator_review"
+  }
+}
+
+function resolveCandidateHumanApproval(input: {
+  candidate: DecisionCandidate
+  portfolioInput?: BuildDecisionContextInput
+}): boolean {
+  const leadId = parseLeadIdFromHref(input.candidate.href) ?? parseLeadIdFromSourceId(input.candidate.id)
+  const constitutionalMap = buildConstitutionalEscalationMapFromPortfolioLeads(
+    input.portfolioInput?.portfolioLeads ?? null,
+  )
+
+  if (
+    shouldSuppressOperatorInterruptForLead({
+      leadId,
+      constitutionalMap,
+      authorityByLeadId: input.portfolioInput?.canonicalAuthorityByLeadId ?? null,
+    })
+  ) {
+    return false
+  }
+
+  const authority = leadId ? input.portfolioInput?.canonicalAuthorityByLeadId?.[leadId] ?? null : null
+  const escalation = evaluateCanonicalEscalation({
+    requestKind: mapKindToEscalationRequest(input.candidate.kind),
+    leadId,
+    opportunityAuthority: authority,
+    signals: {
+      sendReady: input.candidate.kind === "review_approval",
+      preparationComplete: input.candidate.kind === "prepare_outreach",
+      researchComplete: input.candidate.kind === "research_company",
+    },
+  })
+
+  return escalation.interruptOperator && escalation.operatorApprovalRequired
+}
+
+function candidateFromWaiting(
+  item: GrowthHomeWaitingOnYouItem,
+  portfolioInput?: BuildDecisionContextInput,
+): DecisionCandidate {
   const label = item.label.toLowerCase()
   const kind: DecisionCandidate["kind"] = /approve|review|draft|outreach|research|qualif/i.test(label)
     ? "review_approval"
@@ -65,7 +131,7 @@ function candidateFromWaiting(item: GrowthHomeWaitingOnYouItem): DecisionCandida
       ? "review_reply"
       : "review_approval"
 
-  return {
+  const candidate: DecisionCandidate = {
     id: item.id,
     kind,
     title: item.label,
@@ -76,18 +142,23 @@ function candidateFromWaiting(item: GrowthHomeWaitingOnYouItem): DecisionCandida
     requiresHumanApproval: true,
     blocked: false,
   }
+  return {
+    ...candidate,
+    requiresHumanApproval: resolveCandidateHumanApproval({ candidate, portfolioInput }),
+  }
 }
 
 function candidateFromQueueItem(
   item: GrowthHomeDailyWorkQueueItem,
   portfolioEligibility?: GrowthPortfolioEligibilityContext | null,
+  portfolioInput?: BuildDecisionContextInput,
 ): DecisionCandidate | null {
   const kind = inferActionKind(item.actionLabel)
   const leadId = parseLeadIdFromHref(item.href)
   if (portfolioEligibility && leadId && !portfolioEligibility.eligibleLeadIds.has(leadId)) {
     return null
   }
-  return {
+  const candidate: DecisionCandidate = {
     id: item.id,
     kind,
     title: `${item.actionLabel} — ${item.companyName}`,
@@ -104,6 +175,14 @@ function candidateFromQueueItem(
     hotCompany: item.priority === "critical" || item.priority === "high",
     blocked: item.requiresHumanApproval === true && kind === "prepare_outreach",
     blockedBy: item.requiresHumanApproval ? ["operator_approval"] : [],
+  }
+
+  const requiresHumanApproval = resolveCandidateHumanApproval({ candidate, portfolioInput })
+  return {
+    ...candidate,
+    requiresHumanApproval,
+    blocked: requiresHumanApproval && kind === "prepare_outreach",
+    blockedBy: requiresHumanApproval ? ["operator_approval"] : [],
   }
 }
 
@@ -399,9 +478,9 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   }
   const narrative = input.narrativeContext ?? buildAvaNarrativeContext(narrativeInput)
 
-  const approvals = input.waitingOnYou.map(candidateFromWaiting)
+  const approvals = input.waitingOnYou.map((item) => candidateFromWaiting(item, input))
   const opportunities = input.dailyWorkQueue
-    .map((item) => candidateFromQueueItem(item, input.portfolioEligibility))
+    .map((item) => candidateFromQueueItem(item, input.portfolioEligibility, input))
     .filter((row): row is DecisionCandidate => row != null)
   const research = buildResearchCandidates(input)
   const reviewResearchProjection = buildReviewResearchProjectionCandidates(input.portfolioLeads)

@@ -39,7 +39,7 @@ export const GROWTH_HOME_SECTION_OBJECTIVE_TITLE = "Why I'm Doing This" as const
 export const GROWTH_HOME_SECTION_WORKING_NOW_TITLE = "What I'm Working On" as const
 export const GROWTH_HOME_SECTION_PROGRESS_TITLE = "What I've Accomplished" as const
 export const GROWTH_HOME_SECTION_RECOMMENDATION_TITLE = "What I Recommend" as const
-export const GROWTH_HOME_SECTION_PORTFOLIO_TITLE = "Sales Pipeline" as const
+export const GROWTH_HOME_SECTION_PORTFOLIO_TITLE = "Growth Portfolio" as const
 export const GROWTH_HOME_SECTION_COMPLETED_TODAY_TITLE = "What I've Completed Today" as const
 export const GROWTH_HOME_SECTION_WORKSPACE_HEALTH_TITLE = "Business Snapshot" as const
 
@@ -52,7 +52,7 @@ export const GROWTH_HOME_SECTION_PROGRESS_SUBTITLE =
 export const GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE =
   "The decision I'd like your help with" as const
 export const GROWTH_HOME_SECTION_PORTFOLIO_SUBTITLE =
-  "How healthy your sales pipeline is" as const
+  "Portfolio health across companies I'm managing for you" as const
 export const GROWTH_HOME_SECTION_COMPLETED_TODAY_SUBTITLE =
   "Work finished today, in order" as const
 export const GROWTH_HOME_SECTION_WORKSPACE_HEALTH_SUBTITLE =

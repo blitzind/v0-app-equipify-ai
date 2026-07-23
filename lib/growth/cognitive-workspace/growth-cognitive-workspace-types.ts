@@ -25,7 +25,7 @@ export const GROWTH_AVA_COGNITIVE_SECTION_ORDER = [
 
 export type GrowthAvaCognitiveSectionId = (typeof GROWTH_AVA_COGNITIVE_SECTION_ORDER)[number]
 
-/** Power-user tools nested inside Show Me Everything (not top-level). */
+/** Power-user tools nested inside Show Ava's Work (not top-level). */
 export const GROWTH_AVA_COGNITIVE_NESTED_TOOL_ORDER = [
   "research_journal",
   "operational_state",
@@ -63,7 +63,7 @@ export const GROWTH_AVA_COGNITIVE_SECTION_TITLES: Record<
   operational_state: "Operational State",
   activity_timeline: "Activity Timeline",
   human_workspace: "What I Need",
-  raw_intelligence: "Show Me Everything",
+  raw_intelligence: "Show Ava's Work",
 }
 
 /** GE-AIOS-25A-2 — Raw Intelligence domains (presentation grouping only). */

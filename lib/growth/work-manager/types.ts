@@ -56,6 +56,10 @@ export type AvaWorkItem = {
   specialist_confidence?: number | null
   routing_reason?: string | null
   relationship_graph?: import("@/lib/growth/relationship/relationship-graph-types").AvaRelationshipGraphContext | null
+  /** AVA-GROWTH-OPERATOR-1B — bound to canonical decision when present. */
+  canonical_decision_fingerprint?: string | null
+  canonical_authority_owner?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-types").GrowthCanonicalDecisionActor | null
+  authority_bound?: boolean
 }
 
 export type AvaWorkPlanEntry = {

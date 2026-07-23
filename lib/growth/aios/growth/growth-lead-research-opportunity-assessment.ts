@@ -256,9 +256,9 @@ function resolveNextBestAction(
       }
     case "continue_research":
       return {
-        label: "Request Human Review",
-        kind: "request_human_review",
-        reason: qualification.reason,
+        label: "Continue Research",
+        kind: "continue_research",
+        reason: qualification.reason || "Additional research will improve outreach quality — Ava continues autonomously.",
         priority: "medium",
         urgency: "medium",
       }
@@ -272,9 +272,9 @@ function resolveNextBestAction(
       }
     default:
       return {
-        label: "Request Human Review",
-        kind: "request_human_review",
-        reason: qualification.reason,
+        label: "Continue Research",
+        kind: "continue_research",
+        reason: qualification.reason || "Ava continues evaluation autonomously.",
         priority: "medium",
         urgency: "medium",
       }
@@ -329,7 +329,7 @@ function buildEvidenceSummary(input: {
   if (input.qualification.recommendedNextAction) {
     humanReviewNotes.push(`Research suggested: ${input.qualification.recommendedNextAction}`)
   }
-  humanReviewNotes.push("All next actions require operator approval — no autonomous execution.")
+  humanReviewNotes.push("Outbound send remains operator-gated — preparation and research continue autonomously.")
 
   return {
     verifiedEvidence,

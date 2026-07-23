@@ -9,6 +9,10 @@ export const GROWTH_META_RECOMMENDER_QA_MARKER = "growth-ge-ai-2f-meta-recommend
 export const GROWTH_META_RECOMMENDER_RUNTIME_RULE =
   "Meta-Recommender is read-only intelligence coordination — it normalizes existing scoring and recommendation signals without executing actions, mutating Core records, sending outbound, or bypassing Growth Autonomy or human approval." as const
 
+/** AVA-GROWTH-OPERATOR-1B — Meta-Recommender defers per-opportunity execution to Canonical Decision Engine 1A. */
+export const GROWTH_META_RECOMMENDER_AUTHORITY_ROLE =
+  "Portfolio optimizer and cross-signal synthesizer — never per-opportunity execution authority. Lead-scoped recommendations are advisory overlays; Canonical Decision Engine 1A owns next action, ownership, and escalation." as const
+
 export const GROWTH_META_RECOMMENDER_RANKING_FORMULA =
   "score = impact * 0.35 + urgency * 0.25 + confidence * 0.25 - effort * 0.15 (all dimensions normalized 0–100)" as const
 
@@ -99,6 +103,7 @@ export type GrowthMetaRecommenderReadModel = {
   qaMarker: typeof GROWTH_META_RECOMMENDER_QA_MARKER
   generatedAt: string
   rule: typeof GROWTH_META_RECOMMENDER_RUNTIME_RULE
+  authorityRole: typeof GROWTH_META_RECOMMENDER_AUTHORITY_ROLE
   rankingFormula: typeof GROWTH_META_RECOMMENDER_RANKING_FORMULA
   topRecommendations: GrowthMetaRecommendation[]
   recommendations: GrowthMetaRecommendation[]

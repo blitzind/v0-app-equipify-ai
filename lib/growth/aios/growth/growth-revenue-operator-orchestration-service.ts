@@ -18,6 +18,9 @@ import {
   resolveOwningAgent,
   buildAgentHandoff,
 } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-engine"
+import { bindRevenueOperatorOrchestrationToCanonicalAuthority } from "@/lib/growth/aios/growth/growth-revenue-operator-canonical-binding-1b"
+import { buildCanonicalOpportunityAuthorityFromResolution } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-1b"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import type {
   RevenueOperatorOrchestrationEngineResult,
   RevenueOperatorPlanStateInput,
@@ -89,22 +92,39 @@ export async function buildRevenueOperatorReadModel(
     const latestDryRun = getLatestDryRunReportForPlan(planId)
 
     orchestrations.push(
-      buildRevenueOperatorOrchestration({
-        leadId: item.leadId,
-        companyId: item.leadId,
-        companyName: item.companyName,
-        planId,
-        workflowType: snapshot.executionPlan.workflowType,
-        approvalStatus,
-        readinessState: item.readinessState,
-        preflightStatus: null,
-        pilotEligible: pilotEligibility.pilotEligible,
-        pilotBlockedReasons: pilotEligibility.pilotBlockedReasons,
-        runtimeState: runtimeRecord?.state ?? null,
-        latestDryRunStatus: latestDryRun?.finalStatus ?? null,
-        confidence: item.confidence,
-        generatedAt,
-      }),
+      await (async () => {
+        const base = buildRevenueOperatorOrchestration({
+          leadId: item.leadId,
+          companyId: item.leadId,
+          companyName: item.companyName,
+          planId,
+          workflowType: snapshot.executionPlan.workflowType,
+          approvalStatus,
+          readinessState: item.readinessState,
+          preflightStatus: null,
+          pilotEligible: pilotEligibility.pilotEligible,
+          pilotBlockedReasons: pilotEligibility.pilotBlockedReasons,
+          runtimeState: runtimeRecord?.state ?? null,
+          latestDryRunStatus: latestDryRun?.finalStatus ?? null,
+          confidence: item.confidence,
+          generatedAt,
+        })
+
+        const resolution = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+          organizationId: input.organizationId,
+          leadId: item.leadId,
+          generatedAt,
+        }).catch(() => null)
+
+        const canonicalAuthority = resolution
+          ? buildCanonicalOpportunityAuthorityFromResolution(resolution)
+          : null
+
+        return bindRevenueOperatorOrchestrationToCanonicalAuthority({
+          result: base,
+          canonicalAuthority,
+        })
+      })(),
     )
   }
 
