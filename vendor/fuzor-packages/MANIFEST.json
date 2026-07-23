@@ -1,14 +1,50 @@
 {
-  "distribution_milestone": "FUZOR-DISTRIBUTION-1A",
+  "distribution_milestone": "FUZOR-DISTRIBUTION-1B",
   "strategy": "committed-package-artifacts",
-  "generated_at": "2026-07-22T20:34:00.000Z",
-  "update_workflow": "From canonical Fuzor workspace: npm run pack:adopted -- --output <equipify>/vendor/fuzor-packages",
+  "generated_at": "2026-07-23T00:52:00.000Z",
+  "update_workflow": "From canonical Fuzor workspace: npm run build:packages && npm pack per package into <equipify>/vendor/fuzor-packages",
   "packages": [
+    {
+      "name": "@fuzor/configuration",
+      "version": "0.1.0",
+      "file": "fuzor-configuration-0.1.0.tgz",
+      "sha256": "4f65153fc83a4db2234eb2674969e9342fe929cc8951b534bbf1f77ec13c2b3c"
+    },
+    {
+      "name": "@fuzor/context",
+      "version": "0.1.0",
+      "file": "fuzor-context-0.1.0.tgz",
+      "sha256": "c2ba4f61b2a28d2d110bc75cf4dd9cf30c00252988ccd7644693638ee8e84db8"
+    },
+    {
+      "name": "@fuzor/decision-records",
+      "version": "0.1.0",
+      "file": "fuzor-decision-records-0.1.0.tgz",
+      "sha256": "df48cdb6c76ba03353266ef34e4bd40096fe98089a603abefa80714f53a91315"
+    },
+    {
+      "name": "@fuzor/event-bus",
+      "version": "0.1.0",
+      "file": "fuzor-event-bus-0.1.0.tgz",
+      "sha256": "48f1420575cdad7db09a94bfd81ea584c30c8248c1fc77bdbd0f05da69035a6d"
+    },
     {
       "name": "@fuzor/identity",
       "version": "0.1.0",
       "file": "fuzor-identity-0.1.0.tgz",
-      "sha256": "55b64c2ba088c9d1a83a645860d72d66cff2c80afdbf0099304461eb90448357"
+      "sha256": "a7e7ae44e88890167ddeae39b4d9b16ca36367e7a0611cea7454d4caee120908"
+    },
+    {
+      "name": "@fuzor/knowledge",
+      "version": "0.1.0",
+      "file": "fuzor-knowledge-0.1.0.tgz",
+      "sha256": "2c3a9f202c47fb2b7bad512107d74a9f1b56eab18c253d1bd12b0c31f1a37a65"
+    },
+    {
+      "name": "@fuzor/memory",
+      "version": "0.1.0",
+      "file": "fuzor-memory-0.1.0.tgz",
+      "sha256": "5a8c513f7962e709fc63f90997281500c6907d948b3b676ba41d747291192353"
     },
     {
       "name": "@fuzor/observability",
@@ -17,16 +53,10 @@
       "sha256": "9510a56d578db78793a42e20e6a764d3fdab1f23c0c514ec0af2a76be6d9890c"
     },
     {
-      "name": "@fuzor/configuration",
+      "name": "@fuzor/sdk",
       "version": "0.1.0",
-      "file": "fuzor-configuration-0.1.0.tgz",
-      "sha256": "4f65153fc83a4db2234eb2674969e9342fe929cc8951b534bbf1f77ec13c2b3c"
-    },
-    {
-      "name": "@fuzor/knowledge",
-      "version": "0.1.0",
-      "file": "fuzor-knowledge-0.1.0.tgz",
-      "sha256": "d3a9a9d73e8271b72026343a96ea3028ebf8eb23b5a40614cdc9bd46904b589d"
+      "file": "fuzor-sdk-0.1.0.tgz",
+      "sha256": "928a5c3efe82642d4d480c52bdb3a60e174e39963fd9504eb52dcc5d452e88f4"
     }
   ]
 }

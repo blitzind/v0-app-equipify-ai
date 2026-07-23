@@ -9,11 +9,11 @@ overrides:
   '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
   '@fuzor/configuration': file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
   '@fuzor/knowledge': file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
-  '@fuzor/event-bus': file:../../fuzor/packages/event-bus
-  '@fuzor/decision-records': file:../../fuzor/packages/decision-records
-  '@fuzor/memory': file:../../fuzor/packages/memory
-  '@fuzor/context': file:../../fuzor/packages/context
-  '@fuzor/sdk': file:../../fuzor/packages/sdk
+  '@fuzor/event-bus': file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
+  '@fuzor/decision-records': file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
+  '@fuzor/memory': file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz
+  '@fuzor/context': file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz
+  '@fuzor/sdk': file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz
 
 importers:
 
@@ -26,32 +26,32 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
       '@fuzor/configuration':
-        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+        specifier: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
       '@fuzor/context':
-        specifier: file:/Users/blitz/Projects/fuzor/packages/context
-        version: file:../../fuzor/packages/context
+        specifier: file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz
       '@fuzor/decision-records':
-        specifier: file:/Users/blitz/Projects/fuzor/packages/decision-records
-        version: file:../../fuzor/packages/decision-records
+        specifier: file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
       '@fuzor/event-bus':
-        specifier: file:/Users/blitz/Projects/fuzor/packages/event-bus
-        version: file:../../fuzor/packages/event-bus
+        specifier: file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
       '@fuzor/identity':
-        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+        specifier: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/knowledge':
-        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+        specifier: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
       '@fuzor/memory':
-        specifier: file:/Users/blitz/Projects/fuzor/packages/memory
-        version: file:../../fuzor/packages/memory
+        specifier: file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz
       '@fuzor/observability':
-        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+        specifier: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@fuzor/sdk':
-        specifier: file:/Users/blitz/Projects/fuzor/packages/sdk
-        version: file:../../fuzor/packages/sdk
+        specifier: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.71.1(react@19.2.4))
@@ -618,32 +618,37 @@ packages:
     resolution: {integrity: sha512-R+LoVKsYiC/+k4trundt6QknICvmF8TWp2UUbF1ezR7eyTxUYAknLiHR8uHKe3RsP7iwqoLl4WEUTflnCOQWjA==, tarball: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz}
     version: 0.1.0
 
-  '@fuzor/context@file:../../fuzor/packages/context':
-    resolution: {directory: ../../fuzor/packages/context, type: directory}
+  '@fuzor/context@file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz':
+    resolution: {integrity: sha512-DLlKuIE32UH+Z9FgeYxqinEesYATvMDWapIljwlqK29zh/W6BmwtoegXA5ewePmd07yHSwEOADbGryAKesA83w==, tarball: file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/decision-records@file:../../fuzor/packages/decision-records':
-    resolution: {directory: ../../fuzor/packages/decision-records, type: directory}
+  '@fuzor/decision-records@file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz':
+    resolution: {integrity: sha512-m6mPLahWsxc+qJknRz1NR7Dnh5YCnQRzWijmAwPIyXyC7XCc/ohYtHtszDnr8YMxexnxBNK46Ts0Wa3sFJHBmQ==, tarball: file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/event-bus@file:../../fuzor/packages/event-bus':
-    resolution: {directory: ../../fuzor/packages/event-bus, type: directory}
+  '@fuzor/event-bus@file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz':
+    resolution: {integrity: sha512-21RRPMgNNTqfHibaR+JFJBHXM8I5dbe+KfKixsYk+9Zrtt0eYxDs1gaBBIXjrGCybPmD6JCFHdY8qJcBtH6uqg==, tarball: file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz}
+    version: 0.1.0
 
   '@fuzor/identity@file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz':
     resolution: {integrity: sha512-Z6noVxDEdmuEaJUMkuLh6xQxMEM6/DiMUw/bCyBLfc0JPMNrqIzdpJsMJTVutysSy+ph+2gLP1Bz2ZMI5giMYg==, tarball: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz}
     version: 0.1.0
 
   '@fuzor/knowledge@file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz':
-    resolution: {integrity: sha512-pVrb6pRWemk8WHrC4C5z8wnj2ewJNwtVynXNX8/dU/tlNA4jfYp6/oYMcTn6JcH/570nSNe3d9dOsoOp9gD3aA==, tarball: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz}
+    resolution: {integrity: sha512-yD5vWjq3VUgjgiWBGlBuMmgMDy29PhunxC0OT1u7QgUMweSwKWnf//D5RdgmNBIk5mfLRigPdvACQQClhT5E+A==, tarball: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz}
     version: 0.1.0
 
-  '@fuzor/memory@file:../../fuzor/packages/memory':
-    resolution: {directory: ../../fuzor/packages/memory, type: directory}
+  '@fuzor/memory@file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz':
+    resolution: {integrity: sha512-/anGM7PAVrX1CwNScBxP3sDMtXw8zFlC8X1tj1sHbRNpF9T5cmuELfh8RXKuXirTXpVB+sRI/BFE4IZT+vEw3A==, tarball: file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz}
+    version: 0.1.0
 
   '@fuzor/observability@file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz':
     resolution: {integrity: sha512-Gd25gSiJnAWYdQZrA8ybq15gVPquEGwnt2H3DoiOTdEESgreRb4e5FONyQHzgtQdhz4C5ta7aMeHvYFTPy4jog==, tarball: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz}
     version: 0.1.0
 
-  '@fuzor/sdk@file:../../fuzor/packages/sdk':
-    resolution: {directory: ../../fuzor/packages/sdk, type: directory}
+  '@fuzor/sdk@file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz':
+    resolution: {integrity: sha512-Vs3ovQMkBFr2HSDj3eFmHA6QcAc1hfMGNO5cef2q76O6s5mkOAgRSqhF4Cxi745P1oAs3QlrhaOG88AUkz+Nmg==, tarball: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz}
+    version: 0.1.0
 
   '@hookform/resolvers@3.10.0':
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
@@ -913,28 +918,24 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
-    libc: [glibc]
 
   '@next/swc-linux-arm64-musl@16.2.4':
     resolution: {integrity: sha512-iVMMp14514u7Nup2umQS03nT/bN9HurK8ufylC3FZNykrwjtx7V1A7+4kvhbDSCeonTVqV3Txnv0Lu+m2oDXNg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
-    libc: [musl]
 
   '@next/swc-linux-x64-gnu@16.2.4':
     resolution: {integrity: sha512-EZOvm1aQWgnI/N/xcWOlnS3RQBk0VtVav5Zo7n4p0A7UKyTDx047k8opDbXgBpHl4CulRqRfbw3QrX2w5UOXMQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
-    libc: [glibc]
 
   '@next/swc-linux-x64-musl@16.2.4':
     resolution: {integrity: sha512-h9FxsngCm9cTBf71AR4fGznDEDx1hS7+kSEiIRjq5kO1oXWm07DxVGZjCvk0SGx7TSjlUqhI8oOyz7NfwAdPoA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
-    libc: [musl]
 
   '@next/swc-win32-arm64-msvc@16.2.4':
     resolution: {integrity: sha512-3NdJV5OXMSOeJYijX+bjaLge3mJBlh4ybydbT4GFoB/2hAojWHtMhl3CYlYoMrjPuodp0nzFVi4Tj2+WaMg+Ow==}
@@ -1764,28 +1765,24 @@ packages:
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [linux]
-    libc: [glibc]
 
   '@tailwindcss/oxide-linux-arm64-musl@4.2.0':
     resolution: {integrity: sha512-XKcSStleEVnbH6W/9DHzZv1YhjE4eSS6zOu2eRtYAIh7aV4o3vIBs+t/B15xlqoxt6ef/0uiqJVB6hkHjWD/0A==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [linux]
-    libc: [musl]
 
   '@tailwindcss/oxide-linux-x64-gnu@4.2.0':
     resolution: {integrity: sha512-/hlXCBqn9K6fi7eAM0RsobHwJYa5V/xzWspVTzxnX+Ft9v6n+30Pz8+RxCn7sQL/vRHHLS30iQPrHQunu6/vJA==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [linux]
-    libc: [glibc]
 
   '@tailwindcss/oxide-linux-x64-musl@4.2.0':
     resolution: {integrity: sha512-lKUaygq4G7sWkhQbfdRRBkaq4LY39IriqBQ+Gk6l5nKq6Ay2M2ZZb1tlIyRNgZKS8cbErTwuYSor0IIULC0SHw==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [linux]
-    libc: [musl]
 
   '@tailwindcss/oxide-wasm32-wasi@4.2.0':
     resolution: {integrity: sha512-xuDjhAsFdUuFP5W9Ze4k/o4AskUtI8bcAGU4puTYprr89QaYFmhYOPfP+d1pH+k9ets6RoE23BXZM1X1jJqoyw==}
@@ -3233,28 +3230,24 @@ packages:
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
-    libc: [glibc]
 
   lightningcss-linux-arm64-musl@1.31.1:
     resolution: {integrity: sha512-mVZ7Pg2zIbe3XlNbZJdjs86YViQFoJSpc41CbVmKBPiGmC4YrfeOyz65ms2qpAobVd7WQsbW4PdsSJEMymyIMg==}
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
-    libc: [musl]
 
   lightningcss-linux-x64-gnu@1.31.1:
     resolution: {integrity: sha512-xGlFWRMl+0KvUhgySdIaReQdB4FNudfUTARn7q0hh/V67PVGCs3ADFjw+6++kG1RNd0zdGRlEKa+T13/tQjPMA==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
-    libc: [glibc]
 
   lightningcss-linux-x64-musl@1.31.1:
     resolution: {integrity: sha512-eowF8PrKHw9LpoZii5tdZwnBcYDxRw2rRCyvAXLi34iyeYfqCQNA9rmUM0ce62NlPhCvof1+9ivRaTY6pSKDaA==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
-    libc: [musl]
 
   lightningcss-win32-arm64-msvc@1.31.1:
     resolution: {integrity: sha512-aJReEbSEQzx1uBlQizAOBSjcmr9dCdL3XuC/6HLXAxmtErsj2ICo5yYggg1qOODQMtnjNQv2UHb9NpOuFtYe4w==}
@@ -4409,21 +4402,21 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/context@file:../../fuzor/packages/context':
+  '@fuzor/context@file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz':
     dependencies:
-      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
-      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/decision-records': file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
+      '@fuzor/event-bus': file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
       '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
-      '@fuzor/memory': file:../../fuzor/packages/memory
+      '@fuzor/memory': file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz
       '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@supabase/supabase-js': 2.105.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/decision-records@file:../../fuzor/packages/decision-records':
+  '@fuzor/decision-records@file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz':
     dependencies:
-      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/event-bus': file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
       '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@supabase/supabase-js': 2.105.1
@@ -4431,7 +4424,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/event-bus@file:../../fuzor/packages/event-bus':
+  '@fuzor/event-bus@file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz':
     dependencies:
       '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
@@ -4454,10 +4447,10 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/memory@file:../../fuzor/packages/memory':
+  '@fuzor/memory@file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz':
     dependencies:
-      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
-      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/decision-records': file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
+      '@fuzor/event-bus': file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
       '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@supabase/supabase-js': 2.105.1
@@ -4472,15 +4465,15 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/sdk@file:../../fuzor/packages/sdk':
+  '@fuzor/sdk@file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz':
     dependencies:
       '@fuzor/configuration': file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
-      '@fuzor/context': file:../../fuzor/packages/context
-      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
-      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/context': file:vendor/fuzor-packages/fuzor-context-0.1.0.tgz
+      '@fuzor/decision-records': file:vendor/fuzor-packages/fuzor-decision-records-0.1.0.tgz
+      '@fuzor/event-bus': file:vendor/fuzor-packages/fuzor-event-bus-0.1.0.tgz
       '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/knowledge': file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
-      '@fuzor/memory': file:../../fuzor/packages/memory
+      '@fuzor/memory': file:vendor/fuzor-packages/fuzor-memory-0.1.0.tgz
       '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
     transitivePeerDependencies:
       - bufferutil
@@ -6611,7 +6604,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.59.2(eslint@9.39.4(jiti@2.6.1))(typescript@5.7.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)):
+  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.59.2(eslint@9.39.4(jiti@2.6.1))(typescript@5.7.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
@@ -6633,7 +6626,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.4(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.59.2(eslint@9.39.4(jiti@2.6.1))(typescript@5.7.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
+      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.59.2(eslint@9.39.4(jiti@2.6.1))(typescript@5.7.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1))
       hasown: 2.0.3
       is-core-module: 2.16.2
       is-glob: 4.0.3
