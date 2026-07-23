@@ -36,6 +36,9 @@ export function normalizeDraftFactoryWake(wake: string | AiOsDraftFactoryWakeInp
   return "scheduled_resume"
 }
 
+export const GE_AIOS_RESEARCH_SUFFICIENCY_1A_DF_QA_MARKER =
+  "ge-aios-research-sufficiency-1a-draft-factory-v1" as const
+
 /** SV1-1 email_drafting billable drafting authorization — consumer gate only; does not evaluate policy. */
 export function isBillableDraftingAuthorized(
   evidence: Pick<AiOsDraftFactoryCanonicalEvidence, "investmentState" | "spendAuthorized">,
@@ -66,9 +69,17 @@ export function resolveEarliestIncompleteDurableStage(
   if (!evidence.researchCurrent || !evidence.knowledgeComplete) return "research"
   if (evidence.investmentState === "stop_investment") return "investment"
   if (!evidence.portfolioSelected) return "portfolio"
-  if (!evidence.decisionMakerAvailable) return "decision_maker"
-  if (!evidence.contactVerifiedForEmail) return "contact_verification"
-  if (!evidence.personalizationReady) return "personalization"
+
+  const packageReady = evidence.researchSufficientForPackage === true
+
+  if (!packageReady) {
+    if (!evidence.decisionMakerAvailable) return "decision_maker"
+    if (!evidence.contactVerifiedForEmail) return "contact_verification"
+    if (!evidence.personalizationReady) return "personalization"
+  } else if (!evidence.personalizationReady) {
+    return "personalization"
+  }
+
   if (!isBillableDraftingAuthorized(evidence)) return "investment"
   if (!evidence.draftValid) return "generation"
   if (!evidence.rejected && evidence.draftValid) return "approval"

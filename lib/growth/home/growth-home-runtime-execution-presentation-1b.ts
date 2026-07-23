@@ -17,6 +17,7 @@ import type {
   GrowthHomeRuntimeTrustPipelineStep,
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import { humanizeOperatorFacingCopy, parseOperatorFocusConfidenceLine } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
+import { sanitizeMissionSummaryLineForPresentation } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-truthfulness-1b"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 export const GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER =
@@ -412,6 +413,14 @@ export function resolveRuntimeExecutionPresentation(input: {
     const focus = input.productionMissionAuthority.primaryFocus
     const kind = primaryFocusMissionKind(focus)
     const missionLine = buildLeadDiscoveryWorkingNowLine(input.missionDiscovery)
+    const summaryLine = sanitizeMissionSummaryLineForPresentation(
+      input.productionMissionAuthority.operatorSummaryLines[0],
+      input.pendingApprovals,
+    )
+    const nextSummaryLine = sanitizeMissionSummaryLineForPresentation(
+      input.productionMissionAuthority.operatorSummaryLines[1],
+      input.pendingApprovals,
+    )
     return {
       qaMarker: GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER,
       precedenceRank: 5,
@@ -419,7 +428,7 @@ export function resolveRuntimeExecutionPresentation(input: {
       primaryMissionKind: kind,
       currentActivityLabel:
         missionLine?.replace(/\.$/, "") ||
-        input.productionMissionAuthority.operatorSummaryLines[0] ||
+        summaryLine ||
         primaryFocusMissionLabel(focus),
       currentActivityScope: kind === "prospect_research" || kind === "draft_factory" ? "lead" : "portfolio",
       currentLeadCompanyName:
@@ -430,7 +439,7 @@ export function resolveRuntimeExecutionPresentation(input: {
           : describeWorkItemStep(input.activeWork ?? null),
       nextMilestoneLabel:
         buildLeadDiscoveryWorkingNextLine(input.missionDiscovery)?.replace(/\.$/, "") ??
-        input.productionMissionAuthority.operatorSummaryLines[1] ??
+        nextSummaryLine ??
         null,
       pipelineSteps: input.activeWork && isLeadLevelActiveWork(input.activeWork)
         ? buildLeadPipelineSteps(input.activeWork)

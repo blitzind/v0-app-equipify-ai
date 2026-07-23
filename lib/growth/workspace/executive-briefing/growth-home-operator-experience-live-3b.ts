@@ -16,6 +16,14 @@ import {
   buildLeadDiscoveryWorkingNextLine,
   buildLeadDiscoveryWorkingNowLine,
 } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
+import {
+  GROWTH_HOME_NARRATIVE_TRUTHFULNESS_1B_QA_MARKER,
+  packagePreparationInProgressPhrase,
+  packagePreparationMilestonePhrase,
+  portfolioBelowTargetDiscoveryReasonPhrase,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-truthfulness-1b"
+
+export { GROWTH_HOME_NARRATIVE_TRUTHFULNESS_1B_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-truthfulness-1b"
 
 export const GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER =
   "ge-aios-live-3b-home-operator-experience-v1" as const
@@ -146,15 +154,7 @@ function portfolioBelowTargetReason(input: {
   productionMissionAuthority?: GrowthProductionMissionAuthority | null
 }): string | null {
   if (!portfolioBelowTarget(input)) return null
-  const authorityLine = input.productionMissionAuthority?.operatorSummaryLines?.[0]?.trim()
-  if (authorityLine) {
-    const humanized = humanizeOperatorFacingCopy(authorityLine)
-    if (/below target|needs more|replenish|prioritizing discovery/i.test(humanized)) {
-      return "our active portfolio is still below target"
-    }
-    return humanized.charAt(0).toLowerCase() + humanized.slice(1)
-  }
-  return "our active portfolio is still below target"
+  return portfolioBelowTargetDiscoveryReasonPhrase()
 }
 
 function extractCompanyFromActivityLabel(label: string | null | undefined): string | null {
@@ -251,11 +251,8 @@ function buildExecutiveOpeningParagraph(input: {
   }
 
   if (input.preparingOutreach > 0) {
-    const countPhrase =
-      input.preparingOutreach === 1
-        ? "one outreach package"
-        : `${input.preparingOutreach} outreach packages`
-    return `I'm strengthening the sales pipeline by finishing ${countPhrase} for your review${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+    const countPhrase = packagePreparationInProgressPhrase(input.preparingOutreach)
+    return `I'm strengthening the sales pipeline with ${countPhrase}${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
   }
 
   if (isDiscoveryExecution(input)) {
@@ -328,9 +325,7 @@ function executiveNextMilestoneLine(input: {
   }
 
   if (input.preparingOutreach > 0) {
-    return input.preparingOutreach === 1
-      ? "I'll let you know as soon as that outreach package is ready for your review."
-      : "I'll let you know as soon as those outreach packages are ready for your review."
+    return packagePreparationMilestonePhrase(input.preparingOutreach)
   }
 
   const focus = input.canonicalOperatorFocus

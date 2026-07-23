@@ -2,7 +2,14 @@
 
 import type { GrowthLeadResearchQualificationOutput } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import type { GrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
-import type { GrowthLeadResearchResult, GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
+import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
+import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
+import {
+  assessGrowthResearchSufficiency,
+  isPackageReadyFromSufficiency,
+  shouldStopResearchFromSufficiency,
+  type GrowthResearchSufficiencyInput,
+} from "@/lib/growth/research/growth-research-sufficiency-1a"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export const GROWTH_AUTONOMOUS_REVENUE_LOOP_1A_QA_MARKER =
@@ -16,6 +23,21 @@ export const GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE = 55 as const
 
 /** Max missing evidence items before research must continue (obvious disqualifier path). */
 export const GROWTH_RESEARCH_EXIT_MAX_MISSING_EVIDENCE = 3 as const
+
+export {
+  assessGrowthResearchSufficiency,
+  assessGrowthResearchSufficiencyFromLead,
+  buildResearchSufficiencyInputFromAssessment,
+  GROWTH_RESEARCH_SUFFICIENCY_1A_QA_MARKER,
+  GROWTH_RESEARCH_SUFFICIENCY_MAX_TARGETED_PASSES,
+  hasFirstPartyOperationalEvidence,
+  isPackageReadyFromSufficiency,
+  isSendReadyFromSufficiency,
+  providerClassificationConflictsWithFirstPartyEvidence,
+  shouldStopResearchFromSufficiency,
+  type GrowthResearchSufficiencyDecision,
+  type GrowthResearchSufficiencyInput,
+} from "@/lib/growth/research/growth-research-sufficiency-1a"
 
 const LIKELY_DM_STATUSES = new Set([
   "confirmed",
@@ -53,44 +75,97 @@ export function hasEnoughWebsiteEvidence(result: Pick<
   return hasSummary && (hasWebsite || hasSources)
 }
 
+function toSufficiencyInput(input: {
+  fitScore: number
+  confidence: number
+  missingEvidenceCount: number
+  result?: Pick<
+    GrowthLeadResearchResult,
+    | "companySummary"
+    | "websiteSummary"
+    | "sourceUrls"
+    | "decisionMakerCandidates"
+    | "outreachAngles"
+    | "equipmentServiceIndicators"
+    | "equipifyPainPoints"
+  > | null
+  lead?: Pick<
+    GrowthLead,
+    | "decisionMakerStatus"
+    | "primaryDecisionMakerId"
+    | "contactName"
+    | "contactEmail"
+    | "country"
+    | "metadata"
+  > | null
+  researchTimeBudgetExhausted?: boolean
+}): GrowthResearchSufficiencyInput {
+  return {
+    fitScore: input.fitScore,
+    confidence: input.confidence,
+    missingEvidenceCount: input.missingEvidenceCount,
+    result: input.result ?? null,
+    lead: input.lead ?? null,
+    researchTimeBudgetExhausted: input.researchTimeBudgetExhausted,
+  }
+}
+
 /** Research should stop — advance toward outreach prep (draft factory / approval queue). */
 export function isResearchCompleteForOutreach(input: {
   fitScore: number
   confidence: number
   missingEvidenceCount: number
-  result?: Pick<GrowthLeadResearchResult, "companySummary" | "websiteSummary" | "sourceUrls" | "decisionMakerCandidates"> | null
-  lead?: Pick<GrowthLead, "decisionMakerStatus" | "primaryDecisionMakerId" | "contactName"> | null
+  result?: Pick<
+    GrowthLeadResearchResult,
+    | "companySummary"
+    | "websiteSummary"
+    | "sourceUrls"
+    | "decisionMakerCandidates"
+    | "outreachAngles"
+    | "equipmentServiceIndicators"
+    | "equipifyPainPoints"
+  > | null
+  lead?: Pick<
+    GrowthLead,
+    | "decisionMakerStatus"
+    | "primaryDecisionMakerId"
+    | "contactName"
+    | "contactEmail"
+    | "country"
+    | "metadata"
+  > | null
   researchTimeBudgetExhausted?: boolean
 }): boolean {
-  if (isObviousDisqualifier(input)) return true
-  if (input.researchTimeBudgetExhausted === true) return true
-  if (hasEnoughWebsiteEvidence(input.result ?? { companySummary: "", websiteSummary: null, sourceUrls: [] })) {
-    if (input.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE && input.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE) {
-      return true
-    }
-  }
-  if (
-    input.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE &&
-    input.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE &&
-    hasLikelyDecisionMaker({ lead: input.lead, result: input.result ?? null })
-  ) {
-    return true
-  }
-  return false
+  return shouldStopResearchFromSufficiency(assessGrowthResearchSufficiency(toSufficiencyInput(input)))
 }
 
+/** Package-ready for supervised outreach — decision maker not required. */
 export function isGoodEnoughForEarlyOutreach(input: {
   fitScore: number
   confidence: number
   missingEvidenceCount: number
-  result?: Pick<GrowthLeadResearchResult, "decisionMakerCandidates"> | null
-  lead?: Pick<GrowthLead, "decisionMakerStatus" | "primaryDecisionMakerId" | "contactName"> | null
+  result?: Pick<
+    GrowthLeadResearchResult,
+    | "companySummary"
+    | "websiteSummary"
+    | "sourceUrls"
+    | "decisionMakerCandidates"
+    | "outreachAngles"
+    | "equipmentServiceIndicators"
+    | "equipifyPainPoints"
+  > | null
+  lead?: Pick<
+    GrowthLead,
+    | "decisionMakerStatus"
+    | "primaryDecisionMakerId"
+    | "contactName"
+    | "contactEmail"
+    | "country"
+    | "metadata"
+  > | null
+  researchTimeBudgetExhausted?: boolean
 }): boolean {
-  if (isObviousDisqualifier(input)) return false
-  if (input.fitScore < GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE) return false
-  if (input.confidence < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE) return false
-  if (input.missingEvidenceCount > GROWTH_RESEARCH_EXIT_MAX_MISSING_EVIDENCE) return false
-  return hasLikelyDecisionMaker({ lead: input.lead, result: input.result ?? null })
+  return isPackageReadyFromSufficiency(assessGrowthResearchSufficiency(toSufficiencyInput(input)))
 }
 
 export function isGoodEnoughForEarlyOutreachFromRun(
@@ -101,7 +176,20 @@ export function isGoodEnoughForEarlyOutreachFromRun(
   if (confidence < GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE) return false
   const maturity = run.websiteMaturityScore ?? raw
   const fitProxy = maturity <= 1 ? maturity * 100 : maturity
-  return fitProxy >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE || confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE
+  return isGoodEnoughForEarlyOutreach({
+    fitScore: fitProxy,
+    confidence,
+    missingEvidenceCount: 0,
+    result: {
+      companySummary: "Research run completed with website maturity evidence.",
+      websiteSummary: fitProxy >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE ? "Website evidence captured." : null,
+      sourceUrls: fitProxy >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE ? ["https://example.com"] : [],
+      decisionMakerCandidates: [],
+      outreachAngles: fitProxy >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE ? ["Field service operations"] : [],
+      equipmentServiceIndicators: [],
+      equipifyPainPoints: [],
+    },
+  })
 }
 
 const RESEARCH_COMPLETE_WORKFLOW_STATUSES = new Set([
@@ -126,7 +214,12 @@ export function shouldPreferOutreachOverCommitteeResearch(input: {
   qualification: GrowthLeadResearchQualificationOutput
   hasLikelyContact: boolean
 }): boolean {
-  if (!input.hasLikelyContact) return false
+  if (!input.hasLikelyContact) {
+    return (
+      input.qualification.confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE &&
+      input.qualification.fitScore >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE
+    )
+  }
   const action = input.qualification.recommendedNextAction.toLowerCase()
   if (action.includes("committee") || action.includes("decision maker")) return true
   return (

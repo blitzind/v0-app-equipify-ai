@@ -243,10 +243,11 @@ export function projectInvestmentStateFromSignals(
     admission === "accepted" &&
     confidence >= GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE &&
     signals.budgetAvailable !== false &&
-    signals.hasUsableResearch === true &&
-    (/prepare_outreach|pursue|enroll|qualified|outreach|draft/.test(recommendation) ||
-      recommendation === "" ||
-      /continue/.test(recommendation))
+    (signals.researchSufficientForPackage === true ||
+      (signals.hasUsableResearch === true &&
+        (/prepare_outreach|pursue|enroll|qualified|outreach|draft/.test(recommendation) ||
+          recommendation === "" ||
+          /continue/.test(recommendation))))
   ) {
     if (costTier === "outbound") {
       return {

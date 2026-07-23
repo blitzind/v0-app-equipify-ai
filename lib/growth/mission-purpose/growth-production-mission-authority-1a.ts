@@ -32,8 +32,9 @@ export function buildProductionMissionAuthority(input: {
 
   const newCompanies = discovery?.newCompaniesFound ?? 0
   const researchingCount = discovery?.counters.researchingCount ?? portfolio?.health.counts.researching ?? 0
-  const packagesReady = portfolio?.health.counts.awaitingReview ?? 0
-  const admissionsPending = portfolio?.health.counts.awaitingAdmission ?? discovery?.counters.pendingApprovals ?? 0
+  const admissionReviewCount = portfolio?.health.counts.awaitingReview ?? 0
+  const awaitingAdmissionCount = portfolio?.health.counts.awaitingAdmission ?? 0
+  const admissionsPending = awaitingAdmissionCount + admissionReviewCount
   const qualifiedCount = portfolio?.health.counts.qualified ?? 0
 
   const operatorSummaryLines: string[] = []
@@ -50,9 +51,14 @@ export function buildProductionMissionAuthority(input: {
       `${researchingCount} ${pluralize(researchingCount, "is", "are")} currently being researched.`,
     )
   }
-  if (packagesReady > 0) {
+  if (admissionReviewCount > 0) {
     operatorSummaryLines.push(
-      `${packagesReady} outreach ${pluralize(packagesReady, "package is", "packages are")} ready.`,
+      `${admissionReviewCount} ${pluralize(admissionReviewCount, "company requires", "companies require")} admission review.`,
+    )
+  }
+  if (awaitingAdmissionCount > 0) {
+    operatorSummaryLines.push(
+      `${awaitingAdmissionCount} ${pluralize(awaitingAdmissionCount, "company is", "companies are")} awaiting admission.`,
     )
   }
   if (portfolioBelowTarget) {
@@ -67,7 +73,6 @@ export function buildProductionMissionAuthority(input: {
   if (portfolioBelowTarget || discoveryActive) primaryFocus = "discovery"
   else if (researchingCount > 0) primaryFocus = "research"
   else if (admissionsPending > 0) primaryFocus = "admission"
-  else if (packagesReady > 0) primaryFocus = "approvals"
   else if ((portfolio?.health.counts.activeCompanies ?? 0) < (portfolio?.target.targetActiveCompanies ?? 0)) {
     primaryFocus = "portfolio_health"
   }

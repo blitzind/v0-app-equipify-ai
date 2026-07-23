@@ -31,6 +31,7 @@ import type { DraftFactoryWakeObservabilityHandle } from "@/lib/growth/draft-fac
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
+import { assessGrowthResearchSufficiencyFromLead } from "@/lib/growth/research/growth-research-sufficiency-1a"
 import {
   assertGrowthPipelinePromotionIntegrity,
   resolveDraftFactoryAdmittedFromLeadMetadata,
@@ -62,21 +63,15 @@ export async function buildCanonicalEvidenceForLead(
     }
   }
 
-  const resource = evaluateResourceAllocationFacade({
-    organizationId: input.organizationId,
-    accountId: lead.id,
-    resourceClass: "email_drafting",
-    signals: buildResourceAllocationSignalsFromLead(lead, {
-      budgetAvailable: true,
-      killSwitchActive: false,
-    }),
-  })
-
   const hasUsableResearch = Boolean(lead.latestProspectResearchRunId && lead.lastProspectResearchedAt)
   const researchStale = lead.lastProspectResearchedAt
     ? isProspectResearchStale(lead.lastProspectResearchedAt)
     : true
   const researchCurrent = hasUsableResearch && !researchStale
+  const sufficiency = assessGrowthResearchSufficiencyFromLead(lead)
+  const researchSufficientForPackage =
+    researchCurrent && sufficiency.packageReady === true
+  const sendReady = sufficiency.sendReady === true
   const decisionMakerAvailable =
     Boolean(lead.primaryDecisionMakerId) ||
     Boolean(lead.contactName?.trim()) ||
@@ -90,6 +85,18 @@ export async function buildCanonicalEvidenceForLead(
     lead.decisionMakerStatus === "verified_contactable" ||
     lead.decisionMakerStatus === "confirmed" ||
     (Boolean(lead.contactEmail?.includes("@")) && decisionMakerAvailable)
+
+  const resource = evaluateResourceAllocationFacade({
+    organizationId: input.organizationId,
+    accountId: lead.id,
+    resourceClass: "email_drafting",
+    signals: buildResourceAllocationSignalsFromLead(lead, {
+      budgetAvailable: true,
+      killSwitchActive: false,
+      researchSufficientForPackage,
+      sendReady,
+    }),
+  })
 
   const admissionEvidence = resolveDraftFactoryAdmittedFromLeadMetadata(lead.metadata)
 
@@ -105,7 +112,10 @@ export async function buildCanonicalEvidenceForLead(
     decisionMakerAvailable,
     decisionMakerId: lead.primaryDecisionMakerId,
     contactVerifiedForEmail,
-    personalizationReady: researchCurrent && decisionMakerAvailable && contactVerifiedForEmail,
+    researchSufficientForPackage,
+    sendReady,
+    personalizationReady:
+      researchSufficientForPackage || (researchCurrent && decisionMakerAvailable && contactVerifiedForEmail),
     draftValid: false,
     approved: false,
     rejected: admissionEvidence.rejected,

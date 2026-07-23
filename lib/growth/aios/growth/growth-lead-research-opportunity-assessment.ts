@@ -6,9 +6,9 @@ import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/g
 import {
   GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
   GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE,
+  assessGrowthResearchSufficiency,
+  buildResearchSufficiencyInputFromAssessment,
   hasLikelyDecisionMaker,
-  isGoodEnoughForEarlyOutreach,
-  isResearchCompleteForOutreach,
   shouldPreferOutreachOverCommitteeResearch,
 } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
 import { planGrowthLeadResearchExecution } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
@@ -146,24 +146,31 @@ function resolveRecommendation(input: {
 }): GrowthLeadResearchOpportunityRecommendation {
   if (input.fitScore < 40 || input.opportunityScore < 35) return "abandon"
 
-  if (
-    isResearchCompleteForOutreach({
-      fitScore: input.fitScore,
-      confidence: input.confidence,
-      missingEvidenceCount: input.missingEvidenceCount,
+  const sufficiency = assessGrowthResearchSufficiency(
+    buildResearchSufficiencyInputFromAssessment({
       result: input.result,
-      researchTimeBudgetExhausted: input.researchTimeBudgetExhausted,
-    })
-  ) {
-    if (
-      isGoodEnoughForEarlyOutreach({
+      qualification: {
         fitScore: input.fitScore,
+        recommendedNextAction: input.qualification.recommendedNextAction,
+        recommendedWorkOrderType: input.qualification.recommendedWorkOrderType,
         confidence: input.confidence,
-        missingEvidenceCount: input.missingEvidenceCount,
-        result: input.result,
-      })
+        reason: input.qualification.reason,
+        missingEvidence: input.qualification.missingEvidence,
+      },
+      researchTimeBudgetExhausted: input.researchTimeBudgetExhausted,
+    }),
+  )
+
+  if (sufficiency.decision === "terminal_reject") return "abandon"
+  if (sufficiency.decision === "operator_review_required") return "continue_research"
+  if (sufficiency.decision === "sufficient_for_supervised_outreach") return "prepare_outreach"
+  if (sufficiency.decision === "targeted_research_required") {
+    if (
+      sufficiency.missingMaterialEvidence.some(
+        (gap) => gap !== "confidence_or_fit_threshold",
+      )
     ) {
-      return "prepare_outreach"
+      return "continue_research"
     }
   }
 
@@ -305,7 +312,7 @@ function buildEvidenceSummary(input: {
     potentialRisks.push("Fit score below pursuit threshold")
   }
   if (input.result.decisionMakerCandidates.length === 0) {
-    potentialRisks.push("No verified decision makers")
+    potentialRisks.push("No verified decision makers — disclose in package; send remains gated")
   }
 
   const assumptions: string[] = []

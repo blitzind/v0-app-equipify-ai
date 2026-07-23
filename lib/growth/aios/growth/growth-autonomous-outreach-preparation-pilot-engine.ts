@@ -29,8 +29,12 @@ import {
 import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import {
   GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+  assessGrowthResearchSufficiency,
+  buildResearchSufficiencyInputFromAssessment,
   hasCompletedCanonicalProspectResearch,
+  isPackageReadyFromSufficiency,
 } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
+import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
 
 const RECENT_PACKAGE_MS = 24 * 60 * 60 * 1000
 
@@ -80,6 +84,89 @@ export function evaluateOutreachMemoryReadiness(snapshot: GrowthLeadResearchWork
   return { sufficient: true, blockReason: null }
 }
 
+export function evaluateOutreachPackageReadinessFromSnapshot(
+  snapshot: GrowthLeadResearchWorkflowSnapshot | null,
+  result?: Pick<
+    GrowthLeadResearchResult,
+    | "companySummary"
+    | "websiteSummary"
+    | "sourceUrls"
+    | "decisionMakerCandidates"
+    | "outreachAngles"
+    | "equipmentServiceIndicators"
+    | "equipifyPainPoints"
+  > | null,
+): {
+  packageReady: boolean
+  sendReady: boolean
+  blockReason: string | null
+} {
+  if (!snapshot?.qualification) {
+    return { packageReady: false, sendReady: false, blockReason: "Qualification context missing." }
+  }
+  const qualification = snapshot.qualification
+  const companySummary =
+    result?.companySummary?.trim() ||
+    snapshot.evidenceSummary?.verifiedEvidence
+      .find((row) => row.startsWith("Company summary:"))
+      ?.replace(/^Company summary:\s*/i, "")
+      .trim() ||
+    "Research-qualified company"
+  const syntheticResult: GrowthLeadResearchResult = {
+    companySummary,
+    websiteSummary: result?.websiteSummary ?? "Website evidence captured during research.",
+    likelyServiceCategory: null,
+    serviceAreaClues: [],
+    sourceUrls: result?.sourceUrls?.length ? result.sourceUrls : ["https://research-complete.local/evidence"],
+    decisionMakerCandidates: result?.decisionMakerCandidates ?? [],
+    outreachAngles:
+      result?.outreachAngles?.length
+        ? result.outreachAngles
+        : [qualification.recommendedNextAction || "Supervised outreach preparation"],
+    equipmentServiceIndicators:
+      result?.equipmentServiceIndicators?.length
+        ? result.equipmentServiceIndicators
+        : ["Research-qualified operational profile"],
+    equipifyPainPoints: result?.equipifyPainPoints ?? [],
+    equipifyFitScore: qualification.fitScore,
+    researchConfidence: qualification.confidence,
+    recommendedNextAction: qualification.recommendedNextAction,
+    estimatedAnnualRevenue: null,
+    estimatedEmployeeCount: null,
+    fleetSizeEstimate: null,
+    companySizeEstimate: null,
+    caveats: [],
+    crmDetected: null,
+    fieldServiceStackDetected: null,
+    fitModelVersion: "snapshot",
+  }
+  const decision = assessGrowthResearchSufficiency(
+    buildResearchSufficiencyInputFromAssessment({
+      result: syntheticResult,
+      qualification: {
+        ...qualification,
+        missingEvidence: qualification.missingEvidence ?? [],
+        recommendedWorkOrderType: qualification.recommendedWorkOrderType ?? null,
+      },
+    }),
+  )
+  if (!isPackageReadyFromSufficiency(decision)) {
+    return {
+      packageReady: false,
+      sendReady: false,
+      blockReason:
+        decision.decision === "terminal_reject"
+          ? "Research sufficiency rejected this lead."
+          : "Research sufficiency has not reached supervised package readiness.",
+    }
+  }
+  return {
+    packageReady: true,
+    sendReady: decision.decision === "sufficient_for_supervised_outreach" ? decision.sendReady : false,
+    blockReason: null,
+  }
+}
+
 export function hasCompletedInternalExecution(input: {
   executionRuns: GrowthAutonomousExecutionRunRecord[]
   leadId: string
@@ -126,6 +213,14 @@ export function evaluateOutreachPreparationGateReadiness(input: {
     return {
       eligible: false,
       blockReason: `Confidence below threshold (${GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_MIN_CONFIDENCE}).`,
+    }
+  }
+
+  const packageReadiness = evaluateOutreachPackageReadinessFromSnapshot(input.snapshot)
+  if (!packageReadiness.packageReady) {
+    return {
+      eligible: false,
+      blockReason: packageReadiness.blockReason ?? "Package readiness not satisfied.",
     }
   }
 

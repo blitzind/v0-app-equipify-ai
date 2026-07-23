@@ -154,6 +154,10 @@ export type AiOsDraftFactoryCanonicalEvidence = {
   decisionMakerId?: string | null
   contactVerifiedForEmail: boolean
   personalizationReady: boolean
+  /** GE-AIOS-RESEARCH-SUFFICIENCY-1A — enough evidence to prepare operator review package. */
+  researchSufficientForPackage?: boolean
+  /** GE-AIOS-RESEARCH-SUFFICIENCY-1A — verified contact path for authorized transport (not package prep). */
+  sendReady?: boolean
   personalizationId?: string | null
   draftValid: boolean
   packageId?: string | null

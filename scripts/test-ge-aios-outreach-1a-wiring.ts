@@ -9,6 +9,7 @@ import { qualifyGrowthLeadResearch } from "@/lib/growth/aios/growth/growth-lead-
 import {
   GROWTH_AUTONOMOUS_REVENUE_LOOP_1A_QA_MARKER,
   GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE,
+  assessGrowthResearchSufficiency,
   isGoodEnoughForEarlyOutreach,
   isGoodEnoughForEarlyOutreachFromRun,
   isResearchCompleteForOutreach,
@@ -79,6 +80,16 @@ assert.ok(
     websiteMaturityScore: 60,
   }),
 )
+
+const packageReadyWithoutDm = assessGrowthResearchSufficiency({
+  fitScore: baseResult.equipifyFitScore,
+  confidence: baseResult.researchConfidence,
+  missingEvidenceCount: qualification.missingEvidence.length,
+  result: { ...baseResult, decisionMakerCandidates: [] },
+  lead: { country: "US" },
+})
+assert.equal(packageReadyWithoutDm.decision, "sufficient_for_supervised_outreach")
+assert.equal(packageReadyWithoutDm.sendReady, false)
 
 const runtimeTrust = buildGrowthHomeRuntimeTrustViewModel({
   server: null,

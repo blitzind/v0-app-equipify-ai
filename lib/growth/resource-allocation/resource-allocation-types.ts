@@ -71,6 +71,10 @@ export type AiOsResourceAllocationSupportingSignals = {
   approvalGranted?: boolean | null
   killSwitchActive?: boolean | null
   objectiveAligned?: boolean | null
+  /** GE-AIOS-RESEARCH-SUFFICIENCY-1A — canonical package-ready projection input. */
+  researchSufficientForPackage?: boolean | null
+  /** GE-AIOS-RESEARCH-SUFFICIENCY-1A — send/transport readiness remains separately gated. */
+  sendReady?: boolean | null
 }
 
 export type AiOsResourceAllocationRequest = {
