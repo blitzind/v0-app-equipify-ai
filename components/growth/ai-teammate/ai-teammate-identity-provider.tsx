@@ -41,12 +41,13 @@ type AiTeammateIdentityContextValue = {
 
 const AiTeammateIdentityContext = createContext<AiTeammateIdentityContextValue | null>(null)
 
-function applyLocalCache(name: string, onboardingCompleted: boolean) {
-  writeAiTeammateStoredIdentity({ name, onboardingCompleted })
+function applyLocalCache(name: string, onboardingCompleted: boolean, organizationId?: string | null) {
+  writeAiTeammateStoredIdentity({ name, onboardingCompleted }, organizationId)
 }
 
 export function AiTeammateIdentityProvider({ children }: { children: ReactNode }) {
   const [storedName, setStoredName] = useState(AI_TEAMMATE_DEFAULT_NAME)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
@@ -64,11 +65,12 @@ export function AiTeammateIdentityProvider({ children }: { children: ReactNode }
     void (async () => {
       const server = await fetchAiTeammateIdentity()
       if (server) {
+        setOrganizationId(server.organizationId)
         setStoredName(server.name)
         setOnboardingCompleted(server.onboardingCompleted)
         setOnboardingOpen(!server.onboardingCompleted)
         setServerPersisted(server.source === "organization" || server.onboardingCompleted)
-        applyLocalCache(server.name, server.onboardingCompleted)
+        applyLocalCache(server.name, server.onboardingCompleted, server.organizationId)
       }
       setHydrated(true)
       setLoading(false)
@@ -78,10 +80,10 @@ export function AiTeammateIdentityProvider({ children }: { children: ReactNode }
   const teammate = useMemo(() => resolveAiTeammatePresentation(storedName), [storedName])
 
   const persistLocal = useCallback((name: string, completed: boolean) => {
-    applyLocalCache(name, completed)
+    applyLocalCache(name, completed, organizationId)
     setStoredName(name)
     setOnboardingCompleted(completed)
-  }, [])
+  }, [organizationId])
 
   const setTeammateName = useCallback(
     async (raw: string) => {

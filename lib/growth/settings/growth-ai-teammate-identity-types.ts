@@ -1,38 +1,30 @@
 /** GE-AI-UX-3B — AI teammate server identity types (client-safe). */
 
-import { AI_TEAMMATE_DEFAULT_ROLE } from "@/lib/workspace/ai-teammate-identity"
+import {
+  PLATFORM_PERSONA_DEFAULT_ROLE,
+  PLATFORM_PERSONA_IDENTITY_MIGRATION,
+  PLATFORM_PERSONA_SERVER_QA_MARKER,
+  type PlatformPersonaIdentity,
+  type PlatformPersonaIdentityApiResponse,
+  type PlatformPersonaIdentityPatch,
+  type PlatformPersonaIdentityRole,
+  type PlatformPersonaIdentitySource,
+} from "@fuzor/identity"
 
-export const GE_AI_UX_3B_QA_MARKER = "ge-ai-ux-3b-ai-teammate-server-identity-v1" as const
+export const GE_AI_UX_3B_QA_MARKER = PLATFORM_PERSONA_SERVER_QA_MARKER
 
-export const GROWTH_AI_TEAMMATE_IDENTITY_MIGRATION =
-  "20270829120000_growth_organization_ai_teammate_identity_3b.sql" as const
+export const GROWTH_AI_TEAMMATE_IDENTITY_MIGRATION = PLATFORM_PERSONA_IDENTITY_MIGRATION
 
 export const GROWTH_AI_TEAMMATE_IDENTITY_API_PATH = "/api/growth/workspace/settings/ai-teammate" as const
 
-export type AiTeammateIdentitySource = "default" | "organization" | "user_override"
+export type AiTeammateIdentitySource = PlatformPersonaIdentitySource
 
-export type AiTeammateIdentityRole = typeof AI_TEAMMATE_DEFAULT_ROLE
+export type AiTeammateIdentityRole = PlatformPersonaIdentityRole
 
-export type AiTeammateIdentity = {
-  organizationId: string | null
-  name: string
-  role: AiTeammateIdentityRole
-  source: AiTeammateIdentitySource
-  onboardingCompleted: boolean
-  updatedByUserId?: string | null
-  updatedAt?: string | null
-}
+export type AiTeammateIdentity = PlatformPersonaIdentity
 
-export type AiTeammateIdentityPatch = {
-  name?: string
-  onboardingCompleted?: boolean
-}
+export type AiTeammateIdentityPatch = PlatformPersonaIdentityPatch
 
-export type AiTeammateIdentityApiResponse = {
-  ok: boolean
-  qa_marker: string
-  identity: AiTeammateIdentity
-  persisted: boolean
-  message?: string
-  error?: string
-}
+export type AiTeammateIdentityApiResponse = PlatformPersonaIdentityApiResponse
+
+export { PLATFORM_PERSONA_DEFAULT_ROLE as AI_TEAMMATE_DEFAULT_ROLE }

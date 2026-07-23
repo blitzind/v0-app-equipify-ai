@@ -1,96 +1,65 @@
 /**
  * GE-AI-UX-3A — AI Teammate identity (presentation-only, client-safe).
- * Platform: Equipify AI OS. Teammate: default Ava, customer-renamable.
+ * Delegates to @fuzor/identity; Equipify import paths and aliases preserved.
  */
 
-export const GE_AI_UX_3A_QA_MARKER = "ge-ai-ux-3a-ai-teammate-identity-foundation-v1" as const
+import {
+  PLATFORM_PERSONA_DEFAULT_NAME,
+  PLATFORM_PERSONA_DEFAULT_ROLE,
+  PLATFORM_PERSONA_FUTURE_ROLE,
+  PLATFORM_PERSONA_IDENTITY_STORAGE_KEY,
+  PLATFORM_PERSONA_NAME_MAX_LENGTH,
+  PLATFORM_PERSONA_NAME_MIN_LENGTH,
+  PLATFORM_PERSONA_ONBOARDING_STORAGE_KEY,
+  PLATFORM_PERSONA_PRESENTATION_QA_MARKER,
+  PLATFORM_PERSONA_SUGGESTED_NAMES,
+  isValidPlatformPersonaName,
+  normalizePlatformPersonaName,
+  readPlatformPersonaStoredIdentity,
+  resolvePlatformPersonaPresentation,
+  resolvePlatformPersonaPronouns,
+  sanitizePlatformPersonaName,
+  writePlatformPersonaStoredIdentity,
+  type PlatformPersonaPresentation,
+  type PlatformPersonaStoredIdentity,
+  type PlatformPersonaSubjectPronoun,
+} from "@fuzor/identity"
 
-export const AI_TEAMMATE_DEFAULT_NAME = "Ava" as const
+export const GE_AI_UX_3A_QA_MARKER = PLATFORM_PERSONA_PRESENTATION_QA_MARKER
 
-export const AI_TEAMMATE_DEFAULT_ROLE = "Equipify's AI Growth Operator" as const
+export const AI_TEAMMATE_DEFAULT_NAME = PLATFORM_PERSONA_DEFAULT_NAME
 
-export const AI_TEAMMATE_FUTURE_ROLE = "Your AI Business Operator" as const
+export const AI_TEAMMATE_DEFAULT_ROLE = PLATFORM_PERSONA_DEFAULT_ROLE
 
-export const AI_TEAMMATE_IDENTITY_STORAGE_KEY = "equipify:ai-os:teammate-identity/v1" as const
+export const AI_TEAMMATE_FUTURE_ROLE = PLATFORM_PERSONA_FUTURE_ROLE
 
-export const AI_TEAMMATE_ONBOARDING_STORAGE_KEY = "equipify:ai-os:teammate-onboarding/v1" as const
+export const AI_TEAMMATE_IDENTITY_STORAGE_KEY = PLATFORM_PERSONA_IDENTITY_STORAGE_KEY
 
-export const AI_TEAMMATE_NAME_MIN_LENGTH = 2 as const
-export const AI_TEAMMATE_NAME_MAX_LENGTH = 32 as const
+export const AI_TEAMMATE_ONBOARDING_STORAGE_KEY = PLATFORM_PERSONA_ONBOARDING_STORAGE_KEY
 
-export const AI_TEAMMATE_SUGGESTED_NAMES = [
-  "Ava",
-  "Emma",
-  "Claire",
-  "Nora",
-  "Alex",
-  "Jordan",
-  "Charlie",
-  "Scout",
-  "Atlas",
-] as const
+export const AI_TEAMMATE_NAME_MIN_LENGTH = PLATFORM_PERSONA_NAME_MIN_LENGTH
 
-export type AiTeammateSubjectPronoun = "She" | "He" | "They"
+export const AI_TEAMMATE_NAME_MAX_LENGTH = PLATFORM_PERSONA_NAME_MAX_LENGTH
 
-export type AiTeammatePresentation = {
-  name: string
-  role: string
-  subjectPronoun: AiTeammateSubjectPronoun
-  objectPronoun: "her" | "him" | "them"
-  possessivePronoun: "her" | "his" | "their"
-}
+export const AI_TEAMMATE_SUGGESTED_NAMES = PLATFORM_PERSONA_SUGGESTED_NAMES
 
-export type AiTeammateStoredIdentity = {
-  name: string
-  onboardingCompleted: boolean
-}
+export type AiTeammateSubjectPronoun = PlatformPersonaSubjectPronoun
 
-const SHE_PRONOUN_NAMES = new Set(["ava", "emma", "claire", "nora"])
-const THEY_PRONOUN_NAMES = new Set(["alex", "jordan", "charlie", "scout", "atlas"])
+export type AiTeammatePresentation = PlatformPersonaPresentation
 
-export function normalizeAiTeammateName(raw: string): string {
-  const trimmed = raw.trim().replace(/\s+/g, " ")
-  if (!trimmed) return AI_TEAMMATE_DEFAULT_NAME
-  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
-}
+export type AiTeammateStoredIdentity = PlatformPersonaStoredIdentity
 
-export function isValidAiTeammateName(name: string): boolean {
-  const trimmed = name.trim()
-  if (trimmed.length < AI_TEAMMATE_NAME_MIN_LENGTH || trimmed.length > AI_TEAMMATE_NAME_MAX_LENGTH) {
-    return false
-  }
-  return /^[\p{L}\p{N}][\p{L}\p{N}' -]*[\p{L}\p{N}]$|^[\p{L}\p{N}]$/u.test(trimmed)
-}
+export const normalizeAiTeammateName = normalizePlatformPersonaName
 
-export function resolveAiTeammatePronouns(name: string): Pick<
-  AiTeammatePresentation,
-  "subjectPronoun" | "objectPronoun" | "possessivePronoun"
-> {
-  const lower = name.trim().toLowerCase()
-  if (SHE_PRONOUN_NAMES.has(lower)) {
-    return { subjectPronoun: "She", objectPronoun: "her", possessivePronoun: "her" }
-  }
-  if (THEY_PRONOUN_NAMES.has(lower)) {
-    return { subjectPronoun: "They", objectPronoun: "them", possessivePronoun: "their" }
-  }
-  return { subjectPronoun: "They", objectPronoun: "them", possessivePronoun: "their" }
-}
+export const isValidAiTeammateName = isValidPlatformPersonaName
 
-export function resolveAiTeammatePresentation(name?: string | null): AiTeammatePresentation {
-  const resolvedName = normalizeAiTeammateName(name?.trim() || AI_TEAMMATE_DEFAULT_NAME)
-  return {
-    name: resolvedName,
-    role: AI_TEAMMATE_DEFAULT_ROLE,
-    ...resolveAiTeammatePronouns(resolvedName),
-  }
-}
+export const resolveAiTeammatePronouns = resolvePlatformPersonaPronouns
 
-export function sanitizeAiTeammateName(raw: string): string {
-  const normalized = normalizeAiTeammateName(raw)
-  return isValidAiTeammateName(normalized) ? normalized : AI_TEAMMATE_DEFAULT_NAME
-}
+export const resolveAiTeammatePresentation = resolvePlatformPersonaPresentation
 
-export function readAiTeammateStoredIdentity(): AiTeammateStoredIdentity {
+export const sanitizeAiTeammateName = sanitizePlatformPersonaName
+
+function readLegacyUnscopedAiTeammateStoredIdentity(): AiTeammateStoredIdentity {
   if (typeof window === "undefined") {
     return { name: AI_TEAMMATE_DEFAULT_NAME, onboardingCompleted: false }
   }
@@ -110,7 +79,25 @@ export function readAiTeammateStoredIdentity(): AiTeammateStoredIdentity {
   }
 }
 
-export function writeAiTeammateStoredIdentity(next: AiTeammateStoredIdentity): void {
+/** Reads org-scoped storage when organizationId is known; legacy unscoped key before org hydration. */
+export function readAiTeammateStoredIdentity(organizationId?: string | null): AiTeammateStoredIdentity {
+  const scopedOrganizationId = organizationId?.trim()
+  if (scopedOrganizationId) {
+    return readPlatformPersonaStoredIdentity(scopedOrganizationId)
+  }
+  return readLegacyUnscopedAiTeammateStoredIdentity()
+}
+
+/** Writes org-scoped storage when organizationId is known; legacy unscoped key before org hydration. */
+export function writeAiTeammateStoredIdentity(
+  next: AiTeammateStoredIdentity,
+  organizationId?: string | null,
+): void {
+  const scopedOrganizationId = organizationId?.trim()
+  if (scopedOrganizationId) {
+    writePlatformPersonaStoredIdentity(scopedOrganizationId, next)
+    return
+  }
   if (typeof window === "undefined") return
   try {
     window.localStorage.setItem(AI_TEAMMATE_IDENTITY_STORAGE_KEY, JSON.stringify(next))

@@ -1,6 +1,9 @@
 import "server-only"
 
-import { z } from "zod"
+import {
+  isPlatformGrowthEngineEnabledEnv,
+  readPlatformGrowthEngineAiOrgIdFromEnv,
+} from "@fuzor/configuration"
 import { logGrowthEngine as logGrowthEngineEvent } from "@/lib/growth/growth-engine-log"
 import { resolveCookieSessionAuthSnapshot } from "@/lib/growth/growth-engine-cookie-session-auth"
 import {
@@ -16,15 +19,12 @@ import { raceMiddlewareAuthOperation } from "@/lib/supabase/middleware-timeout"
 
 /** Global kill switch for Growth Engine platform routes. Default off. */
 export function isGrowthEngineEnabledEnv(): boolean {
-  return process.env.GROWTH_ENGINE_ENABLED?.trim() === "true"
+  return isPlatformGrowthEngineEnabledEnv()
 }
 
 /** Org UUID used for ai_usage_logs when running internal Growth Engine research. */
 export function getGrowthEngineAiOrgId(): string | null {
-  const id = process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()
-  if (!id) return null
-  const parsed = z.string().uuid().safeParse(id)
-  return parsed.success ? parsed.data : null
+  return readPlatformGrowthEngineAiOrgIdFromEnv()
 }
 
 export function logGrowthEngine(event: string, details: Record<string, unknown>): void {
