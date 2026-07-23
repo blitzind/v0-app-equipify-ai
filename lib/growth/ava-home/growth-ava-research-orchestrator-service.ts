@@ -41,9 +41,9 @@ import type { GrowthLead } from "@/lib/growth/types"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import {
-  GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE,
-  hasLikelyDecisionMaker,
-} from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
+  assessGrowthResearchSufficiencyFromLead,
+  isPackageReadyFromSufficiency,
+} from "@/lib/growth/research/growth-research-sufficiency-1a"
 
 const OUTREACH_READY_ACTIONS = new Set([
   "call_prospect",
@@ -296,10 +296,7 @@ function leadReadyForOutreachReview(
   const status = workflowStatus ?? null
   if (status === "assessed" || status === "qualified" || status === "research_complete") return true
 
-  if (
-    hasLikelyDecisionMaker({ lead }) &&
-    (lead.score ?? 0) >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE
-  ) {
+  if (isPackageReadyFromSufficiency(assessGrowthResearchSufficiencyFromLead(lead))) {
     return true
   }
 
@@ -313,10 +310,6 @@ function leadReadyForOutreachReview(
     lead.nextBestAction === "call_decision_maker" ||
     lead.nextBestAction === "immediate_sales_action"
   ) {
-    return true
-  }
-  if ((lead.score ?? 0) >= 70 && lead.workflowHealth === "healthy") return true
-  if ((lead.score ?? 0) >= GROWTH_EARLY_OUTREACH_MIN_FIT_SCORE && hasLikelyDecisionMaker({ lead })) {
     return true
   }
   return false

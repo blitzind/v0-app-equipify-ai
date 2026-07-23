@@ -65,7 +65,8 @@ const readyInfrastructure = {
   workflowFeatureEnabled: true,
 }
 
-const researchResult = {
+/** Internal-mutation dry-run fixture — not yet package-sufficient; bounded verify_email work remains. */
+const internalDryRunResearchResult = {
   companySummary: "Regional commercial HVAC contractor.",
   websiteSummary: "Commercial HVAC.",
   likelyServiceCategory: "HVAC",
@@ -73,7 +74,7 @@ const researchResult = {
   companySizeEstimate: "40-60",
   equipmentServiceIndicators: ["fleet dispatch"],
   equipifyPainPoints: ["dispatch efficiency"],
-  equipifyFitScore: 78,
+  equipifyFitScore: 52,
   outreachAngles: ["fleet optimization"],
   recommendedNextAction: "Verify contacts",
   researchConfidence: 0.86,
@@ -96,6 +97,13 @@ const researchResult = {
   fleetSizeEstimate: "35 trucks",
   crmDetected: null,
   fieldServiceStackDetected: null,
+}
+
+/** Package-ready fixture — used only to assert outreach_generation stays non-dry-run-eligible. */
+const packageReadyResearchResult = {
+  ...internalDryRunResearchResult,
+  equipifyFitScore: 78,
+  decisionMakerCandidates: [],
 }
 
 console.log(`[${GROWTH_AIOS_GROWTH_3B_PHASE}] Internal Workflow Dry Run certification`)
@@ -122,16 +130,35 @@ assert.match(uiSource, /Non-persistent|non-persistent/)
 assert.equal(uiSource.includes("enqueueGrowthLeadResearchExecution"), false)
 assert.equal(uiSource.toLowerCase().includes("launch"), false)
 
-const qualification = qualifyGrowthLeadResearch({ result: researchResult, researchRunStatus: "succeeded" })
+const qualification = qualifyGrowthLeadResearch({
+  result: internalDryRunResearchResult,
+  researchRunStatus: "succeeded",
+})
 const intelligence = assessGrowthLeadResearchOpportunity({
-  result: researchResult,
+  result: internalDryRunResearchResult,
   qualification: qualification.qualification,
 })
+assert.equal(intelligence.opportunityAssessment.recommendation, "verify_contacts")
 const executionPlan = { ...intelligence.executionPlan, missingPrerequisites: [] as string[] }
-const fixedNow = "2026-06-25T12:00:00.000Z"
-const planId = "glr-ep:lead-cert-3b:verify_email:verify_email"
+assert.equal(executionPlan.workflowType, "verify_email")
+assert.equal(isInternalMutationRuntimeWorkflow(executionPlan.workflowType), true)
 
-const boundary = auditWorkflowBoundary("verify_email", readyInfrastructure)
+const packageReadyQualification = qualifyGrowthLeadResearch({
+  result: packageReadyResearchResult,
+  researchRunStatus: "succeeded",
+})
+const packageReadyIntelligence = assessGrowthLeadResearchOpportunity({
+  result: packageReadyResearchResult,
+  qualification: packageReadyQualification.qualification,
+})
+assert.equal(packageReadyIntelligence.opportunityAssessment.recommendation, "prepare_outreach")
+assert.equal(packageReadyIntelligence.executionPlan.workflowType, "outreach_generation")
+assert.equal(isInternalMutationRuntimeWorkflow(packageReadyIntelligence.executionPlan.workflowType), false)
+
+const fixedNow = "2026-06-25T12:00:00.000Z"
+const planId = `glr-ep:lead-cert-3b:${executionPlan.workflowType}:${executionPlan.workflowType}`
+
+const boundary = auditWorkflowBoundary(executionPlan.workflowType, readyInfrastructure)
 const workflowPreflight = buildWorkflowPreflightChecklist({ boundary, infrastructure: readyInfrastructure })
 const handoff = buildFutureExecutionHandoffContract({
   planId,

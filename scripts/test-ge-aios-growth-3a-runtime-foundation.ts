@@ -68,6 +68,7 @@ const readyInfrastructure = {
   workflowFeatureEnabled: true,
 }
 
+/** Internal-mutation runtime fixture — not package-sufficient; verify_email remains eligible. */
 const researchResult = {
   companySummary: "Regional commercial HVAC contractor.",
   websiteSummary: "Commercial HVAC.",
@@ -76,7 +77,7 @@ const researchResult = {
   companySizeEstimate: "40-60",
   equipmentServiceIndicators: ["fleet dispatch"],
   equipifyPainPoints: ["dispatch efficiency"],
-  equipifyFitScore: 78,
+  equipifyFitScore: 52,
   outreachAngles: ["fleet optimization"],
   recommendedNextAction: "Verify contacts",
   researchConfidence: 0.86,
@@ -131,10 +132,11 @@ const intelligence = assessGrowthLeadResearchOpportunity({
 })
 const executionPlan = { ...intelligence.executionPlan, missingPrerequisites: [] as string[] }
 
+assert.equal(intelligence.opportunityAssessment.recommendation, "verify_contacts")
 assert.equal(executionPlan.workflowType, "verify_email")
 assert.ok(executionPlan.estimatedSteps.length >= 2)
 
-const boundary = auditWorkflowBoundary("verify_email", readyInfrastructure)
+const boundary = auditWorkflowBoundary(executionPlan.workflowType, readyInfrastructure)
 const workflowPreflight = buildWorkflowPreflightChecklist({ boundary, infrastructure: readyInfrastructure })
 const handoff = buildFutureExecutionHandoffContract({
   planId: "glr-ep:lead-cert-3a:verify_email:verify_email",
