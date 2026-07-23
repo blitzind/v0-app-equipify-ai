@@ -143,7 +143,8 @@ export function certifySellerReadiness(input: {
     check(
       "business_strategy",
       "Is business strategy sufficiently complete?",
-      strategyCompleteness.filledSectionCount >= 6,
+      strategyCompleteness.hasContent &&
+        strategyCompleteness.filledSectionCount >= strategyCompleteness.totalSectionCount,
       `Strategy missing areas: ${strategyCompleteness.missingAreas.join(", ")}`,
     ),
     check(

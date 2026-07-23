@@ -66,8 +66,8 @@ assert.match(GROWTH_AUTONOMOUS_RESEARCH_PILOT_RULE, /Research Agent|no outbound/
 assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_AGENT, "research_agent")
 assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_SCHEDULER_MODE, "controlled_agent_wake")
 assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_WAKE_CONDITIONS.length, 4)
-assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour, 10)
-assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay, 100)
+assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour, 40)
+assert.equal(GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay, 750)
 console.log("  ✓ QA marker and pilot constants")
 
 assertNoForbiddenPaths("lib/growth/aios/growth/growth-autonomous-research-pilot-types.ts")
@@ -156,7 +156,7 @@ assert.equal(control, "disabled")
 setAutonomousResearchPilotControlState({ organizationId: ORG, controlState: control, now: GENERATED_AT })
 console.log("  ✓ Pause, resume, disable transitions")
 
-const runs = Array.from({ length: 10 }, (_, index) =>
+const runs = Array.from({ length: GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour }, (_, index) =>
   buildAutonomousResearchRunRecord({
     leadId: `lead-${index}`,
     companyName: "Cert Co",

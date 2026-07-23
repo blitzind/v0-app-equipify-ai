@@ -115,7 +115,7 @@ function main(): void {
     messaging: { ...createEmptyBusinessStrategyContent().messaging, tone: "Educational" },
   })
   assert.equal(completeness.hasContent, true)
-  assert.ok(completeness.wellUnderstoodAreas.includes("messaging"))
+  assert.ok(completeness.wellUnderstoodAreas.includes("messaging & tone"))
   console.log("  ✓ business strategy completeness evaluator")
 
   console.log(`[${PHASE}] PASS — Training workspace certified (local)`)

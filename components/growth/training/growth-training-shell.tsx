@@ -29,7 +29,7 @@ export function GrowthTrainingShell({ children }: GrowthTrainingShellProps) {
 
   return (
     <div
-      className="mx-auto w-full max-w-6xl space-y-6"
+      className="w-full min-w-0 space-y-6"
       data-qa-marker={GROWTH_TRAINING_NAV_QA_MARKER}
       data-qa-section="training-workspace-shell"
     >
@@ -99,7 +99,7 @@ export function GrowthTrainingShell({ children }: GrowthTrainingShellProps) {
           })}
         </nav>
 
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0 w-full">{children}</div>
       </div>
     </div>
   )

@@ -68,6 +68,16 @@ function buildBusinessStrategyArea(input: BuildGrowthTrainingOverviewInput) {
   const strategy = record?.profile.businessStrategy
   const completeness = evaluateBusinessStrategyCompleteness(strategy)
 
+  if (input.latestDraft?.profile.businessStrategy && completeness.hasContent) {
+    return {
+      id: "business_strategy" as const,
+      label: "Business Strategy",
+      status: "in_progress" as const,
+      summary: "You have strategy updates in a draft profile.",
+      href: GROWTH_TRAINING_BUSINESS_STRATEGY_ROUTE,
+      coachingHint: "Approve your profile draft so I can apply your strategy.",
+    }
+  }
   if (input.activeApproved && completeness.hasContent) {
     return {
       id: "business_strategy" as const,
@@ -79,16 +89,6 @@ function buildBusinessStrategyArea(input: BuildGrowthTrainingOverviewInput) {
         completeness.missingAreas.length > 0
           ? `I'd improve fastest if you taught me: ${completeness.missingAreas.slice(0, 3).join(", ")}`
           : null,
-    }
-  }
-  if (input.latestDraft?.profile.businessStrategy && completeness.hasContent) {
-    return {
-      id: "business_strategy" as const,
-      label: "Business Strategy",
-      status: "in_progress" as const,
-      summary: "You have strategy updates in a draft profile.",
-      href: GROWTH_TRAINING_BUSINESS_STRATEGY_ROUTE,
-      coachingHint: "Approve your profile draft so I can apply your strategy.",
     }
   }
   return {

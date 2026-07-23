@@ -854,6 +854,8 @@
     "test:ge-aios-18g-autonomous-lead-discovery": "tsx scripts/test-ge-aios-18g-autonomous-lead-discovery.ts",
     "test:ge-aios-19a-sales-operations-center": "tsx scripts/test-ge-aios-19a-sales-operations-center.ts",
     "test:ge-aios-19c-training-workspace": "tsx scripts/test-ge-aios-19c-training-workspace.ts",
+    "test:aios-training-business-strategy-1b": "tsx scripts/test-aios-training-business-strategy-1b.ts",
+    "test:aios-training-business-strategy-1b:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-aios-training-business-strategy-1b-production.ts",
     "test:ge-aios-19c-2f-about-your-ai": "tsx scripts/test-ge-aios-19c-2f-about-your-ai.ts",
     "test:ge-aios-19c-2a-single-ai-identity-cleanup": "tsx scripts/test-ge-aios-19c-2a-single-ai-identity-cleanup.ts",
     "test:ge-aios-19c-2g-home-cleanup": "tsx scripts/test-ge-aios-19c-2g-home-cleanup.ts",
