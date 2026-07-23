@@ -147,6 +147,10 @@ function main(): void {
       metadata: { business_email: "ops@ericksonaviation.com" },
     },
     { approvedProfile: SAMPLE_PROFILE, activeMissionTitle: "Medical equipment demos" },
+    {
+      operationalKeywordValidation: { pass: true, reason: null },
+      prospectSearchIndustryGatePassed: true,
+    },
   )
   assert.equal(acceptedAdmission.state, "accepted")
   assert.equal(acceptedAdmission.allowAutoResearch, true)

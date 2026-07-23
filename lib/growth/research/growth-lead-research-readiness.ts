@@ -5,6 +5,7 @@ import {
   normalizeDomain,
 } from "@/lib/growth/company-identification/company-identification-normalize"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import { shouldBlockAutonomousResearchForPolicyMetadata } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
 
 import type { GrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -137,6 +138,7 @@ export function shouldAutoQueueLeadResearch(lead: Pick<
   if (admissionState === "review") {
     const domain = normalizeDomain(lead.website)
     if (!domain) return false
+    if (shouldBlockAutonomousResearchForPolicyMetadata(lead.metadata)) return false
   }
 
   const websiteDomain = normalizeDomain(lead.website)

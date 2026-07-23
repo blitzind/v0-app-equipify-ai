@@ -68,7 +68,7 @@ assert.equal(
   false,
 )
 const sourceId = buildInvestmentChangedWakeSourceId(afterSnapshot)
-assert.match(sourceId, /^admission-reconcile:accepted:new:active:increase_investment:spend$/)
+assert.match(sourceId, /^admission-reconcile:accepted:new:active:increase_investment:spend:/)
 console.log("  ✓ material RA input delta + stable wake sourceId")
 
 const staleLead = {

@@ -15,6 +15,7 @@ import {
   type AiOsScarceResourceClass,
 } from "@/lib/growth/resource-allocation/resource-allocation-types"
 import { GROWTH_EARLY_OUTREACH_MIN_CONFIDENCE } from "@/lib/growth/outreach/growth-autonomous-revenue-loop-1a"
+import { projectBoundedResearchInvestmentState } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -145,6 +146,36 @@ export function projectInvestmentStateFromSignals(
     blocking.push("budget_pressure")
   }
 
+  const boundedProjection = projectBoundedResearchInvestmentState({
+    resourceClass,
+    costTier,
+    admissionState: admission,
+    allowAutoResearch: signals.admission?.allowAutoResearch,
+    projection: {
+      researchSufficiencyDecision: signals.researchSufficiencyDecision ?? null,
+      packageReady: signals.researchSufficientForPackage ?? null,
+      sendReady: signals.sendReady ?? null,
+      boundedResearchAuthorization: signals.boundedResearchAuthorization ?? null,
+    },
+  })
+  if (boundedProjection.investmentState) {
+    blocking.push(...boundedProjection.blocking)
+    return {
+      investment_state: boundedProjection.investmentState,
+      reason:
+        boundedProjection.reason ??
+        "Canonical sufficiency/admission investment projection applied.",
+      confidence: boundedProjection.investmentState === "stop_investment" ? 1 : 0.9,
+      blocking_conditions: blocking,
+      next_review:
+        boundedProjection.investmentState === "pending_investment"
+          ? "after_bounded_research_or_operator_review"
+          : boundedProjection.investmentState === "increase_investment"
+            ? "after_bounded_research_action"
+            : null,
+    }
+  }
+
   if (admission === "review" || signals.admission?.requiresHumanReview === true) {
     blocking.push("admission_review")
     return {
@@ -213,6 +244,17 @@ export function projectInvestmentStateFromSignals(
         blocking_conditions: blocking,
         next_review: "after_low_cost_validation",
       }
+    }
+  }
+
+  if (signals.researchSufficientForPackage === true && resourceClass === "website_research") {
+    return {
+      investment_state: "maintain_investment",
+      reason:
+        "Package-ready — maintain research posture without authorizing additional optional research spend.",
+      confidence: Math.max(confidence, 0.85),
+      blocking_conditions: [...blocking, "package_ready_research_complete"],
+      next_review: "on_package_completion",
     }
   }
 

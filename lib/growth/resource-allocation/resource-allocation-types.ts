@@ -1,5 +1,8 @@
 /** SV1-1 / ARCH-1A — Resource Allocation Facade types (client-safe). */
 
+import type { GrowthResearchSufficiencyDecisionKind } from "@/lib/growth/research/growth-research-sufficiency-1a"
+import type { GrowthBoundedResearchAuthorization } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
+
 export const AI_OS_RESOURCE_ALLOCATION_QA_MARKER = "sv1-1-resource-allocation-facade-v1" as const
 
 export const AI_OS_RESOURCE_ALLOCATION_MODE = ["shadow", "enforce"] as const
@@ -75,6 +78,10 @@ export type AiOsResourceAllocationSupportingSignals = {
   researchSufficientForPackage?: boolean | null
   /** GE-AIOS-RESEARCH-SUFFICIENCY-1A — send/transport readiness remains separately gated. */
   sendReady?: boolean | null
+  /** GE-AIOS-INVESTMENT-PROPAGATION-1B — persisted canonical sufficiency decision. */
+  researchSufficiencyDecision?: GrowthResearchSufficiencyDecisionKind | null
+  /** GE-AIOS-INVESTMENT-PROPAGATION-1B — bounded targeted research authorization projection. */
+  boundedResearchAuthorization?: GrowthBoundedResearchAuthorization | null
 }
 
 export type AiOsResourceAllocationRequest = {

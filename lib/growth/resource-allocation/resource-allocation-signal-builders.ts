@@ -10,6 +10,7 @@ import type {
   AiOsResourceAllocationAdmissionSignal,
   AiOsResourceAllocationSupportingSignals,
 } from "@/lib/growth/resource-allocation/resource-allocation-types"
+import { buildBoundedResearchSignalProjectionFromMetadata } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
@@ -73,6 +74,7 @@ export function buildResourceAllocationSignalsFromLead(
     (lead.status === "disqualified" || lead.status === "archived" ? "abandon" : null)
 
   const stopFromStatus = lead.status === "disqualified" || lead.status === "archived"
+  const policyProjection = buildBoundedResearchSignalProjectionFromMetadata(metadata)
 
   return {
     admission,
@@ -81,6 +83,13 @@ export function buildResourceAllocationSignalsFromLead(
     researchFresh,
     researchStale,
     hasUsableResearch,
+    researchSufficientForPackage:
+      overrides?.researchSufficientForPackage ??
+      policyProjection.packageReady ??
+      undefined,
+    sendReady: overrides?.sendReady ?? policyProjection.sendReady ?? undefined,
+    researchSufficiencyDecision: policyProjection.researchSufficiencyDecision,
+    boundedResearchAuthorization: policyProjection.boundedResearchAuthorization,
     stopConditionActive: stopFromStatus,
     stopConditionReason: stopFromStatus ? `Lead status ${lead.status} is a stop condition.` : null,
     ...(overrides ?? {}),

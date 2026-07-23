@@ -5,6 +5,7 @@
 
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
+import { resolveBoundedResearchAuthorizationFromMetadata } from "@/lib/growth/revenue-workflow/growth-investment-propagation-1b"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -18,6 +19,10 @@ export type GrowthResourceAllocationInputSnapshot = {
   stopConditionReason: string | null
   investmentState: string
   spendAuthorized: boolean
+  /** GE-AIOS-INVESTMENT-PROPAGATION-1B */
+  researchSufficiencyDecision: string | null
+  boundedResearchAuthorized: boolean
+  boundedInvestmentRemaining: number
 }
 
 export function captureGrowthResourceAllocationInputSnapshot(
@@ -44,6 +49,11 @@ export function captureGrowthResourceAllocationInputSnapshot(
     resourceClass: "email_drafting",
     signals,
   })
+  const metadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : {}
+  const bounded = resolveBoundedResearchAuthorizationFromMetadata(metadata)
   return {
     admissionState: resolveLeadAdmissionStateFromMetadata(lead.metadata),
     leadStatus: lead.status ?? null,
@@ -51,6 +61,12 @@ export function captureGrowthResourceAllocationInputSnapshot(
     stopConditionReason: signals.stopConditionReason ?? null,
     investmentState: investment.investment_state,
     spendAuthorized: investment.spend_authorized,
+    researchSufficiencyDecision:
+      typeof metadata.research_sufficiency_decision === "string"
+        ? metadata.research_sufficiency_decision
+        : null,
+    boundedResearchAuthorized: bounded.authorized,
+    boundedInvestmentRemaining: bounded.investmentRemaining,
   }
 }
 
@@ -63,7 +79,10 @@ export function hasMaterialResourceAllocationInputChange(
     before.leadStatus !== after.leadStatus ||
     before.stopConditionActive !== after.stopConditionActive ||
     before.investmentState !== after.investmentState ||
-    before.spendAuthorized !== after.spendAuthorized
+    before.spendAuthorized !== after.spendAuthorized ||
+    before.researchSufficiencyDecision !== after.researchSufficiencyDecision ||
+    before.boundedResearchAuthorized !== after.boundedResearchAuthorized ||
+    before.boundedInvestmentRemaining !== after.boundedInvestmentRemaining
   )
 }
 
@@ -78,5 +97,8 @@ export function buildInvestmentChangedWakeSourceId(
     snapshot.stopConditionActive ? "stop" : "active",
     snapshot.investmentState,
     snapshot.spendAuthorized ? "spend" : "no-spend",
+    snapshot.researchSufficiencyDecision ?? "legacy",
+    snapshot.boundedResearchAuthorized ? "bounded" : "unbounded",
+    String(snapshot.boundedInvestmentRemaining),
   ].join(":")
 }
