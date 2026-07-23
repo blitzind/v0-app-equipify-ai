@@ -12,6 +12,8 @@ import {
   normalizeDomain,
 } from "@/lib/growth/company-identification/company-identification-normalize"
 import type { NormalizedLeadIntake } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
+import type { GrowthResearchSufficiencyDecision } from "@/lib/growth/research/growth-research-sufficiency-1a"
+import { applyResearchSufficiencyAdmissionPolicy } from "@/lib/growth/revenue-workflow/growth-admission-policy-1a"
 import {
   GROWTH_LEAD_ADMISSION_21C_QA_MARKER,
   type GrowthLeadAdmissionEvaluation,
@@ -34,6 +36,8 @@ export type GrowthLeadAdmissionEvaluateOptions = {
   } | null
   /** Prospect Search industry gate result carried from external discovery normalization. */
   prospectSearchIndustryGatePassed?: boolean | null
+  /** GE-AIOS-ADMISSION-POLICY-1A — canonical Research Sufficiency projection. */
+  researchSufficiency?: GrowthResearchSufficiencyDecision | null
 }
 
 export type GrowthLeadAdmissionIntakeInput = Pick<
@@ -356,7 +360,7 @@ export function evaluateGrowthLeadAdmission(
           ? ["admission_review_required"]
           : []
 
-  return {
+  const baseEvaluation: GrowthLeadAdmissionEvaluation = {
     qa_marker: GROWTH_LEAD_ADMISSION_21C_QA_MARKER,
     state,
     reasons: uniqueReasons(reasons),
@@ -371,6 +375,15 @@ export function evaluateGrowthLeadAdmission(
       domain: sanitizedDomain,
     },
   }
+
+  if (options?.researchSufficiency) {
+    return applyResearchSufficiencyAdmissionPolicy({
+      base: baseEvaluation,
+      sufficiency: options.researchSufficiency,
+    })
+  }
+
+  return baseEvaluation
 }
 
 export function resolveLeadAdmissionStateFromMetadata(

@@ -26,6 +26,10 @@ import {
   isExternalDiscoveryLeadIntakeSource,
 } from "@/lib/growth/revenue-workflow/growth-operational-keyword-validation-1a"
 import {
+  buildAdmissionPolicyMetadataFromSufficiency,
+  buildResearchSufficiencyDecisionForPostResearchAdmission,
+} from "@/lib/growth/revenue-workflow/growth-admission-policy-1a"
+import {
   buildInvestmentChangedWakeSourceId,
   captureGrowthResourceAllocationInputSnapshot,
   hasMaterialResourceAllocationInputChange,
@@ -164,19 +168,38 @@ export async function reconcileExternalDiscoveryPostResearchAdmission(
       approvedProfile,
     })
 
+  const existingMetadata =
+    input.lead.metadata && typeof input.lead.metadata === "object" ? input.lead.metadata : {}
+  const priorPassesUsed =
+    typeof existingMetadata.admission_targeted_research_passes_used === "number" &&
+    Number.isFinite(existingMetadata.admission_targeted_research_passes_used)
+      ? Math.max(0, existingMetadata.admission_targeted_research_passes_used)
+      : 0
+  const targetedResearchPassesUsed = priorPassesUsed + 1
+
+  const researchSufficiency = buildResearchSufficiencyDecisionForPostResearchAdmission({
+    lead: input.lead,
+    researchRun: input.researchRun ?? null,
+    evidenceBundle: input.evidenceBundle ?? null,
+    websiteCrawlText: input.websiteCrawlText ?? null,
+    targetedResearchPassesUsed,
+  })
+
   const admission = evaluateGrowthLeadAdmission(intake, input.admissionContext, {
     operationalKeywordValidation: keywordValidation,
     prospectSearchIndustryGatePassed: industryGatePassed,
+    researchSufficiency,
   })
 
   const generatedAt = input.generatedAt ?? new Date().toISOString()
-  const existingMetadata =
-    input.lead.metadata && typeof input.lead.metadata === "object" ? input.lead.metadata : {}
   const reconciledStatus = resolveReconciledLeadStatusFromAdmission(admission)
   const reconciledMetadata = {
     ...existingMetadata,
     ...buildLeadAdmissionMetadata(admission, generatedAt),
     ...buildOperationalKeywordValidationMetadata(keywordValidation, generatedAt),
+    ...buildAdmissionPolicyMetadataFromSufficiency(researchSufficiency, generatedAt),
+    admission_targeted_research_passes_used: targetedResearchPassesUsed,
+    investment_propagation_1b_qa_marker: "ge-aios-investment-propagation-1b-v1",
     prospect_search_industry_gate_passed: industryGatePassed,
   }
 
