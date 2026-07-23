@@ -4,6 +4,17 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+  '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+  '@fuzor/configuration': file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+  '@fuzor/knowledge': file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+  '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+  '@fuzor/decision-records': file:../../fuzor/packages/decision-records
+  '@fuzor/memory': file:../../fuzor/packages/memory
+  '@fuzor/context': file:../../fuzor/packages/context
+  '@fuzor/sdk': file:../../fuzor/packages/sdk
+
 importers:
 
   .:
@@ -15,17 +26,32 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
       '@fuzor/configuration':
-        specifier: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+      '@fuzor/context':
+        specifier: file:/Users/blitz/Projects/fuzor/packages/context
+        version: file:../../fuzor/packages/context
+      '@fuzor/decision-records':
+        specifier: file:/Users/blitz/Projects/fuzor/packages/decision-records
+        version: file:../../fuzor/packages/decision-records
+      '@fuzor/event-bus':
+        specifier: file:/Users/blitz/Projects/fuzor/packages/event-bus
+        version: file:../../fuzor/packages/event-bus
       '@fuzor/identity':
-        specifier: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
       '@fuzor/knowledge':
-        specifier: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+      '@fuzor/memory':
+        specifier: file:/Users/blitz/Projects/fuzor/packages/memory
+        version: file:../../fuzor/packages/memory
       '@fuzor/observability':
-        specifier: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+        specifier: file:/Users/blitz/Projects/equipify/equipify-app/vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+      '@fuzor/sdk':
+        specifier: file:/Users/blitz/Projects/fuzor/packages/sdk
+        version: file:../../fuzor/packages/sdk
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.71.1(react@19.2.4))
@@ -592,17 +618,32 @@ packages:
     resolution: {integrity: sha512-R+LoVKsYiC/+k4trundt6QknICvmF8TWp2UUbF1ezR7eyTxUYAknLiHR8uHKe3RsP7iwqoLl4WEUTflnCOQWjA==, tarball: file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz}
     version: 0.1.0
 
+  '@fuzor/context@file:../../fuzor/packages/context':
+    resolution: {directory: ../../fuzor/packages/context, type: directory}
+
+  '@fuzor/decision-records@file:../../fuzor/packages/decision-records':
+    resolution: {directory: ../../fuzor/packages/decision-records, type: directory}
+
+  '@fuzor/event-bus@file:../../fuzor/packages/event-bus':
+    resolution: {directory: ../../fuzor/packages/event-bus, type: directory}
+
   '@fuzor/identity@file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz':
-    resolution: {integrity: sha512-1C/CeJUwFGDLXVClYz/h+1c8u5ofWgMVvznBbx6uu6+SVBYMCFjQg5C+YHXz60eq2wJ3nwr2slU6VgPL0uEDOA==, tarball: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz}
+    resolution: {integrity: sha512-Z6noVxDEdmuEaJUMkuLh6xQxMEM6/DiMUw/bCyBLfc0JPMNrqIzdpJsMJTVutysSy+ph+2gLP1Bz2ZMI5giMYg==, tarball: file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz}
     version: 0.1.0
 
   '@fuzor/knowledge@file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz':
     resolution: {integrity: sha512-pVrb6pRWemk8WHrC4C5z8wnj2ewJNwtVynXNX8/dU/tlNA4jfYp6/oYMcTn6JcH/570nSNe3d9dOsoOp9gD3aA==, tarball: file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz}
     version: 0.1.0
 
+  '@fuzor/memory@file:../../fuzor/packages/memory':
+    resolution: {directory: ../../fuzor/packages/memory, type: directory}
+
   '@fuzor/observability@file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz':
     resolution: {integrity: sha512-Gd25gSiJnAWYdQZrA8ybq15gVPquEGwnt2H3DoiOTdEESgreRb4e5FONyQHzgtQdhz4C5ta7aMeHvYFTPy4jog==, tarball: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz}
     version: 0.1.0
+
+  '@fuzor/sdk@file:../../fuzor/packages/sdk':
+    resolution: {directory: ../../fuzor/packages/sdk, type: directory}
 
   '@hookform/resolvers@3.10.0':
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
@@ -4368,6 +4409,37 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@fuzor/context@file:../../fuzor/packages/context':
+    dependencies:
+      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
+      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+      '@fuzor/memory': file:../../fuzor/packages/memory
+      '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+      '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@fuzor/decision-records@file:../../fuzor/packages/decision-records':
+    dependencies:
+      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+      '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+      '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@fuzor/event-bus@file:../../fuzor/packages/event-bus':
+    dependencies:
+      '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+      '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+      '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@fuzor/identity@file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
@@ -4382,9 +4454,34 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@fuzor/memory@file:../../fuzor/packages/memory':
+    dependencies:
+      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
+      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+      '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
+      '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@fuzor/observability@file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz':
     dependencies:
       '@supabase/supabase-js': 2.105.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@fuzor/sdk@file:../../fuzor/packages/sdk':
+    dependencies:
+      '@fuzor/configuration': file:vendor/fuzor-packages/fuzor-configuration-0.1.0.tgz
+      '@fuzor/context': file:../../fuzor/packages/context
+      '@fuzor/decision-records': file:../../fuzor/packages/decision-records
+      '@fuzor/event-bus': file:../../fuzor/packages/event-bus
+      '@fuzor/identity': file:vendor/fuzor-packages/fuzor-identity-0.1.0.tgz
+      '@fuzor/knowledge': file:vendor/fuzor-packages/fuzor-knowledge-0.1.0.tgz
+      '@fuzor/memory': file:../../fuzor/packages/memory
+      '@fuzor/observability': file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
