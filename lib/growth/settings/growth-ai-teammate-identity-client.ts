@@ -7,14 +7,22 @@ import {
   type AiTeammateIdentityPatch,
 } from "@/lib/growth/settings/growth-ai-teammate-identity-types"
 
-export async function fetchAiTeammateIdentity(): Promise<AiTeammateIdentity | null> {
+export async function fetchAiTeammateIdentity(): Promise<{
+  identity: AiTeammateIdentity | null
+  loadError: string | null
+}> {
   try {
     const res = await fetch(GROWTH_AI_TEAMMATE_IDENTITY_API_PATH, { cache: "no-store" })
     const data = (await res.json().catch(() => ({}))) as AiTeammateIdentityApiResponse
-    if (!res.ok || !data.ok || !data.identity) return null
-    return data.identity
+    if (!res.ok || !data.ok || !data.identity) {
+      return {
+        identity: null,
+        loadError: data.message ?? "Could not load AI teammate identity.",
+      }
+    }
+    return { identity: data.identity, loadError: null }
   } catch {
-    return null
+    return { identity: null, loadError: "Could not load AI teammate identity." }
   }
 }
 

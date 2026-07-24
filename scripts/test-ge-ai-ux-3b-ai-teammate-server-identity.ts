@@ -53,7 +53,7 @@ console.log("  ✓ repository delegates to @fuzor/identity")
 const service = readSource("lib/growth/settings/growth-ai-teammate-identity-service.ts")
 assert.equal(service.includes("fetch("), false)
 assert.ok(service.includes("@fuzor/identity"))
-assert.ok(service.includes("loadPlatformPersonaIdentity"))
+assert.ok(service.includes("loadGrowthAiTeammateIdentityRecord"))
 assert.ok(service.includes("loadAiTeammateIdentity"))
 console.log("  ✓ service layer delegates to @fuzor/identity")
 

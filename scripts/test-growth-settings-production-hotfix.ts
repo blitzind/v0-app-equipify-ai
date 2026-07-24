@@ -32,7 +32,8 @@ function main(): void {
   assert.match(repository, /isGrowthOperatorWorkspaceMissingColumnError/)
 
   const teammateRepo = readSource("lib/growth/settings/growth-ai-teammate-identity-repository.ts")
-  assert.match(teammateRepo, /isGrowthOperatorWorkspaceMissingColumnError/)
+  assert.match(teammateRepo, /loadGrowthAiTeammateIdentityRecord/)
+  assert.match(teammateRepo, /isGrowthOrganizationAiTeammateActivationColumnMissingError/)
   assert.match(teammateRepo, /isGrowthOrganizationAiTeammateIdentityTableMissingError/)
 
   const compat = readSource("lib/growth/settings/growth-workspace-settings-column-compat.ts")

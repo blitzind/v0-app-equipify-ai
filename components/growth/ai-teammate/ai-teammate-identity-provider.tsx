@@ -63,7 +63,7 @@ export function AiTeammateIdentityProvider({ children }: { children: ReactNode }
     setOnboardingOpen(!local.onboardingCompleted)
 
     void (async () => {
-      const server = await fetchAiTeammateIdentity()
+      const { identity: server, loadError } = await fetchAiTeammateIdentity()
       if (server) {
         setOrganizationId(server.organizationId)
         setStoredName(server.name)
@@ -71,6 +71,9 @@ export function AiTeammateIdentityProvider({ children }: { children: ReactNode }
         setOnboardingOpen(!server.onboardingCompleted)
         setServerPersisted(server.source === "organization" || server.onboardingCompleted)
         applyLocalCache(server.name, server.onboardingCompleted, server.organizationId)
+        setError(null)
+      } else if (loadError) {
+        setError(loadError)
       }
       setHydrated(true)
       setLoading(false)
