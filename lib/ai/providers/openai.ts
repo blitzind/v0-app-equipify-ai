@@ -9,6 +9,12 @@ import type {
 } from "@/lib/ai/types"
 import { getProviderApiKey } from "@/lib/ai/providers/credentials"
 
+/** GPT-5 / o-series Chat Completions need max_completion_tokens; many reject custom temperature. */
+function isOpenAiReasoningChatModel(model: string): boolean {
+  const id = model.trim().toLowerCase()
+  return id.startsWith("gpt-5") || /^o[1-9]/.test(id)
+}
+
 function toOpenAiMessages(messages: AiChatMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
   return messages.map((m): OpenAI.Chat.ChatCompletionMessageParam => {
     if (typeof m.content === "string") {
@@ -52,12 +58,20 @@ export function createOpenAiAdapter(): AiProviderAdapter {
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), req.timeoutMs)
         try {
+          const reasoningChat = isOpenAiReasoningChatModel(req.model)
           const completion = await client.chat.completions.create(
             {
               model: req.model,
               messages,
-              temperature: req.temperature,
-              max_tokens: req.maxOutputTokens,
+              ...(reasoningChat
+                ? {
+                    max_completion_tokens: req.maxOutputTokens,
+                    reasoning_effort: "medium" as const,
+                  }
+                : {
+                    temperature: req.temperature,
+                    max_tokens: req.maxOutputTokens,
+                  }),
               ...(req.structuredMode === "json_object"
                 ? { response_format: { type: "json_object" as const } }
                 : {}),
