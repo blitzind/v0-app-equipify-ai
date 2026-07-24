@@ -16,6 +16,9 @@ export const GROWTH_HOME_SALES_OUTCOMES_LOADER_BUDGET_MS = 8_000
 /** Home approval snapshot (HAC slice) — must not block core briefing indefinitely. */
 export const GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS = 8_000
 
+/** Lightweight outreach-package approval summary for Home critical path. */
+export const GROWTH_HOME_CRITICAL_APPROVAL_SUMMARY_LOADER_BUDGET_MS = 4_000 as const
+
 /** Portfolio authority hydration — bounded; degrades to null snapshot on timeout. */
 export const GROWTH_HOME_PORTFOLIO_AUTHORITY_LOADER_BUDGET_MS = 6_000
 

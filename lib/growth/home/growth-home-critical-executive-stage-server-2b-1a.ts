@@ -6,10 +6,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { loadCanonicalOperatorApprovalSummaryForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-approval-summary-loader-2b-1c"
 import { loadCanonicalOperatorApprovalSnapshotForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-loader"
 import type { GrowthCanonicalOperatorApprovalSnapshot } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import {
   GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS,
+  GROWTH_HOME_CRITICAL_APPROVAL_SUMMARY_LOADER_BUDGET_MS,
   GROWTH_HOME_RUNTIME_CRITICAL_LOADER_BUDGET_MS,
   withGrowthHomeLoaderBudget,
   type GrowthHomeLoaderTiming,
@@ -40,6 +42,8 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
   organizationId: string | null
   actorUserId: string
   generatedAt: string
+  /** Lightweight outreach-only approval summary for Home critical path. */
+  lightweightApprovalLoader?: boolean
 }): Promise<GrowthHomeCriticalExecutiveStageResult> {
   const startedAt = Date.now()
   const timings: GrowthHomeLoaderTiming[] = []
@@ -58,15 +62,27 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
     }
   }
 
+  const approvalBudgetMs = input.lightweightApprovalLoader
+    ? GROWTH_HOME_CRITICAL_APPROVAL_SUMMARY_LOADER_BUDGET_MS
+    : GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS
+  const approvalLoaderLabel = input.lightweightApprovalLoader
+    ? "critical_canonical_operator_approval_summary"
+    : "critical_canonical_operator_approval"
+
   const [approvalStep, trainingStep] = await Promise.all([
     withGrowthHomeLoaderBudget({
-      label: "critical_canonical_operator_approval",
-      budgetMs: GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS,
+      label: approvalLoaderLabel,
+      budgetMs: approvalBudgetMs,
       fn: () =>
-        loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
-          organizationId: input.organizationId!,
-          generatedAt: input.generatedAt,
-        }),
+        input.lightweightApprovalLoader
+          ? loadCanonicalOperatorApprovalSummaryForHome(input.admin, {
+              organizationId: input.organizationId!,
+              generatedAt: input.generatedAt,
+            })
+          : loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
+              organizationId: input.organizationId!,
+              generatedAt: input.generatedAt,
+            }),
       fallback: null,
     }),
     withGrowthHomeLoaderBudget({
@@ -112,9 +128,7 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
   const trainingLoaded = trainingStep.value
   const trainingAvailability: GrowthHomeExecutiveSourceAvailability = trainingLoaded
     ? "confirmed"
-    : trainingStep.timing.timedOut
-      ? "unavailable"
-      : "confirmed_empty"
+    : "unavailable"
 
   return {
     timings,

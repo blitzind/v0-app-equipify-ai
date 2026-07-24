@@ -78,7 +78,24 @@ pnpm build
 
 ---
 
-## AVA-GROWTH-HOTFIX-2B-1B — Remaining false Idle path
+## AVA-GROWTH-HOTFIX-2B-1C — Critical load recovery
+
+### Production failure source (post-2B-1B)
+
+2B-1B fixed false Idle, but Home still blocked on the **full `workspace-summary`** path (>12s). Client aborted before server finished; Retry repeated the same slow request.
+
+### Repair
+
+1. **`GET /api/platform/growth/home/critical-executive-state`** — minimal critical projection (<3s target)
+2. **`loadCanonicalOperatorApprovalSummaryForHome`** — outreach packages only (no HAC fan-in / portfolio hydration)
+3. **Staged client load** — critical first (10s), full summary secondary (45s, non-blocking)
+4. **True Retry** — `requestGenerationRef`, `retryAttempt`, fresh `AbortController`, cache-bust query params
+
+### Certification
+
+```bash
+pnpm test:ava-growth-hotfix-2b-1c-home-critical-recovery
+```
 
 ### Exact remaining path (pre-2B-1B)
 

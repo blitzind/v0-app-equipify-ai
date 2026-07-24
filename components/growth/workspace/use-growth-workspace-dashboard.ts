@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  GROWTH_HOME_CRITICAL_EXECUTIVE_STATE_API_PATH,
   GROWTH_HOME_DEBUG_SOURCE_API_PATH,
   GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
   GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH,
 } from "@/lib/growth/home/growth-home-workspace-api-contract"
 import {
-  GROWTH_HOME_WORKSPACE_SUMMARY_CLIENT_TIMEOUT_MS,
   readGrowthHomeExecutiveSessionCache,
   writeGrowthHomeExecutiveSessionCache,
 } from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
+import {
+  GROWTH_HOME_CRITICAL_EXECUTIVE_CLIENT_TIMEOUT_MS,
+  GROWTH_HOME_SECONDARY_WORKSPACE_SUMMARY_TIMEOUT_MS,
+  isGrowthHomeCriticalExecutiveLoadActionable,
+  mergeGrowthHomeWorkspaceSummaryWithCriticalState,
+  type GrowthHomeCriticalExecutiveStatePayload,
+} from "@/lib/growth/home/growth-home-critical-executive-state-2b-1c"
 import {
   normalizeGrowthHomeWorkspaceSummaryPayload,
 } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
@@ -45,84 +52,120 @@ function applyWorkspaceSummaryPayload(
   workspaceSummary: GrowthHomeWorkspaceSummaryPayload
   avaConsole: GrowthHomeWorkspaceSummaryPayload["avaConsole"]
 } {
+  const normalized = normalizeGrowthHomeWorkspaceSummaryPayload(payload)
   return {
-    dashboard: payload.dashboard ?? buildGrowthWorkspaceDashboardViewModel(payload.sources),
-    workspaceSummary: payload,
-    avaConsole: payload.avaConsole ?? null,
+    dashboard: normalized.dashboard ?? buildGrowthWorkspaceDashboardViewModel(normalized.sources),
+    workspaceSummary: normalized,
+    avaConsole: normalized.avaConsole ?? null,
   }
+}
+
+function applyCriticalExecutivePayload(input: {
+  critical: GrowthHomeCriticalExecutiveStatePayload
+  existing: GrowthHomeWorkspaceSummaryPayload | null
+}): {
+  dashboard: GrowthWorkspaceDashboardViewModel
+  workspaceSummary: GrowthHomeWorkspaceSummaryPayload
+  avaConsole: GrowthHomeWorkspaceSummaryPayload["avaConsole"]
+} {
+  const merged = mergeGrowthHomeWorkspaceSummaryWithCriticalState({
+    existing: input.existing,
+    critical: input.critical,
+  })
+  return applyWorkspaceSummaryPayload(merged)
 }
 
 function readInitialExecutiveCache(): GrowthHomeWorkspaceSummaryPayload | null {
   return readGrowthHomeExecutiveSessionCache()
 }
 
-async function fetchGrowthHomeWorkspaceSummary(): Promise<{
-  payload: GrowthHomeWorkspaceSummaryPayload | null
-  errorMessage: string | null
-  timedOut: boolean
-}> {
+async function fetchJsonWithTimeout<T>(input: {
+  url: string
+  timeoutMs: number
+  externalSignal?: AbortSignal
+}): Promise<
+  | { ok: true; data: T; durationMs: number }
+  | { ok: false; timedOut: boolean; errorMessage: string; durationMs: number }
+> {
+  const startedAt = Date.now()
   const controller = new AbortController()
-  const timeoutId = setTimeout(
-    () => controller.abort(),
-    GROWTH_HOME_WORKSPACE_SUMMARY_CLIENT_TIMEOUT_MS,
-  )
+  const onExternalAbort = () => controller.abort()
+  input.externalSignal?.addEventListener("abort", onExternalAbort)
+  const timeoutId = setTimeout(() => controller.abort(), input.timeoutMs)
+
   try {
-    const res = await fetch(GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH, {
+    const res = await fetch(input.url, {
       cache: "no-store",
       signal: controller.signal,
     })
-    const payload = (await res.json().catch(() => ({}))) as Partial<GrowthHomeWorkspaceSummaryPayload>
-    if (!res.ok || payload.ok !== true) {
+    const data = (await res.json().catch(() => ({}))) as T & { ok?: boolean; message?: string }
+    const durationMs = Date.now() - startedAt
+    if (!res.ok || data.ok === false) {
       const message =
-        typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
-          ? payload.message
-          : "Could not load workspace dashboard."
-      return { payload: null, errorMessage: message, timedOut: false }
+        typeof data === "object" && data && "message" in data && typeof data.message === "string"
+          ? data.message
+          : "Could not load Home executive state."
+      return { ok: false, timedOut: false, errorMessage: message, durationMs }
     }
-    return {
-      payload: normalizeGrowthHomeWorkspaceSummaryPayload(payload),
-      errorMessage: null,
-      timedOut: false,
-    }
+    return { ok: true, data, durationMs }
   } catch (error) {
+    const durationMs = Date.now() - startedAt
     const timedOut = error instanceof Error && error.name === "AbortError"
     return {
-      payload: null,
+      ok: false,
+      timedOut,
       errorMessage: timedOut
         ? "Home is taking longer than expected. Please retry in a moment."
         : error instanceof Error
           ? error.message
-          : "Could not load workspace dashboard.",
-      timedOut,
+          : "Could not load Home executive state.",
+      durationMs,
     }
   } finally {
     clearTimeout(timeoutId)
+    input.externalSignal?.removeEventListener("abort", onExternalAbort)
   }
 }
 
-function logHomeDashboardFetch(payload: GrowthHomeWorkspaceSummaryPayload | null): void {
+function logHomeCriticalFetch(input: {
+  requestGeneration: number
+  retryAttempt: number
+  critical: GrowthHomeCriticalExecutiveStatePayload | null
+  durationMs: number | null
+  timedOut: boolean
+}): void {
+  if (typeof window === "undefined") return
+  console.info("[growth/home/critical-fetch]", {
+    endpoint: GROWTH_HOME_CRITICAL_EXECUTIVE_STATE_API_PATH,
+    request_generation: input.requestGeneration,
+    retry_attempt: input.retryAttempt,
+    duration_ms: input.durationMs,
+    timed_out: input.timedOut,
+    critical_availability: input.critical?.criticalLoad?.availability ?? null,
+    pending_approvals: input.critical?.canonicalOperatorApproval?.pendingApprovalCount ?? null,
+    executive_load: input.critical?.executiveLoad ?? null,
+  })
+}
+
+function logHomeDashboardFetch(input: {
+  requestGeneration: number
+  payload: GrowthHomeWorkspaceSummaryPayload | null
+  durationMs: number | null
+  secondary: boolean
+}): void {
   if (typeof window === "undefined") return
   console.info("[growth/home/dashboard-fetch]", {
     batch: GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
     endpoint: GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH,
-    fetched_at: new Date().toISOString(),
-    api_calls: 1,
-    legacy_api_calls_eliminated: 11,
-    duration_ms: payload?.optimization?.durationMs ?? null,
-    revenue_queue_total: payload?.revenueQueue?.total ?? null,
-    list_growth_leads_calls: payload?.optimization?.listGrowthLeadsCalls ?? null,
-    executive_load: payload?.executiveLoad ?? null,
+    request_generation: input.requestGeneration,
+    secondary: input.secondary,
+    duration_ms: input.durationMs ?? input.payload?.optimization?.durationMs ?? null,
+    executive_load: input.payload?.executiveLoad ?? null,
   })
 }
 
 /** Single canonical load — GET /home/workspace-summary (GE-SIMPLIFY-1B). */
 export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorkspaceDashboardSourcePayload> {
-  const { payload } = await fetchGrowthHomeWorkspaceSummary()
-  logHomeDashboardFetch(payload)
-  if (payload) {
-    writeGrowthHomeExecutiveSessionCache(payload)
-    return payload.sources
-  }
   const cached = readGrowthHomeExecutiveSessionCache()
   return cached?.sources ?? EMPTY_SOURCES
 }
@@ -143,13 +186,75 @@ export function useGrowthWorkspaceDashboard() {
   const [loading, setLoading] = useState(!initialApplied)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryAttempt, setRetryAttempt] = useState(0)
+  const [lastRetryOutcome, setLastRetryOutcome] = useState<string | null>(null)
+  const [secondaryLoading, setSecondaryLoading] = useState(false)
 
-  const requestSequenceRef = useRef(0)
+  const requestGenerationRef = useRef(0)
+  const retryAttemptRef = useRef(0)
+  const criticalAbortRef = useRef<AbortController | null>(null)
+  const secondaryAbortRef = useRef<AbortController | null>(null)
   const workspaceSummaryRef = useRef(workspaceSummary)
   workspaceSummaryRef.current = workspaceSummary
 
+  const abortInflightRequests = useCallback((which: "critical" | "secondary" | "all") => {
+    if (which === "critical" || which === "all") {
+      criticalAbortRef.current?.abort()
+      criticalAbortRef.current = null
+    }
+    if (which === "secondary" || which === "all") {
+      secondaryAbortRef.current?.abort()
+      secondaryAbortRef.current = null
+    }
+  }, [])
+
+  const loadSecondaryWorkspaceSummary = useCallback(
+    async (requestGeneration: number) => {
+      abortInflightRequests("secondary")
+      const controller = new AbortController()
+      secondaryAbortRef.current = controller
+      setSecondaryLoading(true)
+
+      const url = `${GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH}?g=${requestGeneration}&secondary=1`
+      const result = await fetchJsonWithTimeout<GrowthHomeWorkspaceSummaryPayload>({
+        url,
+        timeoutMs: GROWTH_HOME_SECONDARY_WORKSPACE_SUMMARY_TIMEOUT_MS,
+        externalSignal: controller.signal,
+      })
+
+      if (requestGeneration !== requestGenerationRef.current) {
+        return
+      }
+
+      logHomeDashboardFetch({
+        requestGeneration,
+        payload: result.ok ? normalizeGrowthHomeWorkspaceSummaryPayload(result.data) : null,
+        durationMs: result.durationMs,
+        secondary: true,
+      })
+
+      if (result.ok) {
+        const fullApplied = applyWorkspaceSummaryPayload(result.data)
+        writeGrowthHomeExecutiveSessionCache(fullApplied.workspaceSummary)
+        setDashboard(fullApplied.dashboard)
+        setWorkspaceSummary(fullApplied.workspaceSummary)
+        setAvaConsole(fullApplied.avaConsole)
+        setError(null)
+        setLastRetryOutcome(null)
+      }
+
+      setSecondaryLoading(false)
+    },
+    [abortInflightRequests],
+  )
+
   const reload = useCallback(async () => {
-    const requestSequence = ++requestSequenceRef.current
+    abortInflightRequests("all")
+    const requestGeneration = ++requestGenerationRef.current
+    retryAttemptRef.current += 1
+    const attempt = retryAttemptRef.current
+    setRetryAttempt(attempt)
+
     const hasConfirmedExecutiveState = Boolean(workspaceSummaryRef.current)
     if (hasConfirmedExecutiveState) {
       setRefreshing(true)
@@ -157,41 +262,81 @@ export function useGrowthWorkspaceDashboard() {
       setLoading(true)
     }
     setError(null)
+    setLastRetryOutcome(null)
 
-    const { payload, errorMessage } = await fetchGrowthHomeWorkspaceSummary()
-    if (requestSequence !== requestSequenceRef.current) {
+    const criticalController = new AbortController()
+    criticalAbortRef.current = criticalController
+
+    const criticalUrl = `${GROWTH_HOME_CRITICAL_EXECUTIVE_STATE_API_PATH}?g=${requestGeneration}&retry=${attempt}&t=${Date.now()}`
+    const criticalResult = await fetchJsonWithTimeout<GrowthHomeCriticalExecutiveStatePayload>({
+      url: criticalUrl,
+      timeoutMs: GROWTH_HOME_CRITICAL_EXECUTIVE_CLIENT_TIMEOUT_MS,
+      externalSignal: criticalController.signal,
+    })
+
+    if (requestGeneration !== requestGenerationRef.current) {
       return
     }
 
-    logHomeDashboardFetch(payload)
+    logHomeCriticalFetch({
+      requestGeneration,
+      retryAttempt: attempt,
+      critical: criticalResult.ok ? criticalResult.data : null,
+      durationMs: criticalResult.durationMs,
+      timedOut: !criticalResult.ok && criticalResult.timedOut,
+    })
 
-    if (payload) {
-      writeGrowthHomeExecutiveSessionCache(payload)
-      const applied = applyWorkspaceSummaryPayload(payload)
+    if (
+      criticalResult.ok &&
+      isGrowthHomeCriticalExecutiveLoadActionable(criticalResult.data.criticalLoad)
+    ) {
+      const applied = applyCriticalExecutivePayload({
+        critical: criticalResult.data,
+        existing: workspaceSummaryRef.current,
+      })
+      writeGrowthHomeExecutiveSessionCache(applied.workspaceSummary)
       setDashboard(applied.dashboard)
       setWorkspaceSummary(applied.workspaceSummary)
       setAvaConsole(applied.avaConsole)
       setError(null)
-    } else {
-      setError(errorMessage)
-      const cached = readGrowthHomeExecutiveSessionCache()
-      const preserved = workspaceSummaryRef.current ?? cached
-      if (preserved) {
-        const applied = applyWorkspaceSummaryPayload(preserved)
-        setDashboard(applied.dashboard)
-        setWorkspaceSummary(applied.workspaceSummary)
-        setAvaConsole(applied.avaConsole)
-      }
-      // First load without confirmed server payload: do not synthesize an empty dashboard (false Idle).
+      setLastRetryOutcome(null)
+      setLoading(false)
+      setRefreshing(false)
+      void loadSecondaryWorkspaceSummary(requestGeneration)
+      return
+    }
+
+    const failureMessage = criticalResult.ok
+      ? "Could not confirm Home executive state."
+      : criticalResult.errorMessage
+
+    setError(failureMessage)
+    setLastRetryOutcome(
+      criticalResult.ok
+        ? "Home executive state is still unavailable."
+        : criticalResult.timedOut
+          ? "Retry timed out before the critical briefing could load."
+          : "Retry could not load the critical briefing.",
+    )
+
+    const preserved = workspaceSummaryRef.current ?? readGrowthHomeExecutiveSessionCache()
+    if (preserved) {
+      const applied = applyWorkspaceSummaryPayload(preserved)
+      setDashboard(applied.dashboard)
+      setWorkspaceSummary(applied.workspaceSummary)
+      setAvaConsole(applied.avaConsole)
     }
 
     setLoading(false)
     setRefreshing(false)
-  }, [])
+  }, [abortInflightRequests, loadSecondaryWorkspaceSummary])
 
   useEffect(() => {
     void reload()
-  }, [reload])
+    return () => {
+      abortInflightRequests("all")
+    }
+  }, [reload, abortInflightRequests])
 
   return {
     dashboard,
@@ -199,9 +344,13 @@ export function useGrowthWorkspaceDashboard() {
     avaConsole,
     loading,
     refreshing,
+    secondaryLoading,
     error,
+    retryAttempt,
+    lastRetryOutcome,
     reload,
     fetchBatchMarker: GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
     debugSourcePath: GROWTH_HOME_DEBUG_SOURCE_API_PATH,
+    requestGeneration: requestGenerationRef.current,
   }
 }

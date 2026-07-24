@@ -229,6 +229,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     organizationId,
     actorUserId: input.actorUserId,
     generatedAt,
+    lightweightApprovalLoader: true,
   })
   stageTimings.push(...criticalExecutiveStage.timings)
   stageTimings.push({

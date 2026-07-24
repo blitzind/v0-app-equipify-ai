@@ -9,6 +9,8 @@ export const GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER =
 export const GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH =
   "/api/platform/growth/home/workspace-summary" as const
 
+export { GROWTH_HOME_CRITICAL_EXECUTIVE_STATE_API_PATH } from "@/lib/growth/home/growth-home-critical-executive-state-2b-1c"
+
 export type GrowthHomeWorkspaceApiRoute = {
   id: string
   path: string

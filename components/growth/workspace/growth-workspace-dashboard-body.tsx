@@ -144,7 +144,7 @@ function DashboardSectionSkeleton() {
 }
 
 export function GrowthWorkspaceDashboardBody() {
-  const { dashboard, workspaceSummary, avaConsole, loading, error, reload, refreshing } =
+  const { dashboard, workspaceSummary, avaConsole, loading, error, reload, refreshing, lastRetryOutcome } =
     useGrowthWorkspaceDashboard()
   const recentViews = useMemo(() => readGrowthWorkspaceRecentViews(), [dashboard?.generatedAt])
   const continueItems = useMemo(() => readGrowthWorkspaceContinueItems(), [dashboard?.generatedAt])
@@ -176,10 +176,13 @@ export function GrowthWorkspaceDashboardBody() {
           data-growth-home-executive-unavailable="true"
         >
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-            <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
-            <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing}>
+            <div className="space-y-1">
+              <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
+              {lastRetryOutcome ? <p className="text-xs text-amber-900/80">{lastRetryOutcome}</p> : null}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing || loading}>
               <RefreshCw className="mr-2 size-4" />
-              {refreshing ? "Refreshing…" : "Retry"}
+              {refreshing || loading ? "Retrying…" : "Retry"}
             </Button>
           </div>
           <GrowthHomeDebugFooter />
@@ -208,10 +211,13 @@ export function GrowthWorkspaceDashboardBody() {
           className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950"
           data-growth-home-executive-unavailable={executiveLoadDegraded ? "true" : undefined}
         >
-          <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
-          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing}>
+          <div className="space-y-1">
+            <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
+            {lastRetryOutcome ? <p className="text-xs text-amber-900/80">{lastRetryOutcome}</p> : null}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing || loading}>
             <RefreshCw className="mr-2 size-4" />
-            {refreshing ? "Refreshing…" : "Retry"}
+            {refreshing || loading ? "Retrying…" : "Retry"}
           </Button>
         </div>
       ) : null}
