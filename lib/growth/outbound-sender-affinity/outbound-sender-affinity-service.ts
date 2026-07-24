@@ -6,7 +6,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
-import { ensureMailboxReadyForOutboundSend } from "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
+import { ensureMailboxEligibleForSenderAssignment, ensureMailboxReadyForOutboundSend } from "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
 import { getMailboxConnectionBySender } from "@/lib/growth/mailboxes/mailbox-repository"
 import {
   claimOutboundSenderAssignment,
@@ -94,8 +94,10 @@ export async function resolveOrAssignOutboundSenderAffinity(
     contactEmail: string
     explicitSenderAccountId?: string | null
     recipientEmailForChecks?: string
+    purpose?: "assignment" | "transport"
   },
 ): Promise<ResolveOutboundSenderAffinityResult> {
+  const forAssignment = input.purpose !== "transport"
   const organizationId = input.organizationId.trim() || getGrowthEngineAiOrgId() || ""
   if (!organizationId) {
     return { ok: false, code: "organization_unavailable", message: "Organization context is required." }
@@ -111,6 +113,7 @@ export async function resolveOrAssignOutboundSenderAffinity(
     const readiness = await ensureAssignedSenderReadyForSend(admin, {
       assignment: existing,
       recipientEmail: input.recipientEmailForChecks ?? input.contactEmail,
+      forAssignment,
     })
     if (!readiness.ok) return readiness
 
@@ -169,6 +172,7 @@ export async function resolveOrAssignOutboundSenderAffinity(
   const readiness = await ensureAssignedSenderReadyForSend(admin, {
     assignment: claimed.assignment,
     recipientEmail: input.recipientEmailForChecks ?? input.contactEmail,
+    forAssignment,
   })
   if (!readiness.ok) return readiness
 
@@ -188,9 +192,12 @@ async function ensureAssignedSenderReadyForSend(
   input: {
     assignment: OutboundSenderAssignment
     recipientEmail: string
+    forAssignment?: boolean
   },
 ): Promise<{ ok: true } | { ok: false; code: string; message: string; reconnectRequired?: boolean }> {
-  const mailboxReady = await ensureMailboxReadyForOutboundSend(admin, input.assignment.senderAccountId)
+  const mailboxReady = input.forAssignment
+    ? await ensureMailboxEligibleForSenderAssignment(admin, input.assignment.senderAccountId)
+    : await ensureMailboxReadyForOutboundSend(admin, input.assignment.senderAccountId)
   if (!mailboxReady.ok) {
     if (mailboxReady.reconnectRequired) {
       await updateOutboundSenderAssignmentStatus(admin, input.assignment.id, {
@@ -209,6 +216,7 @@ async function ensureAssignedSenderReadyForSend(
     senderAccountId: input.assignment.senderAccountId,
     senderPoolId: input.assignment.senderPoolId,
     recipientEmail: input.recipientEmail,
+    mailboxReadinessMode: input.forAssignment ? "assignment" : "transport",
   })
 
   if (!infrastructure.allowed) {

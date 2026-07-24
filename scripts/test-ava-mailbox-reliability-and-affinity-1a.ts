@@ -72,8 +72,8 @@ function main(): void {
     const repo = readSource("lib/growth/mailboxes/mailbox-repository.ts")
     assert.match(repo, /existingEncryptedRefresh/)
     assert.match(repo, /if \(nextRefresh \|\| !existingEncryptedRefresh\)/)
-    const refresh = readSource("lib/growth/mailboxes/mailbox-token-refresh-service.ts")
-    assert.match(refresh, /if \(liveRefresh\.refreshToken\?\.trim\(\)\)/)
+    const loader = readSource("lib/growth/mailboxes/mailbox-credential-loader.ts")
+    assert.match(loader, /if \(refreshed\.refreshToken\?\.trim\(\)\)/)
   })
 
   runGate("OAuth failure taxonomy persists structured metadata", () => {

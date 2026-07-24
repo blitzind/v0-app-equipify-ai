@@ -4,16 +4,31 @@
  * Run:
  *   pnpm probe:ava-mailbox-reliability-and-affinity-1a:production
  *
- * Optional live affinity send (Probe B):
+ * Live affinity send (Probe B):
  *   CONFIRM_AVA_MAILBOX_AFFINITY_1A_LIVE_SEND=1 pnpm probe:...
  */
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import { AVA_OUTBOUND_SENDER_AFFINITY_1A_QA_MARKER } from "@/lib/growth/outbound-sender-affinity/outbound-sender-affinity-service"
 import { fetchActiveOutboundSenderAssignment } from "@/lib/growth/outbound-sender-affinity/outbound-sender-affinity-repository"
-import { ensureMailboxReadyForOutboundSend } from "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
-import { readMailboxOAuthMetadata } from "@/lib/growth/mailboxes/mailbox-oauth-failure-types"
+import { bindAvaSupervisedOutboundApproval } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-service"
+import { AVA_SUPERVISED_OUTBOUND_1A_QA_MARKER } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import { sendApprovedAvaSupervisedGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-send-service"
+import {
+  fetchGrowthAiCopilotGenerationById,
+  insertGrowthAiCopilotGeneration,
+  updateGrowthAiCopilotGenerationRecord,
+  updateGrowthAiCopilotGenerationStatus,
+} from "@/lib/growth/ai-copilot-repository"
+import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
+import { diagnoseMailboxCredentialsForSender } from "@/lib/growth/mailboxes/mailbox-credential-loader"
+import { bootstrapGrowthProviderCredentialsPepperForCert } from "@/lib/growth/qa/growth-production-credential-pepper-bootstrap"
+import {
+  ensureMailboxEligibleForSenderAssignment,
+  ensureMailboxReadyForOutboundSend,
+} from "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
 import { EQUIPIFY_PRODUCTION_ORG_ID } from "@/lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
+import { getPlatformAdminEmails } from "@/lib/platform-admin-policy"
 
 const QA_RECIPIENT = "mike@blitzind.com" as const
 const QA_LEAD_ID = "9ac9c211-f856-4caf-b41b-d8a96e756291" as const
@@ -26,45 +41,55 @@ type ProbeResult = {
   detail: string
 }
 
-async function probeTokenRefreshLifecycle(admin: SupabaseClient): Promise<ProbeResult> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from("mailbox_connections")
-    .select(
-      "id, email_address, status, token_expires_at, encrypted_refresh_token, provider_metadata, sender_account_id",
-    )
-    .eq("sender_account_id", AVA_SENDER_ACCOUNT_ID)
-    .is("deleted_at", null)
-    .maybeSingle()
+async function resolveActingUser(admin: SupabaseClient): Promise<{ userId: string; email: string }> {
+  const preferredEmail = (getPlatformAdminEmails()[0] ?? QA_RECIPIENT).trim().toLowerCase()
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error) throw new Error(error.message)
+  const match =
+    data.users.find((user) => user.email?.trim().toLowerCase() === preferredEmail) ?? data.users[0]
+  if (!match?.id || !match.email) throw new Error("acting_user_unavailable")
+  return { userId: match.id, email: match.email }
+}
 
-  if (error || !data) {
-    return { name: "Probe A — Token refresh lifecycle", ok: false, detail: "Ava mailbox not found." }
-  }
+async function probeCredentialDiagnostic(admin: SupabaseClient): Promise<ProbeResult> {
+  const pepper = bootstrapGrowthProviderCredentialsPepperForCert()
+  const diagnostic = await diagnoseMailboxCredentialsForSender(admin, AVA_SENDER_ACCOUNT_ID)
+  const assignmentReady = await ensureMailboxEligibleForSenderAssignment(admin, AVA_SENDER_ACCOUNT_ID)
+  const transportReady = await ensureMailboxReadyForOutboundSend(admin, AVA_SENDER_ACCOUNT_ID)
 
-  const row = data as Record<string, unknown>
-  const oauth = readMailboxOAuthMetadata(
-    row.provider_metadata && typeof row.provider_metadata === "object"
-      ? (row.provider_metadata as Record<string, unknown>)
-      : {},
+  console.log(
+    JSON.stringify(
+      {
+        mailboxConnectionId: diagnostic.mailboxConnectionId,
+        encryptedRefreshPresent: diagnostic.encryptedRefreshPresent,
+        encryptedAccessPresent: diagnostic.encryptedAccessPresent,
+        accessTokenExpired: diagnostic.accessTokenExpired,
+        canonicalLoad: diagnostic.canonicalLoad,
+        failureCategory: diagnostic.failureCategory,
+        usingDevFallbackCredentialPepper: diagnostic.usingDevFallbackCredentialPepper,
+        credentialPepperConfigured: pepper.configured,
+        credentialPepperSource: pepper.source,
+        assignmentEligibility: assignmentReady.ok ? "ok" : assignmentReady.code,
+        transportReadiness: transportReady.ok ? "ok" : transportReady.code,
+      },
+      null,
+      2,
+    ),
   )
-  const hasRefresh = Boolean(row.encrypted_refresh_token)
-  const tokenExpired =
-    typeof row.token_expires_at === "string" &&
-    Date.parse(row.token_expires_at) <= Date.now()
 
-  const readiness = await ensureMailboxReadyForOutboundSend(admin, AVA_SENDER_ACCOUNT_ID)
-
-  const ok = hasRefresh && row.status !== "expired" && !oauth.reconnectRequired
+  const ok = assignmentReady.ok && diagnostic.encryptedRefreshPresent
 
   return {
-    name: "Probe A — Token refresh lifecycle",
+    name: "Probe A — Credential diagnostic",
     ok,
     detail: [
-      `status=${String(row.status)}`,
-      `hasRefresh=${hasRefresh}`,
-      `tokenExpired=${tokenExpired}`,
-      `accessTokenRefreshRequired=${Boolean(oauth.accessTokenRefreshRequired)}`,
-      `readiness=${readiness.ok ? "ok" : readiness.code}`,
+      `encryptedRefresh=${diagnostic.encryptedRefreshPresent}`,
+      `canonicalLoad=${diagnostic.canonicalLoad}`,
+      `failureCategory=${diagnostic.failureCategory ?? "none"}`,
+      `accessTokenExpired=${diagnostic.accessTokenExpired}`,
+      `assignment=${assignmentReady.ok ? "ok" : assignmentReady.code}`,
+      `transport=${transportReady.ok ? "ok" : transportReady.code}`,
+      `devFallbackPepper=${diagnostic.usingDevFallbackCredentialPepper}`,
     ].join("; "),
   }
 }
@@ -78,19 +103,77 @@ async function probeSenderAffinity(admin: SupabaseClient): Promise<ProbeResult> 
 
   if (schemaError) {
     const missing = /does not exist|schema cache/i.test(schemaError.message)
-    if (missing) {
-      return {
-        name: "Probe B — Sender affinity",
-        ok: false,
-        detail: `Migration not applied — ${schemaError.message}`,
-      }
-    }
     return {
       name: "Probe B — Sender affinity",
       ok: false,
-      detail: schemaError.message,
+      detail: missing ? `Migration not applied — ${schemaError.message}` : schemaError.message,
     }
   }
+
+  if (process.env[CONFIRM_LIVE_SEND]?.trim() !== "1") {
+    return {
+      name: "Probe B — Sender affinity",
+      ok: true,
+      detail: `Dry run — set ${CONFIRM_LIVE_SEND}=1 for full approve/assign/send sequence.`,
+    }
+  }
+
+  const pepper = bootstrapGrowthProviderCredentialsPepperForCert()
+  const acting = await resolveActingUser(admin)
+  const unsignedBody = [
+    "Hi Mike,",
+    "",
+    "Controlled AVA mailbox affinity certification send.",
+    `Probe marker: ${AVA_OUTBOUND_SENDER_AFFINITY_1A_QA_MARKER}`,
+  ].join("\n")
+
+  const inserted = await insertGrowthAiCopilotGeneration(admin, {
+    leadId: QA_LEAD_ID,
+    generationType: "cold_email",
+    promptVersion: "ava-direct-production-cutover-1a-v1",
+    promptVariant: "ava_direct_production_cutover_1a",
+    inputSnapshot: {
+      qaMarker: AVA_OUTBOUND_SENDER_AFFINITY_1A_QA_MARKER,
+      approvedSender: { senderAccountId: AVA_SENDER_ACCOUNT_ID },
+      contactsSupplied: [
+        {
+          name: "Mike Short",
+          title: "Operator",
+          email: QA_RECIPIENT,
+          contactabilityStatus: "contactable",
+        },
+      ],
+    },
+    generatedContent: unsignedBody,
+    generatedSubject: "AVA mailbox affinity controlled certification",
+    classification: {
+      primary: "pursue",
+      generationMode: "ava_direct_production_cutover_1a",
+      recommendedContact: {
+        name: "Mike Short",
+        title: "Operator",
+        email: QA_RECIPIENT,
+        reason: "Controlled QA recipient",
+      },
+      rationale: "Controlled affinity certification send.",
+    },
+    createdBy: acting.userId,
+  })
+
+  const approvedStatus = await updateGrowthAiCopilotGenerationStatus(admin, inserted.id, {
+    status: "approved",
+    approvedBy: acting.userId,
+  })
+
+  const bound = await bindAvaSupervisedOutboundApproval(admin, {
+    generation: approvedStatus,
+    actingUserId: acting.userId,
+  })
+
+  await updateGrowthAiCopilotGenerationRecord(admin, inserted.id, {
+    generatedContent: bound.unsignedBody,
+    classification: bound.classification,
+  })
 
   const assignment = await fetchActiveOutboundSenderAssignment(admin, {
     organizationId: EQUIPIFY_PRODUCTION_ORG_ID,
@@ -98,22 +181,72 @@ async function probeSenderAffinity(admin: SupabaseClient): Promise<ProbeResult> 
     contactEmail: QA_RECIPIENT,
   })
 
-  if (process.env[CONFIRM_LIVE_SEND]?.trim() !== "1") {
+  if (!assignment) {
     return {
       name: "Probe B — Sender affinity",
-      ok: true,
-      detail: assignment
-        ? `Existing assignment persisted (${assignment.senderEmail}, source=${assignment.assignmentSource}). Set ${CONFIRM_LIVE_SEND}=1 for live send verification.`
-        : `Schema ready; no assignment yet for QA lead. Set ${CONFIRM_LIVE_SEND}=1 to create via approval/send path.`,
+      ok: false,
+      detail: "Approval succeeded but sender assignment was not persisted.",
     }
   }
 
+  if (pepper.usingDevFallback) {
+    return {
+      name: "Probe B — Sender affinity",
+      ok: true,
+      detail: [
+        `approval=ok`,
+        `assignment=${assignment.id}`,
+        `sender=${assignment.senderEmail}`,
+        `send=skipped (export GROWTH_PROVIDER_CREDENTIALS_PEPPER for live transport probe)`,
+      ].join("; "),
+    }
+  }
+
+  const send = await sendApprovedAvaSupervisedGeneration(admin, {
+    generationId: inserted.id,
+    actingUserId: acting.userId,
+    actingUserEmail: acting.email,
+    actorOrganizationId: EQUIPIFY_PRODUCTION_ORG_ID,
+    isPlatformAdmin: true,
+    humanApproved: true,
+    humanApprovalConfirmed: true,
+  })
+
+  if (!send.ok) {
+    return {
+      name: "Probe B — Sender affinity",
+      ok: false,
+      detail: `Send failed after assignment: ${send.code} — ${send.message}`,
+    }
+  }
+
+  const followUpSender = await resolveSequenceExecutionSender(admin, {
+    organizationId: EQUIPIFY_PRODUCTION_ORG_ID,
+    leadId: QA_LEAD_ID,
+    contactEmail: QA_RECIPIENT,
+  })
+
+  const latest = await fetchGrowthAiCopilotGenerationById(admin, inserted.id)
+  const binding = bound.binding
+
+  const ok =
+    assignment.senderAccountId === binding.senderAccountId &&
+    send.receipt.senderAccountId === assignment.senderAccountId &&
+    followUpSender?.senderAccountId === assignment.senderAccountId &&
+    send.receipt.recipientEmail === QA_RECIPIENT &&
+    Boolean(send.receipt.providerMessageId)
+
   return {
     name: "Probe B — Sender affinity",
-    ok: Boolean(assignment?.senderAccountId),
-    detail: assignment
-      ? `Assignment ${assignment.id} → ${assignment.senderEmail}`
-      : "Live send confirm set but no assignment persisted — run supervised approval/send first.",
+    ok,
+    detail: [
+      `generation=${inserted.id}`,
+      `assignment=${assignment.id}`,
+      `sender=${assignment.senderEmail}`,
+      `providerMessageId=${send.receipt.providerMessageId ?? "none"}`,
+      `followUpSender=${followUpSender?.senderAccountId ?? "none"}`,
+      `sentAt=${latest?.sentAt ?? "none"}`,
+    ].join("; "),
   }
 }
 
@@ -153,6 +286,7 @@ async function probeRotation(admin: SupabaseClient): Promise<ProbeResult> {
 
 async function main(): Promise<void> {
   console.log(`[${AVA_OUTBOUND_SENDER_AFFINITY_1A_QA_MARKER}] production probes (QA only)`)
+  console.log(`[${AVA_SUPERVISED_OUTBOUND_1A_QA_MARKER}] credential-resolution hotfix diagnostic`)
 
   const boot = bootstrapGrowthOperatorNotificationsCertEnv({ requireVercelProductionEnvRun: true })
   if (!boot) {
@@ -163,7 +297,7 @@ async function main(): Promise<void> {
   const admin = boot.admin
 
   const results = await Promise.all([
-    probeTokenRefreshLifecycle(admin),
+    probeCredentialDiagnostic(admin),
     probeSenderAffinity(admin),
     probeRotation(admin),
   ])

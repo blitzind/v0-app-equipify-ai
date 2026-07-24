@@ -23,6 +23,7 @@ export async function resolveAvaSupervisedOutboundSenderBundle(
     contactEmail: input.recipientEmail,
     explicitSenderAccountId: input.explicitSenderAccountId ?? null,
     recipientEmailForChecks: input.recipientEmail,
+    purpose: "assignment",
   })
 
   if (!affinity.ok) {

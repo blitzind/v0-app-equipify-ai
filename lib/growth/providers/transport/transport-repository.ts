@@ -8,11 +8,7 @@ import type {
   ProviderAdapterCredentials,
 } from "@/lib/growth/providers/adapters/provider-adapter-types"
 import { decryptGrowthProviderCredentials } from "@/lib/growth/outbound/credentials-crypto"
-import { decryptMailboxToken, encryptMailboxToken } from "@/lib/growth/mailboxes/mailbox-token-manager"
-import { refreshGoogleMailboxTokensLive } from "@/lib/growth/mailboxes/google-mailbox-live-validation"
-import { refreshMicrosoftMailboxTokensLive } from "@/lib/growth/mailboxes/microsoft-mailbox-live-validation"
-import { microsoftProviderOAuthConfigured } from "@/lib/growth/provider-setup/microsoft-oauth"
-import { googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
+import { loadMailboxCredentialsForSender } from "@/lib/growth/mailboxes/mailbox-credential-loader"
 import { getDeliveryProvider, listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import type { DeliveryRouteCandidate } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
@@ -267,63 +263,18 @@ async function loadMailboxTokensForSender(
   senderAccountId: string,
   providerFamily?: GrowthDeliveryProviderFamily,
 ): Promise<{ access_token: string | null; refresh_token: string | null; email_address: string | null }> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from("mailbox_connections")
-    .select(
-      "id, provider_family, encrypted_access_token, encrypted_refresh_token, email_address, token_expires_at",
-    )
-    .eq("sender_account_id", senderAccountId)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-  if (!data) return { access_token: null, refresh_token: null, email_address: null }
-
-  const row = data as Row
-  const family = (providerFamily ?? asString(row.provider_family)) as GrowthDeliveryProviderFamily
-  let accessToken = decryptMailboxToken(asString(row.encrypted_access_token) || null)
-  const refreshToken = decryptMailboxToken(asString(row.encrypted_refresh_token) || null)
-  const emailAddress = asString(row.email_address) || null
-
-  const encryptedRefresh = asString(row.encrypted_refresh_token) || null
-  const expiresAtMs = Date.parse(asString(row.token_expires_at))
-  const accessExpired =
-    !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now() + 60_000 || !accessToken
-
-  if (accessExpired && encryptedRefresh) {
-    const refreshLive =
-      family === "google" && googleProviderOAuthConfigured()
-        ? await refreshGoogleMailboxTokensLive(encryptedRefresh)
-        : family === "microsoft" && microsoftProviderOAuthConfigured()
-          ? await refreshMicrosoftMailboxTokensLive(encryptedRefresh)
-          : null
-
-    if (refreshLive?.ok) {
-      accessToken = refreshLive.accessToken
-      const now = new Date().toISOString()
-      const patch: Record<string, unknown> = {
-        encrypted_access_token: encryptMailboxToken(refreshLive.accessToken),
-        token_expires_at: refreshLive.expiresAt,
-        last_refresh_attempt: now,
-        last_successful_refresh: now,
-        updated_at: now,
-      }
-      if (refreshLive.refreshToken) {
-        patch.encrypted_refresh_token = encryptMailboxToken(refreshLive.refreshToken)
-      }
-      await admin.schema("growth").from("mailbox_connections").update(patch).eq("id", asString(row.id))
-    } else if (!refreshLive?.ok && accessToken) {
-      accessToken = null
-    }
+  const loaded = await loadMailboxCredentialsForSender(admin, senderAccountId, {
+    providerFamily,
+    refreshIfExpired: true,
+    persistRefresh: true,
+  })
+  if (!loaded.ok) {
+    return { access_token: null, refresh_token: null, email_address: null }
   }
-
   return {
-    access_token: accessToken,
-    refresh_token: refreshToken,
-    email_address: emailAddress,
+    access_token: loaded.accessToken,
+    refresh_token: loaded.refreshToken,
+    email_address: loaded.emailAddress,
   }
 }
 

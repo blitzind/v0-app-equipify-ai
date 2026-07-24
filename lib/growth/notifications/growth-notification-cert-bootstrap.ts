@@ -15,6 +15,7 @@ import {
   applySupabaseUrlPublicAlias,
   bootstrapGrowthProductionEnv,
 } from "@/lib/growth/qa/reply-flow-env-bootstrap"
+import { bootstrapGrowthProviderCredentialsPepperForCert } from "@/lib/growth/qa/growth-production-credential-pepper-bootstrap"
 
 export const GROWTH_OPERATOR_NOTIFICATIONS_PRODUCTION_ENV_SOURCES = [
   ".env.vercel.production",
@@ -90,6 +91,8 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
   process.env.NEXT_PUBLIC_SUPABASE_URL = url
   process.env.SUPABASE_URL = url
   process.env.SUPABASE_SERVICE_ROLE_KEY = jwt
+
+  bootstrapGrowthProviderCredentialsPepperForCert()
 
   return {
     url,

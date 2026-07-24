@@ -40,6 +40,7 @@ export async function evaluatePreSendInfrastructureAllowed(
     senderAccountId: string
     senderPoolId?: string | null
     recipientEmail?: string
+    mailboxReadinessMode?: "assignment" | "transport"
   },
 ): Promise<GrowthPreSendInfrastructureResult> {
   const sender = await getSenderAccount(admin, input.senderAccountId)
@@ -113,10 +114,12 @@ export async function evaluatePreSendInfrastructureAllowed(
 
   const mailbox = await getMailboxConnectionBySender(admin, input.senderAccountId).catch(() => null)
   if (mailbox) {
-    const { ensureMailboxReadyForOutboundSend } = await import(
-      "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
-    )
-    const readiness = await ensureMailboxReadyForOutboundSend(admin, input.senderAccountId)
+    const { ensureMailboxEligibleForSenderAssignment, ensureMailboxReadyForOutboundSend } =
+      await import("@/lib/growth/mailboxes/mailbox-pre-send-readiness")
+    const readiness =
+      input.mailboxReadinessMode === "assignment"
+        ? await ensureMailboxEligibleForSenderAssignment(admin, input.senderAccountId)
+        : await ensureMailboxReadyForOutboundSend(admin, input.senderAccountId)
     if (!readiness.ok) {
       await recordInternalOutboundAuditEvent(admin, {
         eventType: "pre_send_blocked",

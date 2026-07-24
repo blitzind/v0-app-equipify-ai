@@ -14,14 +14,12 @@ export function isUsingDevFallbackCredentialPepper(): boolean {
   return resolveCredentialPepper() === DEV_FALLBACK_CREDENTIAL_PEPPER
 }
 
-const PEPPER = resolveCredentialPepper()
+function deriveKey(): Buffer {
+  return createHash("sha256").update(resolveCredentialPepper()).update("|growth-provider-credentials|").digest()
+}
 
 const ALGORITHM = "aes-256-gcm"
 const IV_BYTES = 12
-
-function deriveKey(): Buffer {
-  return createHash("sha256").update(PEPPER).update("|growth-provider-credentials|").digest()
-}
 
 /** Encrypt provider credentials JSON for storage. Never log return value. */
 export function encryptGrowthProviderCredentials(credentials: Record<string, unknown>): string {
