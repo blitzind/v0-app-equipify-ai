@@ -38,10 +38,11 @@ import {
   missionLifecycleStatusLabel,
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { formatMissionFindLeadsMonitoringStatus } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
+import { buildGrowthReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 const ACTIVE_MISSION_LIMIT = 3
-const APPROVALS_HREF = `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/approvals`
+const APPROVALS_HREF = buildGrowthReviewHref({ tab: "packages" })
 
 function missionControls(input: {
   detailHref: string

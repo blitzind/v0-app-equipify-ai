@@ -91,7 +91,7 @@ function main(): void {
   assert.equal(GROWTH_AVA_COMPLETED_WORK_QA_MARKER, "ge-aios-sv1-6b-ava-completed-work-v1")
   assert.equal(resolveCompletedWorkTitle(teammate), "Ava completed work")
   assert.equal(resolveCompletedWorkNavLabel(teammate), "Ava's Work")
-  assert.equal(GROWTH_AVA_COMPLETED_WORK_HREF, "/growth/os/approvals")
+  assert.equal(GROWTH_AVA_COMPLETED_WORK_HREF, "/growth/review?tab=packages")
   assert.equal(growthCustomerApprovalsTitle(teammate), resolveCompletedWorkTitle(teammate))
   console.log("  ✓ Ava Completed Work contract + customer title aligned")
 

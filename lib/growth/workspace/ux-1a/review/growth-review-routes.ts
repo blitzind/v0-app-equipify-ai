@@ -1,6 +1,9 @@
 /** GE-AIOS-UX-1A Phase 3 — Review Human Decision Queue routes (client-safe). */
 
 import { isGrowthWorkspaceFirstUx1aEnabled } from "@/lib/growth/navigation/growth-workspace-first-ux-1a-feature"
+import { AVA_GROWTH_OPERATOR_2B_ROUTING_CONVERGENCE_QA_MARKER } from "@/lib/growth/workspace/ux-2b/review/growth-executive-approval-routing-2b"
+
+export { AVA_GROWTH_OPERATOR_2B_ROUTING_CONVERGENCE_QA_MARKER }
 
 export const GROWTH_REVIEW_QA_MARKER = "ge-aios-ux-1a-review-human-decision-queue-v1" as const
 
@@ -39,7 +42,7 @@ export function buildGrowthReviewPackageHref(packageId: string): string {
   return buildGrowthReviewHref({ tab: "packages", item: packageId })
 }
 
-/** Customer AI OS — open the lead CRM drawer for package review. */
+/** Customer AI OS — open the lead CRM drawer (View Lead / operational inspection only). */
 export function buildCustomerPackageReviewHref(leadId: string): string {
   const params = new URLSearchParams({ open: leadId })
   return `${GROWTH_CUSTOMER_LEADS_CRM_HREF}?${params.toString()}`
@@ -107,7 +110,7 @@ export function parseLeadIdFromPackageReviewRoute(route: string | undefined): st
   return null
 }
 
-/** Normalize customer-facing package review links to the CRM lead drawer. */
+/** Resolve CRM drawer href for View Lead — not the executive approval entry. */
 export function resolveCustomerPackageReviewHref(input: {
   leadId?: string | null
   route?: string | null
@@ -129,19 +132,29 @@ export type ResolveOperatorPackageReviewHrefInput = {
   route?: string | null
 }
 
-/** Canonical operator package review entry — customer CRM drawer when lead id is known. */
+function resolvePackageIdFromReviewInput(input: ResolveOperatorPackageReviewHrefInput): string | null {
+  const direct = input.packageId?.trim()
+  if (direct) return direct
+
+  const route = input.route?.trim()
+  if (!route) return null
+
+  const params = readReviewHrefParams(route)
+  return extractPackageIdFromHref(route, params)
+}
+
+/** Canonical operator package review entry — executive package queue (package-first). */
 export function resolveOperatorPackageReviewHref(
   input: ResolveOperatorPackageReviewHrefInput | string | null | undefined,
 ): string {
-  if (typeof input === "string") {
+  if (typeof input === "string" || input == null) {
     return buildGrowthReviewHref({ tab: "packages" })
   }
 
-  const customerHref = resolveCustomerPackageReviewHref({
-    leadId: input?.leadId,
-    route: input?.route,
-  })
-  if (customerHref) return customerHref
+  const packageId = resolvePackageIdFromReviewInput(input)
+  if (packageId) {
+    return buildGrowthReviewPackageHref(packageId)
+  }
 
   return buildGrowthReviewHref({ tab: "packages" })
 }
@@ -177,13 +190,18 @@ function readReviewHrefParams(href: string): URLSearchParams {
   }
 }
 
-/** Remap legacy operator approval surfaces to customer-safe package review links when UX-1A is active. */
+/** Remap legacy operator approval surfaces to the executive review queue (AVA-GROWTH-OPERATOR-2B). */
 export function remapLegacyHrefToGrowthReview(href: string): string {
   const normalized = href.trim()
-  const customerHref = resolveCustomerPackageReviewHref({ route: normalized })
-  if (customerHref) return customerHref
-
   const params = readReviewHrefParams(normalized)
+
+  if (normalized.includes(GROWTH_REVIEW_PAGE_HREF)) {
+    const packageId = extractPackageIdFromHref(normalized, params)
+    if (packageId && params.get("tab") !== "sends") {
+      return buildGrowthReviewPackageHref(packageId)
+    }
+    return normalized
+  }
 
   if (normalized.includes("/campaigns/sequences")) {
     const jobId =
@@ -194,19 +212,22 @@ export function remapLegacyHrefToGrowthReview(href: string): string {
     return jobId ? buildGrowthReviewSendHref(jobId) : buildGrowthReviewHref({ tab: "sends" })
   }
 
-  if (normalized.includes("/pilot/lead-research/")) {
-    const leadId = normalized.match(/lead-research\/([^/?#]+)/)?.[1] ?? null
-    const packageCustomerHref = resolveCustomerPackageReviewHref({ leadId, route: normalized })
-    if (packageCustomerHref) return packageCustomerHref
+  if (
+    normalized.includes("/leads/crm") ||
+    parseLeadIdFromPathSegment(normalized) ||
+    normalized.includes("/pilot/lead-research/")
+  ) {
     const packageId = extractPackageIdFromHref(normalized, params)
-    return resolveOperatorPackageReviewHref({ route: normalized, packageId })
+    return packageId
+      ? buildGrowthReviewPackageHref(packageId)
+      : buildGrowthReviewHref({ tab: "packages" })
   }
 
   if (normalized.includes("/os/approvals") || /approve|approval|outreach|package/i.test(normalized)) {
-    const packageCustomerHref = resolveCustomerPackageReviewHref({ route: normalized })
-    if (packageCustomerHref) return packageCustomerHref
     const packageId = extractPackageIdFromHref(normalized, params)
-    return resolveOperatorPackageReviewHref({ route: normalized, packageId })
+    return packageId
+      ? buildGrowthReviewPackageHref(packageId)
+      : buildGrowthReviewHref({ tab: "packages" })
   }
 
   if (/send|sequence/i.test(normalized)) {

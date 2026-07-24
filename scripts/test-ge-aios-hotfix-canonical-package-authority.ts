@@ -228,8 +228,8 @@ assertHomeApprovalAuthoritySync({
 })
 assert.equal(multiAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Block Imaging"))
 assert.equal(multiAiOsUx.waitingOnYou[1]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
-assert.equal(multiAiOsUx.waitingOnYou[0]?.href, buildCustomerPackageReviewHref(LEAD_BLOCK))
-assert.equal(multiAiOsUx.waitingOnYou[1]?.href, buildCustomerPackageReviewHref(LEAD_BLITZ))
+assert.equal(multiAiOsUx.waitingOnYou[0]?.href, buildGrowthReviewPackageHref("pkg-block-imaging"))
+assert.equal(multiAiOsUx.waitingOnYou[1]?.href, buildGrowthReviewPackageHref("pkg-blitz-industries"))
 assert.ok(multiSnapshot.packages.every((pkg) => !pkg.reviewHref.startsWith("/admin/")))
 console.log("  ✓ Test D — multi-package snapshot stays synchronized across Home and Review")
 
@@ -248,7 +248,7 @@ assertHomeApprovalAuthoritySync({
   reviewPackageCount: singleReviewQueue.packageCount,
 })
 assert.equal(singleAiOsUx.waitingOnYou[0]?.label, formatOperatorPriorityPackageTitle("Blitz Industries"))
-assert.equal(singleAiOsUx.waitingOnYou[0]?.href, buildCustomerPackageReviewHref(LEAD_BLITZ))
+assert.equal(singleAiOsUx.waitingOnYou[0]?.href, buildGrowthReviewPackageHref("pkg-blitz-industries"))
 const adminRouteSnapshot = buildCanonicalOperatorApprovalSnapshot({
   hacItems: [
     outreachItem({
@@ -260,7 +260,8 @@ const adminRouteSnapshot = buildCanonicalOperatorApprovalSnapshot({
     }),
   ],
 })
-assert.equal(adminRouteSnapshot.packages[0]?.reviewHref, buildCustomerPackageReviewHref(LEAD_BLOCK))
+assert.equal(adminRouteSnapshot.packages[0]?.reviewHref, buildGrowthReviewPackageHref("hac-admin-route"))
+assert.doesNotMatch(adminRouteSnapshot.packages[0]?.reviewHref ?? "", /\/leads\/crm/)
 console.log("  ✓ Test A — single package synchronizes hero, waiting, and review")
 
 const emptySnapshot = emptyCanonicalOperatorApprovalSnapshot()

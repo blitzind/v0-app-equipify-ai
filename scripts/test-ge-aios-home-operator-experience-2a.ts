@@ -127,7 +127,7 @@ function main(): void {
   console.log(`[${PHASE}] Human-centered executive briefing certification`)
 
   runGate("QA marker exported", () => {
-    assert.equal(GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER, "ge-aios-home-operator-experience-2a-v1")
+    assert.equal(GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER, "ava-growth-operator-2a-executive-experience-v1")
   })
 
   runGate("Hero briefing visible in closure mode (component always renders paragraphs)", () => {
@@ -144,11 +144,14 @@ function main(): void {
     assert.doesNotMatch(runtimeSource, /Current assignment/)
   })
 
-  runGate("Closure mode surfaces Waiting on You before Runtime Trust", () => {
+  runGate("Executive surface shows Waiting on You before Show details", () => {
     const dashboardSource = readSource(
       "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
     )
-    assert.match(dashboardSource, /operatorClosureMode \? \([\s\S]*GrowthHomeAiOsWaitingOnYouSection[\s\S]*GrowthHomeAvaRuntimeTrustSection/)
+    assert.match(
+      dashboardSource,
+      /GrowthHomeAiOsWaitingOnYouSection[\s\S]*executive-show-details/,
+    )
   })
 
   runGate("Portfolio activity labels are humanized", () => {
@@ -192,6 +195,7 @@ function main(): void {
       currentActivityLabel: runtime.currentActivityLabel,
       repliesToday: 2,
       canonicalOperatorFocus: operatorFocus(),
+      executiveExperienceMode: false,
     })
     assert.equal(briefing.paragraphs.length, 3)
     assert.match(briefing.paragraphs[0] ?? "", /sales pipeline growing/i)
@@ -210,6 +214,7 @@ function main(): void {
       pendingApprovals: 1,
       readyForOutreachReview: 0,
       canonicalOperatorFocus: operatorFocus({ source: "approval", title: "Review Less Stress Property Management" }),
+      executiveExperienceMode: false,
     })
     assert.match(briefing.paragraphs[0] ?? "", /sales momentum/i)
     assert.match(briefing.paragraphs[1] ?? "", /need your review on one outreach package/i)
@@ -223,6 +228,7 @@ function main(): void {
       pendingApprovals: 0,
       primaryMissionLabel: "Prospect Research",
       currentActivityLabel: "Researching ABC Mechanical",
+      executiveExperienceMode: false,
     })
     assert.match(briefing.paragraphs[0] ?? "", /sales opportunity/i)
     assert.match(briefing.paragraphs[0] ?? "", /ABC Mechanical/i)
@@ -247,6 +253,7 @@ function main(): void {
         primaryFocus: "portfolio_health",
       }),
       primaryMissionLabel: "Portfolio Maintenance",
+      executiveExperienceMode: false,
     })
     assert.match(briefing.paragraphs[0] ?? "", /portfolio is healthy/i)
     assert.match(briefing.paragraphs[0] ?? "", /continue monitoring the pipeline/i)

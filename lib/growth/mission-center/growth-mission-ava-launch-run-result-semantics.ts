@@ -157,6 +157,6 @@ export function buildAvaLaunchRunHumanApprovalSummary(input: {
     orgHumanApprovalPendingTotal: input.orgPendingItems.length,
     runRelatedPending,
     topItems: input.topItems,
-    approvalsHref: "/growth/os/approvals",
+    approvalsHref: "/growth/review?tab=packages",
   }
 }

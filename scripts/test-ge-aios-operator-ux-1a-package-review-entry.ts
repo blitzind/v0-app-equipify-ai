@@ -12,6 +12,7 @@ import {
 import {
   buildCustomerPackageReviewHref,
   buildGrowthReviewHref,
+  buildGrowthReviewPackageHref,
   remapLegacyHrefToGrowthReview,
   resolveCustomerPackageReviewHref,
   resolveOperatorPackageReviewHref,
@@ -32,26 +33,27 @@ function readSource(relativePath: string): string {
 
 console.log(`[${GROWTH_OPERATOR_PACKAGE_REVIEW_ENTRY_1A_QA_MARKER}] Operator package review entry tests`)
 
+const executivePackageHref = buildGrowthReviewPackageHref(PACKAGE_ID)
 const customerHref = buildCustomerPackageReviewHref(LEAD_ID)
 assert.equal(
   resolveOperatorPackageReviewHref({ leadId: LEAD_ID, packageId: PACKAGE_ID }),
-  customerHref,
+  executivePackageHref,
 )
 assert.equal(
   resolveCustomerPackageReviewHref({ route: `/admin/growth/leads/${LEAD_ID}` }),
   customerHref,
 )
 assert.equal(resolveOperatorPackageReviewHref(null), buildGrowthReviewHref({ tab: "packages" }))
-console.log("  ✓ resolveOperatorPackageReviewHref builds customer CRM drawer URL")
+console.log("  ✓ resolveOperatorPackageReviewHref builds executive package review URL")
 
 const pilotLegacy = `/growth/os/pilot/lead-research/${LEAD_ID}?packageId=${encodeURIComponent(PACKAGE_ID)}`
-assert.equal(remapLegacyHrefToGrowthReview(pilotLegacy), customerHref)
+assert.equal(remapLegacyHrefToGrowthReview(pilotLegacy), executivePackageHref)
 assert.equal(
   remapLegacyHrefToGrowthReview(`/growth/os/approvals?packageId=${encodeURIComponent(PACKAGE_ID)}`),
-  buildGrowthReviewHref({ tab: "packages" }),
+  executivePackageHref,
 )
 assert.equal(remapLegacyHrefToGrowthReview("/growth/os/approvals"), buildGrowthReviewHref({ tab: "packages" }))
-console.log("  ✓ legacy pilot and approvals hrefs remap to customer-safe package review links")
+console.log("  ✓ legacy pilot and approvals hrefs remap to executive review queue")
 
 const hacItems = collectOutreachPackageApprovalItems({
   organizationId: "00757488-1026-44a5-aac4-269533ac21be",
@@ -98,10 +100,11 @@ const hacItems = collectOutreachPackageApprovalItems({
   ],
   meetingPreparationRuns: [],
 })
-assert.equal(hacItems[0]?.route, customerHref)
+assert.equal(hacItems[0]?.route, executivePackageHref)
 assert.doesNotMatch(hacItems[0]?.route ?? "", /pilot\/lead-research/)
 assert.doesNotMatch(hacItems[0]?.route ?? "", /^\/admin\//)
-console.log("  ✓ HAC outreach package items route to customer CRM URL")
+assert.doesNotMatch(hacItems[0]?.route ?? "", /\/leads\/crm/)
+console.log("  ✓ HAC outreach package items route to executive package review URL")
 
 const snapshot = buildCanonicalOperatorApprovalSnapshot({
   hacItems,
@@ -123,14 +126,14 @@ const snapshot = buildCanonicalOperatorApprovalSnapshot({
   ]),
 })
 const task = buildCanonicalOperatorTask({ approvalSnapshot: snapshot })
-assert.equal(task?.href, customerHref)
+assert.equal(task?.href, executivePackageHref)
 assert.equal(task?.whatHappensNext, formatOperatorPriorityRecommendedNextStep())
 assert.doesNotMatch(task?.whatHappensNext ?? "", /send the sequence/i)
-console.log("  ✓ canonical operator task uses customer CRM href and accurate authorize promise")
+console.log("  ✓ canonical operator task uses executive package href and accurate authorize promise")
 
 const hero = readSource("lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a.ts")
-assert.match(hero, /resolveCustomerPackageReviewHref/)
-assert.doesNotMatch(hero, /`\/admin\/growth\/leads\/\$\{canonicalHero\.leadId\}`/)
+assert.match(hero, /remapLegacyHrefToGrowthReview/)
+assert.doesNotMatch(hero, /resolveCustomerPackageReviewHref/)
 const hacEngine = readSource("lib/growth/aios/approvals/growth-human-approval-center-engine.ts")
 assert.match(hacEngine, /resolveOperatorPackageReviewHref\(/)
 assert.doesNotMatch(hacEngine, /route: `\/growth\/os\/pilot\/lead-research\/\$\{pkg\.leadId\}\?packageId=/)
@@ -140,8 +143,9 @@ const packageCard = readSource("components/growth/ai-os/approvals/growth-ava-com
 assert.match(packageCard, /GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS/)
 assert.match(packageCard, /GROWTH_OPERATOR_PACKAGE_AUTHORIZE_SUCCESS/)
 assert.match(packageCard, /Authorize/)
+assert.match(packageCard, /View lead/)
 assert.doesNotMatch(packageCard, /Approving this package does not send/)
-console.log("  ✓ source wiring points Home/HAC/legacy approvals to customer CRM drawer")
+console.log("  ✓ source wiring points Home/HAC to executive package; View Lead opens CRM")
 
 const workspace = readSource("components/growth/ai-os/growth-ava-operator-approval-workspace.tsx")
 assert.match(workspace, /Authorize/)

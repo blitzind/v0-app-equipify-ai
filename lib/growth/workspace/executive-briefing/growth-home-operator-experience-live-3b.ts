@@ -17,6 +17,9 @@ import {
   buildLeadDiscoveryWorkingNowLine,
 } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import {
+  shortenExecutiveParagraph,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-executive-experience-2a"
+import {
   GROWTH_HOME_NARRATIVE_TRUTHFULNESS_1B_QA_MARKER,
   packagePreparationInProgressPhrase,
   packagePreparationMilestonePhrase,
@@ -32,27 +35,27 @@ export const GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3C_QA_MARKER =
   "ge-aios-live-3c-human-centered-home-language-v1" as const
 
 export const GROWTH_HOME_OPERATOR_EXPERIENCE_2A_QA_MARKER =
-  "ge-aios-home-operator-experience-2a-v1" as const
+  "ava-growth-operator-2a-executive-experience-v1" as const
 
-export const GROWTH_HOME_SECTION_HERO_TITLE = "Current Work" as const
-export const GROWTH_HOME_SECTION_OBJECTIVE_TITLE = "Why I'm Doing This" as const
+export const GROWTH_HOME_SECTION_HERO_TITLE = "Executive Briefing" as const
+export const GROWTH_HOME_SECTION_OBJECTIVE_TITLE = "Current Objective" as const
 export const GROWTH_HOME_SECTION_WORKING_NOW_TITLE = "What I'm Working On" as const
 export const GROWTH_HOME_SECTION_PROGRESS_TITLE = "What I've Accomplished" as const
-export const GROWTH_HOME_SECTION_RECOMMENDATION_TITLE = "What I Recommend" as const
-export const GROWTH_HOME_SECTION_PORTFOLIO_TITLE = "Growth Portfolio" as const
+export const GROWTH_HOME_SECTION_RECOMMENDATION_TITLE = "Current Recommendation" as const
+export const GROWTH_HOME_SECTION_PORTFOLIO_TITLE = "Portfolio Health" as const
 export const GROWTH_HOME_SECTION_COMPLETED_TODAY_TITLE = "What I've Completed Today" as const
 export const GROWTH_HOME_SECTION_WORKSPACE_HEALTH_TITLE = "Business Snapshot" as const
 
 export const GROWTH_HOME_SECTION_OBJECTIVE_SUBTITLE =
-  "The business outcome this work is serving" as const
+  "The business outcome driving today's work" as const
 export const GROWTH_HOME_SECTION_WORKING_NOW_SUBTITLE =
   "The exact task running right now" as const
 export const GROWTH_HOME_SECTION_PROGRESS_SUBTITLE =
   "Measurable progress from today's work" as const
 export const GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE =
-  "The decision I'd like your help with" as const
+  "My recommendation for your next decision" as const
 export const GROWTH_HOME_SECTION_PORTFOLIO_SUBTITLE =
-  "Portfolio health across companies I'm managing for you" as const
+  "How healthy your active pipeline is right now" as const
 export const GROWTH_HOME_SECTION_COMPLETED_TODAY_SUBTITLE =
   "Work finished today, in order" as const
 export const GROWTH_HOME_SECTION_WORKSPACE_HEALTH_SUBTITLE =
@@ -390,17 +393,21 @@ export function buildHeroExecutiveBriefing(input: {
   currentActivityLabel?: string | null
   repliesToday?: number
   canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
+  setupIncomplete?: boolean
+  executiveExperienceMode?: boolean
 }): GrowthHomeHeroExecutiveBriefing {
   /** Canonical approval queue — sole authority for "ready for your review" language. */
   const pendingPackages = Math.max(0, input.pendingApprovals ?? 0)
   /** Research loop in-progress count — not the same as operator review queue. */
   const preparingOutreach = Math.max(0, input.readyForOutreachReview ?? 0)
-  const setupIncomplete = input.dailyActivityNarrative?.focus === "setup"
+  const setupIncomplete =
+    input.setupIncomplete ?? input.dailyActivityNarrative?.focus === "setup"
+  const executiveMode = input.executiveExperienceMode !== false
   const paragraphs: string[] = []
 
   if (setupIncomplete) {
     paragraphs.push(
-      "I'm ready to start — I just need a few setup steps from you before I can begin finding and researching companies.",
+      "I'm ready to start — complete the remaining setup steps in Training and I'll begin finding and researching companies.",
     )
     return {
       qaMarker: GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
@@ -424,7 +431,9 @@ export function buildHeroExecutiveBriefing(input: {
     }),
   )
 
-  paragraphs.push(operatorNeedLine(pendingPackages))
+  if (!executiveMode || pendingPackages <= 0) {
+    paragraphs.push(operatorNeedLine(pendingPackages))
+  }
 
   paragraphs.push(
     executiveNextMilestoneLine({
@@ -439,14 +448,17 @@ export function buildHeroExecutiveBriefing(input: {
   )
 
   const sanitized = paragraphs
-    .map((paragraph) => humanizeOperatorFacingCopy(paragraph))
+    .map((paragraph) =>
+      executiveMode ? shortenExecutiveParagraph(humanizeOperatorFacingCopy(paragraph), 2) : humanizeOperatorFacingCopy(paragraph),
+    )
     .filter(Boolean)
-    .slice(0, 3)
+
+  const limited = executiveMode ? sanitized.slice(0, 2) : sanitized.slice(0, 3)
 
   return {
     qaMarker: GROWTH_HOME_OPERATOR_EXPERIENCE_LIVE_3B_QA_MARKER,
-    paragraphs: sanitized,
-    narrative: sanitized.join(" "),
+    paragraphs: limited,
+    narrative: limited.join(" "),
   }
 }
 
@@ -773,6 +785,7 @@ export function detectHomeSectionNarrativeOverlap(input: {
   objectiveTitle: string | null
   recommendationHeadline: string | null
   progressLabels: string[]
+  waitingOnYouSummaries?: string[]
 }): string[] {
   const overlaps: string[] = []
   const normalize = (value: string | null | undefined) => value?.trim().toLowerCase() ?? ""
@@ -791,6 +804,9 @@ export function detectHomeSectionNarrativeOverlap(input: {
   if (working && recommendation && working.includes(recommendation.slice(0, 24))) {
     overlaps.push("working_now_recommendation")
   }
+  if (hero && recommendation && hero.includes(recommendation.slice(0, 24))) {
+    overlaps.push("hero_recommendation")
+  }
 
   for (const label of input.progressLabels) {
     const normalized = normalize(label)
@@ -800,10 +816,22 @@ export function detectHomeSectionNarrativeOverlap(input: {
     }
   }
 
+  for (const summary of input.waitingOnYouSummaries ?? []) {
+    const normalized = normalize(summary)
+    if (hero && normalized && (hero.includes(normalized.slice(0, 24)) || normalized.includes(hero.slice(0, 24)))) {
+      overlaps.push("hero_waiting_on_you")
+      break
+    }
+  }
+
+  if (/review|approval|packages ready|need your review/i.test(hero)) {
+    overlaps.push("hero_waiting_on_you")
+  }
+
   return overlaps
 }
 
-/** GE-AIOS-LAUNCH-1A — Suppress duplicated narrative when sections repeat the same story. */
+/** GE-AIOS-LAUNCH-1A / AVA-GROWTH-OPERATOR-2A — Suppress duplicated narrative when sections repeat the same story. */
 export function applyHomeNarrativeDedup(input: {
   overlaps: string[]
   heroBriefing: GrowthHomeHeroExecutiveBriefing
@@ -813,9 +841,15 @@ export function applyHomeNarrativeDedup(input: {
   heroBriefing: GrowthHomeHeroExecutiveBriefing
   workingNow: GrowthHomeWorkingNowPresentation
   suppressRecommendationHeadline: boolean
+  suppressRecommendationIntro: boolean
+  suppressWorkspaceHealthPendingApprovals: boolean
+  suppressRuntimeTrustWhatHappensNext: boolean
 } {
   let workingNow = input.workingNow
   let suppressRecommendationHeadline = false
+  let suppressRecommendationIntro = false
+  let suppressWorkspaceHealthPendingApprovals = false
+  let suppressRuntimeTrustWhatHappensNext = false
 
   if (input.overlaps.includes("hero_working_now")) {
     workingNow = {
@@ -824,18 +858,34 @@ export function applyHomeNarrativeDedup(input: {
     }
   }
 
-  if (input.overlaps.includes("working_now_recommendation")) {
+  if (
+    input.overlaps.includes("working_now_recommendation") ||
+    input.overlaps.includes("hero_recommendation") ||
+    input.overlaps.includes("hero_objective")
+  ) {
     suppressRecommendationHeadline = true
   }
 
   if (input.overlaps.includes("hero_objective")) {
-    suppressRecommendationHeadline = true
+    suppressRecommendationIntro = true
+  }
+
+  if (input.overlaps.includes("hero_waiting_on_you")) {
+    suppressWorkspaceHealthPendingApprovals = true
+    suppressRuntimeTrustWhatHappensNext = true
+  }
+
+  if (input.overlaps.includes("hero_progress")) {
+    suppressWorkspaceHealthPendingApprovals = true
   }
 
   return {
     heroBriefing: input.heroBriefing,
     workingNow,
     suppressRecommendationHeadline,
+    suppressRecommendationIntro,
+    suppressWorkspaceHealthPendingApprovals,
+    suppressRuntimeTrustWhatHappensNext,
   }
 }
 

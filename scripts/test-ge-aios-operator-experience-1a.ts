@@ -27,7 +27,7 @@ import {
   stripInternalEngineTerms,
 } from "../lib/growth/aios/operator-experience/growth-operator-language-1a"
 import { buildAiOsUxViewModel } from "../lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
-import { buildCustomerPackageReviewHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { buildGrowthReviewPackageHref } from "../lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { formatOperatorPriorityRecommendedNextStep } from "../lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { buildGrowthHomeExecutiveBriefingCertDashboard } from "../lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 
@@ -137,7 +137,7 @@ const snapshot = buildCanonicalOperatorApprovalSnapshot({
 assert.equal(snapshot.outreachPackageCount, 1)
 assert.equal(snapshot.outreachDraftCount, 2)
 assert.equal(snapshot.topPackage?.companyName, "Block Imaging")
-assert.equal(snapshot.topPackage?.reviewHref, buildCustomerPackageReviewHref(BLOCK_LEAD))
+assert.equal(snapshot.topPackage?.reviewHref, buildGrowthReviewPackageHref("pkg-block-imaging-001"))
 console.log("  ✓ canonical approval snapshot counts packages and drafts consistently")
 
 const decision = buildGrowthCanonicalNextBestDecision(decisionInput())
@@ -165,7 +165,7 @@ assert.ok(task)
 assert.match(task!.title, /Block Imaging/)
 assert.equal(task!.draftCount, 2)
 assert.equal(task!.packageCount, 1)
-assert.equal(task!.href, buildCustomerPackageReviewHref(BLOCK_LEAD))
+assert.equal(task!.href, buildGrowthReviewPackageHref("pkg-block-imaging-001"))
 assert.equal(task!.whatHappensNext, formatOperatorPriorityRecommendedNextStep())
 console.log("  ✓ canonical operator task collapses duplicate home priorities")
 

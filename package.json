@@ -1077,6 +1077,8 @@
     "test:ava-growth-operator-1f-platform-consolidation": "tsx scripts/test-ava-growth-operator-1f-platform-consolidation.ts",
     "test:ava-growth-hotfix-1f-1b-home-summary-resilience": "tsx scripts/test-ava-growth-hotfix-1f-1b-home-summary-resilience.ts",
     "test:ava-growth-hotfix-1f-1d-canonical-training-state": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-growth-hotfix-1f-1d-canonical-training-state.ts",
+    "test:ava-growth-operator-2a-executive-experience": "tsx scripts/test-ava-growth-operator-2a-executive-experience.ts",
+    "test:ava-growth-operator-2b-routing-convergence": "tsx scripts/test-ava-growth-operator-2b-routing-convergence.ts",
     "test:ge-aios-portfolio-eligibility-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-portfolio-eligibility-closure-1a.ts",
     "test:ge-aios-datamoon-autonomous-discovery-cutover-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-datamoon-autonomous-discovery-cutover-1a.ts",
     "test:ge-aios-datamoon-discovery-terminal-state-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-datamoon-discovery-terminal-state-1a.ts",

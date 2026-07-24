@@ -24,6 +24,19 @@ export function polishExecutiveLanguage(text: string): string {
   output = output.replace(/^I believe /i, "The strongest explanation is that ")
   output = output.replace(/\bIt seems like\b/gi, "Current evidence suggests")
   output = output.replace(/\bI guess\b/gi, "There is not yet enough evidence to conclude")
+  output = output.replace(
+    /Autonomous preparation capacity currently exceeds review capacity\s*\((\d+) packages awaiting decision\)\.?/i,
+    (_match, count: string) => {
+      const n = Number(count)
+      return n === 1
+        ? "I've prepared one qualified opportunity. Reviewing it now will allow me to continue building the pipeline."
+        : `I've prepared ${n} qualified opportunities. Reviewing them now will allow me to continue building the pipeline.`
+    },
+  )
+  output = output.replace(
+    /Clear the approval queue before prioritizing additional discovery or research expansion\.?/i,
+    "Review what's ready first — then I'll keep building the pipeline.",
+  )
   return output
 }
 

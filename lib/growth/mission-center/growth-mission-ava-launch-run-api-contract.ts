@@ -232,7 +232,7 @@ export type GrowthMissionAvaLaunchRunHumanApprovalSummary = {
     href: string | null
     leadId: string | null
   }>
-  approvalsHref: "/growth/os/approvals"
+  approvalsHref: "/growth/review?tab=packages"
 }
 
 export type GrowthMissionAvaLaunchRunResult = {

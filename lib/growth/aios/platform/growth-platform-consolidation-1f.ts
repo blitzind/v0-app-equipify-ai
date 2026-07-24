@@ -26,6 +26,7 @@ export const GROWTH_PLATFORM_CANONICAL_ESCALATION_MODULES = [
 export const GROWTH_PLATFORM_EXECUTIVE_EXPERIENCE_MODULES = [
   "lib/growth/aios/operator-experience/growth-executive-experience-1d.ts",
   "lib/growth/workspace/ux-1d/review/growth-executive-approval-package-1d.ts",
+  "lib/growth/workspace/ux-2b/review/growth-executive-approval-routing-2b.ts",
   "lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-synthesizer-1e.ts",
 ] as const
 

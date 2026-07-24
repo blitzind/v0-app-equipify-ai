@@ -5,6 +5,10 @@
 
 import type { GrowthHumanApprovalItem } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  buildGrowthReviewHref,
+  buildGrowthReviewPackageHref,
+} from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import type { GrowthCanonicalPrimaryAction } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-types"
 import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
 import {
@@ -118,9 +122,18 @@ export function buildCanonicalMission(input: BuildCanonicalMissionInput): Growth
     ...(decisionProjection?.why ?? []).slice(0, 2),
   ].filter((row, index, all) => Boolean(row?.trim()) && all.indexOf(row) === index)
 
-  const workspaceHref = `${GROWTH_WORKSPACE_BASE_PATH}/leads/${input.leadId}`
-  const approvalsHref = `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`
-  const completedWorkHref = approvalsHref
+  const pendingApproval = requiredApprovals.find((row) => row.status === "waiting") ?? null
+  const pendingPackageId = packageForLead?.packageId?.trim() || null
+  const executiveApprovalHref = pendingPackageId
+    ? buildGrowthReviewPackageHref(pendingPackageId)
+    : buildGrowthReviewHref({ tab: "packages" })
+
+  const workspaceHref =
+    pendingApproval && pendingPackageId
+      ? executiveApprovalHref
+      : `${GROWTH_WORKSPACE_BASE_PATH}/leads/${input.leadId}`
+  const approvalsHref = executiveApprovalHref
+  const completedWorkHref = executiveApprovalHref
   const callWorkspaceHref = `${GROWTH_WORKSPACE_BASE_PATH}/calls?leadId=${input.leadId}`
   const meetingHref = input.upcomingMeeting?.at ? `${GROWTH_WORKSPACE_BASE_PATH}/meetings` : null
 

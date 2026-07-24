@@ -42,7 +42,7 @@ import {
   GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW,
 } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
-import { remapLegacyHrefToGrowthReview, resolveCustomerPackageReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { remapLegacyHrefToGrowthReview } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import {
   projectSupervisedSalesProgressNarrative,
   type GrowthSupervisedSalesProgressNarrative,
@@ -70,11 +70,9 @@ import type { GrowthHomeAvaRecommendationAccountabilitySnapshot } from "@/lib/gr
 
 function normalizeOperatorReviewHref(
   href: string | null | undefined,
-  leadId?: string | null,
+  _leadId?: string | null,
 ): string | null {
   if (!href) return null
-  const customerHref = resolveCustomerPackageReviewHref({ leadId, route: href })
-  if (customerHref) return customerHref
   return remapLegacyHrefToGrowthReview(href)
 }
 

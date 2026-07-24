@@ -41,6 +41,11 @@ import {
   GROWTH_HOME_SECTION_RECOMMENDATION_TITLE,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 import {
+  GROWTH_HOME_EXECUTIVE_EXPERIENCE_2A_REASONING_TOGGLE,
+  humanizeExecutivePresentationCopy,
+  AVA_GROWTH_OPERATOR_2A_EXECUTIVE_EXPERIENCE_QA_MARKER,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-executive-experience-2a"
+import {
   buildStrategicMarketKey,
   readGrowthHomeAvaStrategicOverrideRecords,
   recordGrowthHomeAvaStrategicOverride,
@@ -55,6 +60,8 @@ type Props = {
   strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
   executiveReasoning?: GrowthHomeAvaExecutiveReasoningPayload | null
   suppressPrimaryHeadline?: boolean
+  suppressRecommendationIntro?: boolean
+  executiveMode?: boolean
 }
 
 function displayHeadline(item: GrowthHomeAvaRecommendationItem, activeIndex: number): string {
@@ -285,8 +292,11 @@ export function GrowthHomeAvaRecommendationExperienceSection({
   strategicAdvisorContext = null,
   executiveReasoning = null,
   suppressPrimaryHeadline = false,
+  suppressRecommendationIntro = false,
+  executiveMode = false,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
+  const [showReasoningDetails, setShowReasoningDetails] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [showWhy, setShowWhy] = useState(false)
   const [showAssignment, setShowAssignment] = useState(false)
@@ -452,6 +462,8 @@ export function GrowthHomeAvaRecommendationExperienceSection({
       data-qa-marker-next-1c={GROWTH_AIOS_NEXT_1C_STRATEGIC_ADVISOR_QA_MARKER}
       data-qa-marker-next-1d={GROWTH_AIOS_NEXT_1D_AVA_OUTCOME_PLANNING_QA_MARKER}
       data-qa-marker-next-1e={GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER}
+      data-executive-mode={executiveMode ? "true" : "false"}
+      data-qa-marker-2a={executiveMode ? AVA_GROWTH_OPERATOR_2A_EXECUTIVE_EXPERIENCE_QA_MARKER : undefined}
       className="space-y-4 rounded-xl border border-indigo-200/70 bg-indigo-50/30 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20 sm:p-5"
     >
       <div className="border-b border-border/40 pb-3">
@@ -461,20 +473,22 @@ export function GrowthHomeAvaRecommendationExperienceSection({
         <p className="text-sm text-muted-foreground">{GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE}</p>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-sm leading-relaxed text-muted-foreground">{experience.sinceLastVisitLine}</p>
-        <p className="text-sm font-medium text-foreground">{experience.recommendationIntro}</p>
-        {experience.executiveReasoningLine ? (
-          <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-executive-reasoning">
-            {experience.executiveReasoningLine}
-          </p>
-        ) : null}
-        {experience.organizationalLearningLine ? (
-          <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-organizational-learning">
-            {experience.organizationalLearningLine}
-          </p>
-        ) : null}
-      </div>
+      {!suppressRecommendationIntro && !executiveMode ? (
+        <div className="space-y-2">
+          <p className="text-sm leading-relaxed text-muted-foreground">{experience.sinceLastVisitLine}</p>
+          <p className="text-sm font-medium text-foreground">{experience.recommendationIntro}</p>
+          {experience.executiveReasoningLine ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-executive-reasoning">
+              {humanizeExecutivePresentationCopy(experience.executiveReasoningLine)}
+            </p>
+          ) : null}
+          {experience.organizationalLearningLine ? (
+            <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-organizational-learning">
+              {experience.organizationalLearningLine}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {activeRecommendation ? (
         <article className="space-y-4 rounded-lg border border-border/60 bg-card/80 p-4">
@@ -483,34 +497,45 @@ export function GrowthHomeAvaRecommendationExperienceSection({
             <div className="min-w-0 space-y-2">
               {!suppressPrimaryHeadline ? (
                 <p className="text-base font-semibold leading-snug text-foreground">
-                  {displayHeadline(activeRecommendation, activeIndex)}
+                  {humanizeExecutivePresentationCopy(displayHeadline(activeRecommendation, activeIndex))}
                 </p>
               ) : null}
-              {whyBullets.length > 0 ? (
+              {executiveMode && (whyBullets.length > 0 || outcomeProjection || executiveReasoning) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 text-muted-foreground"
+                  onClick={() => setShowReasoningDetails((value) => !value)}
+                >
+                  {showReasoningDetails ? "Hide Ava's reasoning" : GROWTH_HOME_EXECUTIVE_EXPERIENCE_2A_REASONING_TOGGLE}
+                </Button>
+              ) : null}
+              {(!executiveMode || showReasoningDetails) && whyBullets.length > 0 ? (
                 <ul className="space-y-1.5 text-sm text-foreground" data-qa-field="recommendation-supporting-reasons">
                   {whyBullets.map((line) => (
                     <li key={line} className="flex gap-2">
                       <span aria-hidden>•</span>
-                      <span>{line}</span>
+                      <span>{humanizeExecutivePresentationCopy(line)}</span>
                     </li>
                   ))}
                 </ul>
               ) : null}
-              {executiveReasoning?.primary?.alternativeExplanations?.[0] ? (
+              {(!executiveMode || showReasoningDetails) && executiveReasoning?.primary?.alternativeExplanations?.[0] ? (
                 <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-alternative">
                   <span className="font-medium text-foreground">Another explanation · </span>
                   {executiveReasoning.primary.alternativeExplanations[0]}
                 </p>
               ) : null}
-              {alternativeRecommendation && activeIndex === 0 ? (
+              {alternativeRecommendation && activeIndex === 0 && (!executiveMode || showReasoningDetails) ? (
                 <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="recommendation-next-alternative">
                   <span className="font-medium text-foreground">Instead, I could · </span>
                   {(alternativeRecommendation.employeeHeadline ?? alternativeRecommendation.headline).replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "")}
                 </p>
               ) : null}
-              {outcomeProjection ? (
+              {outcomeProjection && (!executiveMode || showReasoningDetails) ? (
                 <OutcomeDrivenDetails outcome={outcomeProjection} />
-              ) : (
+              ) : !outcomeProjection && (!executiveMode || showReasoningDetails) ? (
                 <>
                   {activeRecommendation.employeeLeadParagraph ? (
                     <p className="text-sm leading-relaxed text-foreground">{activeRecommendation.employeeLeadParagraph}</p>
@@ -521,8 +546,8 @@ export function GrowthHomeAvaRecommendationExperienceSection({
                     </p>
                   ) : null}
                 </>
-              )}
-              {explanation?.estimatedEffortLabel ? (
+              ) : null}
+              {(!executiveMode || showReasoningDetails) && explanation?.estimatedEffortLabel ? (
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Estimated effort · {explanation.estimatedEffortLabel}
                 </p>
@@ -540,7 +565,9 @@ export function GrowthHomeAvaRecommendationExperienceSection({
             </div>
           </div>
 
-          <ExecutionPath steps={activeRecommendation.executionPathSteps ?? []} />
+          {(!executiveMode || showReasoningDetails) ? (
+            <ExecutionPath steps={activeRecommendation.executionPathSteps ?? []} />
+          ) : null}
 
           {activeRecommendation.leadId ? (
             <p className="text-sm">

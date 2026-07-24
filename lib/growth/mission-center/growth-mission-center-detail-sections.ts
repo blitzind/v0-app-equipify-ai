@@ -10,6 +10,7 @@ import {
 import { GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { buildAiOsMissionPlanningHref, GROWTH_AI_OS_PUBLIC_BASE_PATH } from "@/lib/growth/aios/ai-os-public-routes"
+import { buildGrowthReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 function artifactItems(objective: GrowthObjective, resourceTypes: string[]): string[] {
@@ -39,7 +40,7 @@ export function buildMissionDetailSections(input: {
 }): GrowthMissionCenterDetailSection[] {
   const teammate = resolveAiTeammatePresentation(input.teammateName)
   const planningHref = buildAiOsMissionPlanningHref(input.objective.id) ?? `${GROWTH_WORKSPACE_BASE_PATH}/objectives`
-  const approvalsHref = `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/approvals`
+  const approvalsHref = buildGrowthReviewHref({ tab: "packages" })
   const findLeadsBinding = resolveFindLeadsBinding(input.objective)
   const leadDiscoveryItems = [
     ...buildLeadDiscoveryDetailItems(findLeadsBinding),

@@ -31,7 +31,7 @@ export const GROWTH_HOME_STARTUP_STEP_PATHS = {
   autonomy: `${GROWTH_WORKSPACE_BASE_PATH}/settings/autonomy`,
   calendar: `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
   booking: `${GROWTH_WORKSPACE_BASE_PATH}/settings/booking`,
-  approvals: `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`,
+  approvals: `${GROWTH_WORKSPACE_BASE_PATH}/review?tab=packages`,
   prospectSearch: `${GROWTH_WORKSPACE_BASE_PATH}/leads/prospect-search`,
 } as const
 
