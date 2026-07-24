@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Bot, ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -10,11 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { GrowthOutreachPersonalizationPreview } from "@/components/growth/growth-outreach-personalization-preview"
-import { GrowthOutboundSenderContextBadge } from "@/components/growth/signatures/growth-outbound-sender-context-badge"
-import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthAvaOperatorWorkspaceReview } from "@/components/growth/growth-ava-operator-workspace-review"
+import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import {
+  formatOperatorGenerationTypeLabel,
+  formatOperatorWorkspaceReviewIntro,
+  resolvePrimaryOperatorReviewGeneration,
+  summarizeOperatorWorkspaceHeader,
+} from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3a"
 import type {
   GrowthAiCopilotGeneration,
   GrowthAiCopilotGenerationType,
@@ -29,40 +34,19 @@ type GrowthAiCopilotProps = {
 }
 
 const EMAIL_TYPES: Array<{ type: GrowthAiCopilotGenerationType; label: string }> = [
-  { type: "cold_email", label: "Suggested Email" },
-  { type: "follow_up_email", label: "Suggested Follow Up" },
-  { type: "reengagement_email", label: "Suggested Reengagement" },
+  { type: "cold_email", label: "Recommended Email" },
+  { type: "follow_up_email", label: "Follow-up Email" },
+  { type: "reengagement_email", label: "Re-engagement Email" },
   { type: "executive_email", label: "Executive Email" },
-  { type: "breakup_email", label: "Breakup Email" },
+  { type: "breakup_email", label: "Closing Email" },
 ]
 
 const CALL_TYPES: Array<{ type: GrowthAiCopilotGenerationType; label: string }> = [
   { type: "call_opening", label: "Call Opening" },
   { type: "call_objection_response", label: "Objection Response" },
-  { type: "call_risk_brief", label: "Call Risk Brief" },
+  { type: "call_risk_brief", label: "Call Brief" },
   { type: "call_summary", label: "Call Summary" },
 ]
-
-function statusTone(status: GrowthAiCopilotGeneration["status"]): "healthy" | "warning" | "neutral" {
-  if (status === "approved") return "healthy"
-  if (status === "draft") return "warning"
-  return "neutral"
-}
-
-function playbookSourceAttributionLabel(attribution: Record<string, unknown>): string | null {
-  const sourceTitles = attribution.sourceTitles
-  if (!Array.isArray(sourceTitles) || sourceTitles.length === 0) return null
-  const titles = sourceTitles.filter((title): title is string => typeof title === "string" && title.trim().length > 0)
-  if (titles.length === 0) return null
-  return titles.join(", ")
-}
-
-function formatGenerationTypeLabel(type: GrowthAiCopilotGenerationType): string {
-  return type
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ")
-}
 
 export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   const { teammate } = useAiTeammateIdentity()
@@ -71,11 +55,21 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   const [generating, setGenerating] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [queueItems, setQueueItems] = useState<GrowthOutreachQueueItem[]>([])
-  const [queueEventsById, setQueueEventsById] = useState<Record<string, Array<{ eventType: string; createdAt: string }>>>({})
   const [senderProfiles, setSenderProfiles] = useState<GrowthSenderProfilesDashboardPayload["profiles"]>([])
   const [selectedSenderAccountId, setSelectedSenderAccountId] = useState<string>("__default__")
+  const [prepareOpen, setPrepareOpen] = useState(false)
+  const [previousOpen, setPreviousOpen] = useState(false)
+
+  const primaryGeneration = useMemo(
+    () => resolvePrimaryOperatorReviewGeneration(generations),
+    [generations],
+  )
+
+  const previousGenerations = useMemo(
+    () => generations.filter((entry) => entry.id !== primaryGeneration?.id).slice(0, 4),
+    [generations, primaryGeneration?.id],
+  )
 
   const loadQueueItems = useCallback(async () => {
     try {
@@ -83,17 +77,6 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; items?: GrowthOutreachQueueItem[] }
       if (!res.ok || !data.items) return
       setQueueItems(data.items)
-      const events: Record<string, Array<{ eventType: string; createdAt: string }>> = {}
-      await Promise.all(
-        data.items.slice(0, 5).map(async (item) => {
-          const detailRes = await fetch(`/api/platform/growth/outreach/queue/${item.id}`, { cache: "no-store" })
-          const detail = (await detailRes.json().catch(() => ({}))) as {
-            events?: Array<{ eventType: string; createdAt: string }>
-          }
-          events[item.id] = detail.events ?? []
-        }),
-      )
-      setQueueEventsById(events)
     } catch {
       // ignore queue load failures in drawer
     }
@@ -109,7 +92,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
         generations?: GrowthAiCopilotGeneration[]
         message?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load copilot history.")
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load Ava recommendations.")
       setGenerations(data.generations ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
@@ -153,7 +136,6 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
       }
       if (data.generation.id !== "ephemeral") {
         setGenerations((prev) => [data.generation!, ...prev].slice(0, 20))
-        setExpandedId(data.generation.id)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed.")
@@ -200,13 +182,12 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
         ok?: boolean
         item?: GrowthOutreachQueueItem
         error?: string
-        sequence_execution_href?: string
         message?: string
       }
       if (createRes.status === 410 || created.error === "adapter_outbound_cutover_disabled") {
         throw new Error(
           created.message ??
-            "Outreach queue is disabled. Approve sends from Sequence Execution (native Gmail transport).",
+            "Outbound sending is not enabled yet. Your approval is saved for when sending resumes.",
         )
       }
       if (!createRes.ok || !created.item) throw new Error("Queue failed.")
@@ -226,296 +207,184 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   }
 
   function queueItemForGeneration(generationId: string) {
-    return queueItems.find((item) => item.generationId === generationId)
+    return queueItems.find((item) => item.generationId === generationId) ?? null
   }
-
-  const draftCount = generations.filter((entry) => entry.status === "draft").length
-  const approvedCount = generations.filter((entry) => entry.status === "approved").length
-  const recent = generations[0]
-  const collapsedSummary =
-    generations.length === 0
-      ? "No drafts"
-      : draftCount > 0 || approvedCount > 0
-        ? `Drafts: ${draftCount} • Approved: ${approvedCount}`
-        : recent
-          ? `Recent: ${formatGenerationTypeLabel(recent.generationType)}`
-          : "No drafts"
 
   return (
     <GrowthCollapsibleEngineCard
       id="growth-ai-copilot"
       title={growthAvaPanelTitle(teammate)}
       icon={<Bot className="size-4" />}
-      headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}
-      defaultOpen={false}
+      headerAside={
+        <span className="text-xs text-muted-foreground">{summarizeOperatorWorkspaceHeader(generations)}</span>
+      }
+      defaultOpen
       persistKey={GROWTH_DRAWER_CARD_KEYS.aiCopilot}
     >
       <div className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Advisory drafts only — human approval required. Deterministic intelligence remains authoritative. No auto-send.
-        </p>
-
-        {senderProfiles.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Write as sender</p>
-            <Select value={selectedSenderAccountId} onValueChange={setSelectedSenderAccountId}>
-              <SelectTrigger className="max-w-md">
-                <SelectValue placeholder="Default outbound sender" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__default__">Default outbound sender</SelectItem>
-                {senderProfiles.map((row) => (
-                  <SelectItem key={row.profile.id} value={row.profile.sender_account_id}>
-                    {row.profile.display_name}
-                    {row.profile.title ? ` — ${row.profile.title}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Generate email</p>
-          <div className="flex flex-wrap gap-2">
-            {EMAIL_TYPES.map((entry) => (
-              <Button
-                key={entry.type}
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={generating !== null}
-                onClick={() => void generate(entry.type)}
-              >
-                {generating === entry.type ? (
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-1 size-3.5" />
-                )}
-                {entry.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Generate response</p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={generating !== null}
-            onClick={() => void generate("response_draft")}
-          >
-            {generating === "response_draft" ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="mr-1 size-3.5" />
-            )}
-            Draft Response
-          </Button>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Generate call prep</p>
-          <div className="flex flex-wrap gap-2">
-            {CALL_TYPES.map((entry) => (
-              <Button
-                key={entry.type}
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={generating !== null}
-                onClick={() => void generate(entry.type)}
-              >
-                {generating === entry.type ? (
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-1 size-3.5" />
-                )}
-                {entry.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">{formatOperatorWorkspaceReviewIntro(teammate)}</p>
 
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">History</p>
-          {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading…
-            </div>
-          ) : generations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No generations yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {generations.slice(0, 5).map((entry) => {
-                const expanded = expandedId === entry.id
-                const sourceAttribution = playbookSourceAttributionLabel(entry.playbookAttribution)
-                const outboundIdentity = entry.inputSnapshot?.outboundIdentity as
-                  | { displayName?: string; title?: string | null }
-                  | undefined
-                return (
-                  <li key={entry.id} className="rounded-lg border border-border p-3 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium capitalize">{entry.generationType.replace(/_/g, " ")}</span>
-                        <GrowthBadge label={entry.status} tone={statusTone(entry.status)} />
-                        <GrowthBadge label={entry.promptVariant} tone="neutral" />
-                        {entry.classification.primary ? (
-                          <GrowthBadge label={String(entry.classification.primary)} tone="neutral" />
-                        ) : null}
-                        {entry.playbookInfluenceScore > 0 ? (
-                          <GrowthBadge label={`playbook ${entry.playbookInfluenceScore}`} tone="healthy" />
-                        ) : null}
-                        {sourceAttribution ? (
-                          <GrowthBadge label={`Influenced by: ${sourceAttribution}`} tone="neutral" />
-                        ) : null}
-                        <GrowthOutboundSenderContextBadge identity={outboundIdentity} />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setExpandedId(expanded ? null : entry.id)}
-                        >
-                          {expanded ? "Hide" : "View"}
-                        </Button>
-                        {entry.status === "approved" ? (
-                          <>
-                            {queueItemForGeneration(entry.id) ? (
-                              <GrowthBadge
-                                label={queueItemForGeneration(entry.id)!.status.replace(/_/g, " ")}
-                                tone={
-                                  queueItemForGeneration(entry.id)!.status === "executed"
-                                    ? "healthy"
-                                    : queueItemForGeneration(entry.id)!.status === "failed"
-                                      ? "attention"
-                                      : "warning"
-                                }
-                              />
-                            ) : (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={actingId === entry.id}
-                                  onClick={() => void queueGeneration(entry.id, false)}
-                                >
-                                  Approve + Queue
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={actingId === entry.id}
-                                  onClick={() => void queueGeneration(entry.id, true)}
-                                >
-                                  Queue & Execute
-                                </Button>
-                              </>
-                            )}
-                          </>
-                        ) : null}
-                        {entry.status === "draft" ? (
-                          <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={actingId === entry.id}
-                              onClick={() => void approve(entry.id)}
-                            >
-                              {actingId === entry.id ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : (
-                                <Check className="size-3.5" />
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={actingId === entry.id}
-                              onClick={() => void discard(entry.id)}
-                            >
-                              <X className="size-3.5" />
-                            </Button>
-                          </>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void navigator.clipboard.writeText(entry.generatedContent)}
-                        >
-                          <Copy className="size-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                    {expanded ? (
-                      <div className="mt-3 space-y-2">
-                        {entry.classification.personalization ? (
-                          <GrowthOutreachPersonalizationPreview
-                            audit={entry.classification.personalization}
-                            generatedSubject={entry.generatedSubject}
-                            generatedContent={entry.generatedContent}
-                            outboundIdentity={outboundIdentity}
-                          />
-                        ) : (
-                          <>
-                            <GrowthOutboundSenderContextBadge identity={outboundIdentity} />
-                            {entry.generatedSubject ? (
-                              <p className="font-medium">Subject: {entry.generatedSubject}</p>
-                            ) : null}
-                            <pre className="whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-xs">
-                              {entry.generatedContent}
-                            </pre>
-                          </>
-                        )}
-                        {entry.classification.callPrep ? (
-                          <div className="rounded-md border border-amber-200 bg-amber-50/40 p-2 text-xs">
-                            <p className="font-medium">Call prep</p>
-                            <pre className="mt-1 whitespace-pre-wrap">
-                              {JSON.stringify(entry.classification.callPrep, null, 2)}
-                            </pre>
-                          </div>
-                        ) : null}
-                        {entry.playbookInfluenceScore > 0 ? (
-                          <div className="rounded-md border border-violet-200 bg-violet-50/40 p-2 text-xs">
-                            <p className="font-medium">Playbook influence ({entry.playbookInfluenceScore})</p>
-                            {sourceAttribution ? (
-                              <p className="mt-1 text-muted-foreground">Influenced by: {sourceAttribution}</p>
-                            ) : null}
-                            {Array.isArray(entry.playbookAttribution?.ruleTitles) &&
-                            entry.playbookAttribution.ruleTitles.length > 0 ? (
-                              <ul className="mt-1 list-disc pl-4">
-                                {(entry.playbookAttribution.ruleTitles as string[]).map((title) => (
-                                  <li key={title}>{title}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="mt-1 text-muted-foreground">Approved playbook rules influenced this draft.</p>
-                            )}
-                            {Array.isArray(entry.playbookAttribution?.conflicts) &&
-                            (entry.playbookAttribution.conflicts as unknown[]).length > 0 ? (
-                              <p className="mt-2 text-amber-800">
-                                {(entry.playbookAttribution.conflicts as unknown[]).length} playbook conflict(s) detected.
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading Ava&apos;s recommendation…
+          </div>
+        ) : primaryGeneration ? (
+          <GrowthAvaOperatorWorkspaceReview
+            lead={lead}
+            teammate={teammate}
+            generation={primaryGeneration}
+            acting={actingId === primaryGeneration.id}
+            queueItem={queueItemForGeneration(primaryGeneration.id)}
+            onApprove={() => void approve(primaryGeneration.id)}
+            onReject={() => void discard(primaryGeneration.id)}
+            onQueue={
+              primaryGeneration.status === "approved"
+                ? () => void queueGeneration(primaryGeneration.id, false)
+                : undefined
+            }
+            onQueueAndSend={
+              primaryGeneration.status === "approved"
+                ? () => void queueGeneration(primaryGeneration.id, true)
+                : undefined
+            }
+          />
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+            Ava has not prepared a recommendation for this account yet.
+          </div>
+        )}
+
+        {previousGenerations.length > 0 ? (
+          <div className="rounded-lg border border-border/60">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              onClick={() => setPreviousOpen((value) => !value)}
+            >
+              {previousOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+              Previous preparations ({previousGenerations.length})
+            </button>
+            {previousOpen ? (
+              <ul className="space-y-2 border-t border-border/60 p-3">
+                {previousGenerations.map((entry) => (
+                  <li key={entry.id} className="rounded-md border border-border/60 px-3 py-2 text-sm">
+                    <p className="font-medium text-foreground">
+                      {formatOperatorGenerationTypeLabel(entry.generationType)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.generatedSubject?.trim() || "No subject"} ·{" "}
+                      {entry.status === "draft"
+                        ? "Ready for your review"
+                        : entry.status === "approved"
+                          ? "Approved"
+                          : "Declined"}
+                    </p>
                   </li>
-                )
-              })}
-            </ul>
-          )}
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="rounded-lg border border-border/60">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            onClick={() => setPrepareOpen((value) => !value)}
+          >
+            {prepareOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            Ask Ava to prepare another message
+          </button>
+          {prepareOpen ? (
+            <div className="space-y-4 border-t border-border/60 p-3">
+              {senderProfiles.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Write as</p>
+                  <Select value={selectedSenderAccountId} onValueChange={setSelectedSenderAccountId}>
+                    <SelectTrigger className="max-w-md">
+                      <SelectValue placeholder="Default sender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Default sender</SelectItem>
+                      {senderProfiles.map((row) => (
+                        <SelectItem key={row.profile.id} value={row.profile.sender_account_id}>
+                          {row.profile.display_name}
+                          {row.profile.title ? ` — ${row.profile.title}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</p>
+                <div className="flex flex-wrap gap-2">
+                  {EMAIL_TYPES.map((entry) => (
+                    <Button
+                      key={entry.type}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={generating !== null}
+                      onClick={() => void generate(entry.type)}
+                    >
+                      {generating === entry.type ? (
+                        <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1 size-3.5" />
+                      )}
+                      {entry.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Reply</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={generating !== null}
+                  onClick={() => void generate("response_draft")}
+                >
+                  {generating === "response_draft" ? (
+                    <Loader2 className="mr-1 size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-1 size-3.5" />
+                  )}
+                  Reply Draft
+                </Button>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Call prep</p>
+                <div className="flex flex-wrap gap-2">
+                  {CALL_TYPES.map((entry) => (
+                    <Button
+                      key={entry.type}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={generating !== null}
+                      onClick={() => void generate(entry.type)}
+                    >
+                      {generating === entry.type ? (
+                        <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1 size-3.5" />
+                      )}
+                      {entry.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </GrowthCollapsibleEngineCard>

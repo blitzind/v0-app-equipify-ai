@@ -939,6 +939,7 @@
     "test:ava-persisted-operator-validation-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-persisted-operator-validation-1a.ts",
     "test:ava-operator-experience-2a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-operator-experience-2a.ts",
     "test:ava-home-projection-cutover-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-home-projection-cutover-1a.ts",
+    "test:ava-operator-workspace-3a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-operator-workspace-3a.ts",
     "run:ava-home-projection-cutover-1a-production-validation": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-home-projection-cutover-1a-production-validation.ts",
     "run:ava-persisted-operator-validation-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-persisted-operator-validation-1a.ts",
     "test:ava-reasoning-calibration-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-reasoning-calibration-1a.ts",
