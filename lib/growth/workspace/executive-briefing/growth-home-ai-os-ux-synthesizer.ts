@@ -85,9 +85,9 @@ function overallConfidence(dashboard: GrowthWorkspaceDashboardViewModel): {
     ? Math.max(
         0,
         100 -
-          (dashboard.briefing.summary.pending_approvals ?? 0) * 3 -
-          (dashboard.briefing.mailbox.warnings ?? 0) * 8 -
-          (dashboard.briefing.mailbox.expired_mailboxes ?? 0) * 20,
+          (dashboard.briefing?.summary.pending_approvals ?? 0) * 3 -
+          (dashboard.briefing?.mailbox.warnings ?? 0) * 8 -
+          (dashboard.briefing?.mailbox.expired_mailboxes ?? 0) * 20,
       )
     : engagementScore
   return confidencePresentation(readiness > 0 ? readiness : engagementScore)

@@ -212,14 +212,14 @@ export function buildAvaNarrativeContext(input: BuildAvaNarrativeContextInput): 
       }),
     )
   }
-  const mailboxWarnings = workspaceSummary.dashboard.briefing?.mailbox?.warnings ?? 0
-  const expiredMailboxes = workspaceSummary.dashboard.briefing?.mailbox?.expired_mailboxes ?? 0
+  const mailboxWarnings = workspaceSummary.dashboard?.briefing?.mailbox?.warnings ?? 0
+  const expiredMailboxes = workspaceSummary.dashboard?.briefing?.mailbox?.expired_mailboxes ?? 0
   if (mailboxWarnings > 0 || expiredMailboxes > 0) {
     risks.push(
       fact({
         kind: "risk",
         label: "mailbox_health",
-        detail: workspaceSummary.dashboard.briefing?.section_summaries.mailbox ?? null,
+        detail: workspaceSummary.dashboard?.briefing?.section_summaries?.mailbox ?? null,
         severity: 1,
       }),
     )

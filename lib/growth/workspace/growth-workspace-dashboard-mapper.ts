@@ -85,17 +85,17 @@ export function buildGrowthWorkspaceDashboardViewModel(
   const leadsNeedingAction = countInboxSections(input.leadInboxSections, ["high_priority", "needs_review"])
   const callReadyLeads = input.cadenceSummary?.callTasksDueCount ?? 0
   const inboxRequiringReplies =
-    input.briefing?.summary.replies_needing_attention ??
+    input.briefing?.summary?.replies_needing_attention ??
     input.conversationDashboard?.conversationRisk?.length ??
     0
   const opportunitiesRequiringFollowUp =
-    input.pipelineDashboard?.dealsNeedingAction ?? input.briefing?.meetings.opportunities_pending ?? 0
+    input.pipelineDashboard?.dealsNeedingAction ?? input.briefing?.meetings?.opportunities_pending ?? 0
 
-  const emailsSentToday = input.briefing?.revenue.emails_sent ?? input.sequenceExecution?.sent24h ?? 0
-  const repliesToday = input.briefing?.revenue.replies ?? inboxRequiringReplies
+  const emailsSentToday = input.briefing?.revenue?.emails_sent ?? input.sequenceExecution?.sent24h ?? 0
+  const repliesToday = input.briefing?.revenue?.replies ?? inboxRequiringReplies
   const callsToday = input.callsDashboard?.workspaceDashboard?.stats?.callsToday ?? 0
   const meetingsToday =
-    input.briefing?.summary.meetings_today ?? input.cadenceSummary?.callTasksDueCount ?? 0
+    input.briefing?.summary?.meetings_today ?? input.cadenceSummary?.callTasksDueCount ?? 0
 
   const openOpportunities = openOpportunityCount(input.pipelineDashboard)
   const forecastValue = input.pipelineDashboard?.forecastTotals.commit.amount ?? 0
@@ -107,7 +107,7 @@ export function buildGrowthWorkspaceDashboardViewModel(
   const activeEnrollments = input.sequenceFoundation?.dashboard?.active_count ?? 0
   const executionsToday = input.sequenceExecution?.sent24h ?? 0
   const approvalQueueCount =
-    input.sequenceExecution?.pendingApproval ?? input.briefing?.summary.pending_approvals ?? 0
+    input.sequenceExecution?.pendingApproval ?? input.briefing?.summary?.pending_approvals ?? 0
 
   const engagementScore = Math.round(input.opportunityReadiness?.averageReadiness ?? 0)
   const hotCompanies = input.engagementWorkspace?.highIntent?.cards?.length ?? 0
@@ -295,11 +295,11 @@ export function buildGrowthWorkspaceDashboardViewModel(
     generatedAt: new Date().toISOString(),
     briefing: input.briefing,
     operatorName: input.briefing?.operator_name ?? null,
-    recommendedAction: input.briefing?.summary.recommended_action ?? null,
+    recommendedAction: input.briefing?.summary?.recommended_action ?? null,
     welcome: {
       greeting: input.briefing?.greeting ?? "Welcome back",
       operatorName: input.briefing?.operator_name ?? null,
-      recommendedAction: input.briefing?.summary.recommended_action ?? null,
+      recommendedAction: input.briefing?.summary?.recommended_action ?? null,
       todaysFocus:
         input.briefing?.priorities?.[0]?.title ??
         input.briefing?.section_summaries?.inbox ??

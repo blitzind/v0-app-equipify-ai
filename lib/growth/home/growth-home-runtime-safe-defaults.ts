@@ -19,9 +19,33 @@ import type { AvaSpecialistOrchestratorResult } from "@/lib/growth/specialists/t
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import type { GrowthHomeAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import type { GrowthHomeAvaHeroViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
+import {
+  buildGrowthWorkspaceDashboardViewModel,
+  type GrowthWorkspaceDashboardSourcePayload,
+} from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
+import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 
 export const GROWTH_HOME_RUNTIME_HOTFIX_16X_1_QA_MARKER =
   "ge-aios-hotfix-16x-1-home-runtime-undefined-arrays-v1" as const
+
+export const AVA_GROWTH_HOTFIX_2B_1E_QA_MARKER = "ava-growth-hotfix-2b-1e-null-briefing-ai-teammate-v1" as const
+
+export const EMPTY_GROWTH_HOME_WORKSPACE_SOURCES: GrowthWorkspaceDashboardSourcePayload = {
+  briefing: null,
+  leadInboxSections: [],
+  cadenceSummary: null,
+  pipelineDashboard: null,
+  opportunityReadiness: null,
+  sequenceFoundation: null,
+  sequenceExecution: null,
+  engagementWorkspace: null,
+  conversationDashboard: null,
+  relationshipDashboard: null,
+  callsDashboard: null,
+  dailyRevenueWorkQueueEnabled: false,
+  dailyRevenueWorkQueue: null,
+  dailyRevenueWorkQueueDisplay: null,
+}
 
 export function emptyGrowthHomeRelationshipSnapshots(): GrowthHomeRelationshipSnapshotEnrichment {
   return {
@@ -104,9 +128,14 @@ export function normalizeGrowthHomeWorkspaceSummaryPayload(
   const leadPool = payload.leadPool ?? emptyGrowthHomeLeadPoolSummary()
   const generatedAt = payload.generatedAt ?? new Date().toISOString()
   const organizationId = payload.organizationalMemory?.store.organizationId ?? "local-organization"
+  const sources = payload.sources ?? EMPTY_GROWTH_HOME_WORKSPACE_SOURCES
+  const dashboard =
+    payload.dashboard ?? buildGrowthWorkspaceDashboardViewModel(sources)
 
   return {
     ...(payload as GrowthHomeWorkspaceSummaryPayload),
+    sources,
+    dashboard,
     briefing: null,
     salesOutcomes: payload.salesOutcomes ?? emptyGrowthHomeSalesOutcomes(generatedAt),
     organizationalMemory:

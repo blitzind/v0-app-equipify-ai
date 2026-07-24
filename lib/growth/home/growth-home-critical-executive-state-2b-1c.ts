@@ -182,7 +182,6 @@ export function mergeGrowthHomeWorkspaceSummaryWithCriticalState(input: {
         dailyRevenueWorkQueue: null,
         dailyRevenueWorkQueueDisplay: null,
       },
-      dashboard: null,
       revenueQueue: { total: 0, queueSource: "canonical" as const, sectionCounts: [] },
       callQueue: { readyCount: 0, nextLabel: null },
       meetings: { today: 0, thisWeek: 0, scheduled: 0 },

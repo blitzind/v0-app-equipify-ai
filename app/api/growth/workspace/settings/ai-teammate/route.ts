@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import {
+  PLATFORM_PERSONA_DEFAULT_NAME,
+  PLATFORM_PERSONA_DEFAULT_ROLE,
+} from "@fuzor/identity"
+import {
   GE_AI_UX_3B_QA_MARKER,
   type AiTeammateIdentity,
 } from "@/lib/growth/settings/growth-ai-teammate-identity-types"
 import {
-  loadAiTeammateIdentity,
+  loadAiTeammateIdentityGracefully,
   updateAiTeammateIdentity,
 } from "@/lib/growth/settings/growth-ai-teammate-identity-service"
 import {
@@ -28,6 +32,16 @@ const patchSchema = z
   })
   .strict()
 
+function defaultAiTeammateIdentity(organizationId: string | null): AiTeammateIdentity {
+  return {
+    organizationId,
+    name: PLATFORM_PERSONA_DEFAULT_NAME,
+    role: PLATFORM_PERSONA_DEFAULT_ROLE,
+    source: "default",
+    onboardingCompleted: false,
+  }
+}
+
 function mapResponse(identity: AiTeammateIdentity, persisted: boolean) {
   return {
     ok: true as const,
@@ -37,20 +51,43 @@ function mapResponse(identity: AiTeammateIdentity, persisted: boolean) {
   }
 }
 
-export async function GET(request: Request) {
-  const access = await requireGrowthWorkspaceSettingsAccess(request)
-  if (!access.ok) return access.response
+function degradedAiTeammateResponse(input: {
+  organizationId: string | null
+  warning: string
+}) {
+  return NextResponse.json(
+    {
+      ...mapResponse(defaultAiTeammateIdentity(input.organizationId), false),
+      degraded: true,
+      warning: input.warning,
+    },
+    { status: 200 },
+  )
+}
 
+export async function GET(request: Request) {
+  let organizationId: string | null = null
   try {
-    const identity = await loadAiTeammateIdentity(access.admin, {
+    const access = await requireGrowthWorkspaceSettingsAccess(request)
+    if (!access.ok) return access.response
+
+    organizationId = access.organizationId
+    const { identity, degraded, warning } = await loadAiTeammateIdentityGracefully(access.admin, {
       organizationId: access.organizationId,
       userId: access.userId,
     })
     const persisted = identity.source === "organization" || identity.onboardingCompleted
+    if (degraded) {
+      return NextResponse.json({
+        ...mapResponse(identity, persisted),
+        degraded: true,
+        warning,
+      })
+    }
     return NextResponse.json(mapResponse(identity, persisted))
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load AI teammate identity."
-    return growthWorkspaceSettingsJsonError("ai_teammate_identity_load_failed", message, 500)
+    return degradedAiTeammateResponse({ organizationId, warning: message })
   }
 }
 

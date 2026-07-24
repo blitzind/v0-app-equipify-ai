@@ -20,31 +20,12 @@ import {
 } from "@/lib/growth/home/growth-home-critical-executive-state-2b-1c"
 import { logGrowthHomeMountStage } from "@/lib/growth/home/growth-home-mount-diagnostics-2b-1d"
 import {
+  EMPTY_GROWTH_HOME_WORKSPACE_SOURCES,
   normalizeGrowthHomeWorkspaceSummaryPayload,
 } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
-import {
-  buildGrowthWorkspaceDashboardViewModel,
-  type GrowthWorkspaceDashboardSourcePayload,
-} from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
+import type { GrowthWorkspaceDashboardSourcePayload } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
-
-const EMPTY_SOURCES: GrowthWorkspaceDashboardSourcePayload = {
-  briefing: null,
-  leadInboxSections: [],
-  cadenceSummary: null,
-  pipelineDashboard: null,
-  opportunityReadiness: null,
-  sequenceFoundation: null,
-  sequenceExecution: null,
-  engagementWorkspace: null,
-  conversationDashboard: null,
-  relationshipDashboard: null,
-  callsDashboard: null,
-  dailyRevenueWorkQueueEnabled: false,
-  dailyRevenueWorkQueue: null,
-  dailyRevenueWorkQueueDisplay: null,
-}
 
 function applyWorkspaceSummaryPayload(
   payload: GrowthHomeWorkspaceSummaryPayload,
@@ -53,11 +34,11 @@ function applyWorkspaceSummaryPayload(
   workspaceSummary: GrowthHomeWorkspaceSummaryPayload
   avaConsole: GrowthHomeWorkspaceSummaryPayload["avaConsole"]
 } {
-  const normalized = normalizeGrowthHomeWorkspaceSummaryPayload(payload)
+  const workspaceSummary = normalizeGrowthHomeWorkspaceSummaryPayload(payload)
   return {
-    dashboard: normalized.dashboard ?? buildGrowthWorkspaceDashboardViewModel(normalized.sources),
-    workspaceSummary: normalized,
-    avaConsole: normalized.avaConsole ?? null,
+    dashboard: workspaceSummary.dashboard,
+    workspaceSummary,
+    avaConsole: workspaceSummary.avaConsole ?? null,
   }
 }
 
@@ -180,7 +161,7 @@ function logHomeDashboardFetch(input: {
 /** Single canonical load — GET /home/workspace-summary (GE-SIMPLIFY-1B). */
 export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorkspaceDashboardSourcePayload> {
   const cached = readGrowthHomeExecutiveSessionCache()
-  return cached?.sources ?? EMPTY_SOURCES
+  return cached?.sources ?? EMPTY_GROWTH_HOME_WORKSPACE_SOURCES
 }
 
 export function useGrowthWorkspaceDashboard() {

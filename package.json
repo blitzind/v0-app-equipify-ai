@@ -1083,6 +1083,7 @@
     "test:ava-growth-hotfix-2b-1b-false-idle": "tsx scripts/test-ava-growth-hotfix-2b-1b-false-idle.ts",
     "test:ava-growth-hotfix-2b-1c-home-critical-recovery": "tsx scripts/test-ava-growth-hotfix-2b-1c-home-critical-recovery.ts",
     "test:ava-growth-hotfix-2b-1d-home-mount": "tsx scripts/test-ava-growth-hotfix-2b-1d-home-mount.ts",
+    "test:ava-growth-hotfix-2b-1e-null-briefing-ai-teammate": "tsx scripts/test-ava-growth-hotfix-2b-1e-null-briefing-ai-teammate.ts",
     "test:ge-aios-portfolio-eligibility-closure-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-portfolio-eligibility-closure-1a.ts",
     "test:ge-aios-datamoon-autonomous-discovery-cutover-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-datamoon-autonomous-discovery-cutover-1a.ts",
     "test:ge-aios-datamoon-discovery-terminal-state-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-datamoon-discovery-terminal-state-1a.ts",
