@@ -535,9 +535,9 @@ export function buildGrowthHomeRuntimeTrustViewModel(input: {
     pendingApprovals: input.pendingApprovals,
     operatorApprovalCompanyName:
       input.operatorApprovalCompanyName ??
-      input.canonicalOperatorFocus?.source === "approval"
-        ? input.canonicalOperatorFocus.companyName
-        : null,
+      (input.canonicalOperatorFocus?.source === "approval"
+        ? (input.canonicalOperatorFocus?.companyName ?? null)
+        : null),
     activeClaim: canonicalClaim,
     activeWork: input.activeWork,
     portfolioOperator: input.portfolioOperator ?? null,

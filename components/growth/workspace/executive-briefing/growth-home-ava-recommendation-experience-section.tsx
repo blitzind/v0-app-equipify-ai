@@ -295,9 +295,10 @@ export function GrowthHomeAvaRecommendationExperienceSection({
   const [showAlternatives, setShowAlternatives] = useState(false)
   const [overrideAcknowledged, setOverrideAcknowledged] = useState(false)
 
-  const activeRecommendation = experience.recommendations[activeIndex] ?? null
-  const alternativeRecommendation = experience.recommendations[activeIndex + 1] ?? null
-  const remainingCount = Math.max(0, experience.recommendations.length - activeIndex - 1)
+  const recommendations = experience.recommendations ?? []
+  const activeRecommendation = recommendations[activeIndex] ?? null
+  const alternativeRecommendation = recommendations[activeIndex + 1] ?? null
+  const remainingCount = Math.max(0, recommendations.length - activeIndex - 1)
   const outcomeProjection = activeRecommendation?.outcomeProjection ?? null
 
   const strategicContext = useMemo(

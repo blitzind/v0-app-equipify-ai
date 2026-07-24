@@ -251,8 +251,8 @@ export function buildCanonicalOperatorTask(input: {
 export function mapCanonicalApprovalPackagesToWaitingOnYou(
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot,
 ): GrowthHomeWaitingOnYouItem[] {
-  return approvalSnapshot.packages.map((pkg) => {
-    const isSupervisedDraft = pkg.itemId.startsWith("supervised-draft:")
+  return (approvalSnapshot.packages ?? []).map((pkg) => {
+    const isSupervisedDraft = (pkg.itemId ?? "").startsWith("supervised-draft:")
     return {
       id: `approval:${pkg.itemId}`,
       label: isSupervisedDraft
@@ -276,7 +276,7 @@ export function resolveCanonicalWaitingOnYouItems(input: {
   supervisedNeedsInformation?: GrowthHomeWaitingOnYouItem[]
 }): GrowthHomeWaitingOnYouItem[] {
   const packageRows =
-    input.approvalSnapshot && input.approvalSnapshot.packages.length > 0
+    input.approvalSnapshot && (input.approvalSnapshot.packages?.length ?? 0) > 0
       ? mapCanonicalApprovalPackagesToWaitingOnYou(input.approvalSnapshot)
       : []
 

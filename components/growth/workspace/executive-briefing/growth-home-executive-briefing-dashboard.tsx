@@ -198,9 +198,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
         teammate,
         operatorDisplayName,
         missionDiscovery: workspaceSummary?.missionDiscovery ?? null,
-        portfolioBelowTarget: (workspaceSummary?.portfolioManager?.health.needsCount ?? 0) > 0,
-        portfolioTargetCurrent: workspaceSummary?.portfolioManager?.health.counts.activeCompanies ?? null,
-        portfolioTargetGoal: workspaceSummary?.portfolioManager?.target.targetActiveCompanies ?? null,
+        portfolioBelowTarget: (workspaceSummary?.portfolioManager?.health?.needsCount ?? 0) > 0,
+        portfolioTargetCurrent: workspaceSummary?.portfolioManager?.health?.counts?.activeCompanies ?? null,
+        portfolioTargetGoal: workspaceSummary?.portfolioManager?.target?.targetActiveCompanies ?? null,
         portfolioOperator: workspaceSummary?.portfolioManager?.operator ?? null,
         productionMissionAuthority: workspaceSummary?.productionMissionAuthority ?? null,
         canonicalOperatorApproval: workspaceSummary?.canonicalOperatorApproval ?? null,
@@ -451,7 +451,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       totalOpportunities: metricValueFromDashboard(dashboard, "intelligence", "Hot companies"),
       pendingApprovals: canonicalPendingApprovals,
       portfolio: workspaceSummary?.portfolioManager?.operator ?? null,
-      leadsNeedingAction: workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0,
+      leadsNeedingAction: workspaceSummary?.operatorTasks?.leadsNeedingAction ?? 0,
     })
     const heroBriefing = buildHeroExecutiveBriefing({
       statusLabel: avaHero.statusLabel,
@@ -472,18 +472,18 @@ export function GrowthHomeExecutiveBriefingDashboard({
       workingNowTask: workingNow.activeTask,
       objectiveTitle: avaHero.businessObjectiveLeadership?.primaryObjective?.title ?? null,
       recommendationHeadline:
-        avaHero.recommendationExperience?.recommendations[0]?.employeeHeadline ??
-        avaHero.recommendationExperience?.recommendations[0]?.headline ??
+        avaHero.recommendationExperience?.recommendations?.[0]?.employeeHeadline ??
+        avaHero.recommendationExperience?.recommendations?.[0]?.headline ??
         null,
-      progressLabels: measurableProgress.items.map((item) => item.label),
+      progressLabels: (measurableProgress.items ?? []).map((item) => item.label),
     })
     const deduped = applyHomeNarrativeDedup({
       overlaps: narrativeOverlap,
       heroBriefing,
       workingNow,
       recommendationHeadline:
-        avaHero.recommendationExperience?.recommendations[0]?.employeeHeadline ??
-        avaHero.recommendationExperience?.recommendations[0]?.headline ??
+        avaHero.recommendationExperience?.recommendations?.[0]?.employeeHeadline ??
+        avaHero.recommendationExperience?.recommendations?.[0]?.headline ??
         null,
     })
     return {
@@ -510,7 +510,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
     setupIncomplete,
     workspaceSummary?.generatedAt,
     workspaceSummary?.missionDiscovery,
-    workspaceSummary?.operatorTasks.leadsNeedingAction,
+    workspaceSummary?.operatorTasks?.leadsNeedingAction,
     workspaceSummary?.portfolioManager?.operator,
     workspaceSummary?.productionMissionAuthority,
     workspaceSummary?.canonicalOperatorFocus,
@@ -699,13 +699,14 @@ export function GrowthHomeExecutiveBriefingDashboard({
             waitingOnYou={aiOsUx.waitingOnYou}
             workManager={avaHero.workManager ?? null}
             pendingApprovals={canonicalPendingApprovals}
-            emailsSentToday={workspaceSummary?.kpis.emailsSentToday ?? 0}
+            emailsSentToday={workspaceSummary?.kpis?.emailsSentToday ?? 0}
             outreachPreparedToday={workspaceSummary?.salesOutcomes?.outreach_prepared ?? 0}
             organizationalKnowledgeCount={
-              workspaceSummary?.organizationalKnowledge?.store.items.filter((row) => row.active && !row.superseded_by)
-                .length ?? 0
+              workspaceSummary?.organizationalKnowledge?.store?.items?.filter(
+                (row) => row.active && !row.superseded_by,
+              ).length ?? 0
             }
-            learnedTodayCount={avaHero.dailyActivityNarrative?.learned_today.length ?? 0}
+            learnedTodayCount={avaHero.dailyActivityNarrative?.learned_today?.length ?? 0}
           />
         ) : null}
       </div>

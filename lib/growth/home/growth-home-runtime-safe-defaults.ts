@@ -191,6 +191,13 @@ export function normalizeGrowthHomeAvaHeroViewModel(
 export function normalizeGrowthHomeAiOsUxViewModel(
   aiOsUx: GrowthHomeAiOsUxViewModel,
 ): GrowthHomeAiOsUxViewModel {
+  const canonicalApprovalSnapshot = aiOsUx.canonicalApprovalSnapshot
+    ? {
+        ...aiOsUx.canonicalApprovalSnapshot,
+        packages: aiOsUx.canonicalApprovalSnapshot.packages ?? [],
+      }
+    : null
+
   return {
     ...aiOsUx,
     waitingOnYou: aiOsUx.waitingOnYou ?? [],
@@ -199,8 +206,13 @@ export function normalizeGrowthHomeAiOsUxViewModel(
     waitingOnYouOverflow: aiOsUx.waitingOnYouOverflow ?? 0,
     approveItemsCount: aiOsUx.approveItemsCount ?? 0,
     canonicalOperatorTask: aiOsUx.canonicalOperatorTask ?? null,
-    canonicalApprovalSnapshot: aiOsUx.canonicalApprovalSnapshot ?? null,
-    canonicalActiveMissions: aiOsUx.canonicalActiveMissions ?? null,
+    canonicalApprovalSnapshot,
+    canonicalActiveMissions: aiOsUx.canonicalActiveMissions
+      ? {
+          ...aiOsUx.canonicalActiveMissions,
+          missions: aiOsUx.canonicalActiveMissions.missions ?? [],
+        }
+      : null,
     canonicalOperatorFocus: aiOsUx.canonicalOperatorFocus ?? null,
     canonicalOperatorProgress: aiOsUx.canonicalOperatorProgress ?? null,
   }

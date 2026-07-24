@@ -611,7 +611,7 @@ export function buildAiOsUxViewModel(input: {
   })
 
   const hasCanonicalPackageList =
-    (input.canonicalApprovalSnapshot?.packages.length ?? 0) > 0
+    (input.canonicalApprovalSnapshot?.packages?.length ?? 0) > 0
 
   const waitingSummary = input.canonicalApprovalSnapshot
     ? buildCanonicalOperatorWaitingSummary({
