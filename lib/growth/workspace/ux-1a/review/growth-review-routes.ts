@@ -39,9 +39,9 @@ export function buildGrowthReviewPackageHref(packageId: string): string {
   return buildGrowthReviewHref({ tab: "packages", item: packageId })
 }
 
-/** Customer AI OS — open the lead CRM drawer for package review. */
+/** Customer AI OS — open the lead CRM drawer on the AI Copilot draft. */
 export function buildCustomerPackageReviewHref(leadId: string): string {
-  const params = new URLSearchParams({ open: leadId })
+  const params = new URLSearchParams({ open: leadId, focus: "ai-copilot" })
   return `${GROWTH_CUSTOMER_LEADS_CRM_HREF}?${params.toString()}`
 }
 

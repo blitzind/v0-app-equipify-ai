@@ -19,15 +19,15 @@ export const GROWTH_AIOS_NEXT_1B_RECOMMENDATION_PRESENTATION_QA_MARKER =
   "ge-aios-next-1b-ava-recommendation-presentation-v1" as const
 
 const DEFAULT_RESEARCH_EXECUTION_PATH = [
-  "Finish research",
-  "Prepare outreach package",
+  "Understand company",
+  "Prepare email draft",
   "Wait for approval",
   "Begin outreach",
 ] as const
 
 const DEFAULT_APPROVAL_EXECUTION_PATH = [
-  "Review package",
-  "Authorize outreach",
+  "Review email draft",
+  "Approve outreach",
   "Begin outreach",
   "Schedule follow-up",
 ] as const
@@ -52,8 +52,8 @@ function executionPathForKind(
 function expectedOutcomeForItem(item: GrowthHomeAvaRecommendationItem): string | null {
   if (item.kind === "approval_package") {
     return item.companyName
-      ? `1 review-ready opportunity package for ${item.companyName}.`
-      : "1 review-ready opportunity package."
+      ? `1 email draft ready for review for ${item.companyName}.`
+      : "1 email draft ready for review."
   }
   if (item.kind === "lead_decision" || item.kind === "operator_focus") {
     return item.companyName

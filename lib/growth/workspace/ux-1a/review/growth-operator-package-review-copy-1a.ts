@@ -35,12 +35,12 @@ export const GROWTH_OPERATOR_PACKAGE_TWO_STEP_LADDER_STEPS = [
   },
 ] as const
 
-/** GE-AIOS-OPERATOR-UX-1C — Package authorization vs transport execution readiness. */
+/** Package authorization vs transport execution readiness — draft-first operator vocabulary. */
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_HEADLINE =
-  "Package ready for authorization" as const
+  "Email draft ready for approval" as const
 
 export const GROWTH_OPERATOR_PACKAGE_AUTHORIZE_READY_DETAIL =
-  "Ava's strategy and drafts are ready for your decision." as const
+  "Ava's recommendation and email draft are ready for your decision." as const
 
 export const GROWTH_OPERATOR_PACKAGE_TRANSPORT_SETUP_INCOMPLETE_TITLE =
   "Transport setup incomplete" as const

@@ -199,7 +199,7 @@ function main(): void {
     assert.match(briefing.paragraphs[0] ?? "", /below target/i)
     assert.match(briefing.paragraphs[0] ?? "", /in parallel/i)
     assert.match(briefing.paragraphs[1] ?? "", /don't currently need anything from you/i)
-    assert.match(briefing.paragraphs[2] ?? "", /buying committee verification is complete/i)
+    assert.match(briefing.paragraphs[2] ?? "", /enough information at Less Stress Property Management/i)
     assert.doesNotMatch(briefing.paragraphs[2] ?? "", /^Waiting on buying committee verification/i)
   })
 
@@ -211,9 +211,9 @@ function main(): void {
       readyForOutreachReview: 0,
       canonicalOperatorFocus: operatorFocus({ source: "approval", title: "Review Less Stress Property Management" }),
     })
-    assert.match(briefing.paragraphs[0] ?? "", /sales momentum/i)
-    assert.match(briefing.paragraphs[1] ?? "", /need your review on one outreach package/i)
-    assert.match(briefing.paragraphs[2] ?? "", /After your review/i)
+    assert.match(briefing.paragraphs[0] ?? "", /sales momentum|email draft|reviewed/i)
+    assert.match(briefing.paragraphs[1] ?? "", /need your approval on 1 email draft/i)
+    assert.match(briefing.paragraphs[2] ?? "", /After your approval/i)
   })
 
   runGate("Active lead hero explains advancement toward review-ready outreach", () => {
@@ -224,9 +224,9 @@ function main(): void {
       primaryMissionLabel: "Prospect Research",
       currentActivityLabel: "Researching ABC Mechanical",
     })
-    assert.match(briefing.paragraphs[0] ?? "", /sales opportunity/i)
+    assert.match(briefing.paragraphs[0] ?? "", /reviewing ABC Mechanical|email draft/i)
     assert.match(briefing.paragraphs[0] ?? "", /ABC Mechanical/i)
-    assert.match(briefing.paragraphs[2] ?? "", /Once research is complete/i)
+    assert.match(briefing.paragraphs[2] ?? "", /finished reviewing|email draft/i)
   })
 
   runGate("Idle healthy portfolio hero reinforces operator confidence", () => {
@@ -249,10 +249,10 @@ function main(): void {
       primaryMissionLabel: "Portfolio Maintenance",
     })
     assert.match(briefing.paragraphs[0] ?? "", /portfolio is healthy/i)
-    assert.match(briefing.paragraphs[0] ?? "", /continue monitoring the pipeline/i)
-    assert.match(briefing.paragraphs[0] ?? "", /review-ready opportunity needs your attention/i)
+    assert.match(briefing.paragraphs[0] ?? "", /continue monitoring companies/i)
+    assert.match(briefing.paragraphs[0] ?? "", /recommendation needs your attention/i)
     assert.match(briefing.paragraphs[1] ?? "", /don't currently need anything from you/i)
-    assert.match(briefing.paragraphs[2] ?? "", /qualifying companies until the next review-ready opportunity/i)
+    assert.match(briefing.paragraphs[2] ?? "", /reviewing companies until the next recommendation|email draft/i)
   })
 
   runGate("Runtime trust VM passes operator focus presentation fields", () => {

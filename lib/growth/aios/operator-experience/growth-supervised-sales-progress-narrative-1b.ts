@@ -154,7 +154,7 @@ export function projectSupervisedSalesProgressNarrative(input: {
     const count = pendingApprovalCount || packageCount
     const headline =
       companyName && count <= 1
-        ? `${companyName} has an opportunity package ready for your review.`
+        ? `${companyName} has an email draft ready for your review.`
         : formatOperatorPackagesReadyHeadline(count)
     const supportingSentence = formatOperatorPriorityRecommendedNextStep()
 
@@ -206,13 +206,13 @@ export function projectSupervisedSalesProgressNarrative(input: {
     const count = Math.max(qualifiedPreparing.length, missionDiscovery?.lifecycleState === "preparing_recommendations" ? 1 : 0)
     const headline =
       companyName && count <= 1
-        ? `${companyName} is qualified. ${teammate} is preparing the outreach package.`
-        : `${count} ${pluralize(count, "company", "companies")} qualified. ${teammate} is preparing their outreach packages.`
+        ? `${companyName} is qualified. ${teammate} is preparing the email draft.`
+        : `${count} ${pluralize(count, "company", "companies")} qualified. ${teammate} is preparing their email drafts.`
     return {
       qaMarker: GROWTH_SUPERVISED_SALES_PROGRESS_NARRATIVE_1B_QA_MARKER,
       primaryStage: "qualified",
       headline,
-      supportingSentence: "I'll bring this back to you when the opportunity package is ready for review.",
+      supportingSentence: "I'll bring this back to you when the email draft is ready for review.",
       secondaryContext: buildSecondaryResearchContext(researchingCount, teammate),
       completedSummary,
       companyName,

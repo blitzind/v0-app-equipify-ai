@@ -17,6 +17,11 @@ import {
   buildLeadDiscoveryWorkingNowLine,
 } from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
 import {
+  formatOperatorDailyBriefNeedLine,
+  formatOperatorDailyBriefOpening,
+  inferDailyBriefReviewCounts,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-ava-direct-2a"
+import {
   GROWTH_HOME_NARRATIVE_TRUTHFULNESS_1B_QA_MARKER,
   packagePreparationInProgressPhrase,
   packagePreparationMilestonePhrase,
@@ -226,11 +231,24 @@ function buildExecutiveOpeningParagraph(input: {
   const belowTargetReason = portfolioBelowTargetReason(input)
 
   if (input.pendingPackages > 0) {
-    const packagePhrase =
+    const briefCounts = inferDailyBriefReviewCounts({
+      pendingDraftCount: input.pendingPackages,
+      completedTodayLines: input.dailyActivityNarrative?.completed_today,
+    })
+    const opening = formatOperatorDailyBriefOpening({
+      pendingDraftCount: input.pendingPackages,
+      companiesReviewedToday: briefCounts.companiesReviewedToday,
+      strongOpportunities: briefCounts.strongOpportunities,
+      notAFit: briefCounts.notAFit,
+      needsInformation: briefCounts.needsInformation,
+    })
+    if (opening) return opening
+
+    const draftPhrase =
       input.pendingPackages === 1
-        ? "the next outreach package is ready for your review"
-        : `${input.pendingPackages} outreach packages are ready for your review`
-    return `I've prepared qualified outreach so we can keep sales momentum, and ${packagePhrase}, so we only contact companies you've approved.`
+        ? "1 email draft is ready for your review"
+        : `${input.pendingPackages} email drafts are ready for your review`
+    return `I've finished reviewing companies, and ${draftPhrase}.`
   }
 
   if (
@@ -238,7 +256,7 @@ function buildExecutiveOpeningParagraph(input: {
     !portfolioBelowTarget(input) &&
     input.portfolioOperator?.discoveryRunning !== true
   ) {
-    return `Your active portfolio is healthy. I'll continue monitoring the pipeline and let you know as soon as a review-ready opportunity needs your attention.${replySuffix}`
+    return `Your active portfolio is healthy. I'll continue monitoring companies and let you know as soon as a recommendation needs your attention.${replySuffix}`
   }
 
   if (isLeadExecutionActivity(input.currentActivityLabel)) {
@@ -247,7 +265,7 @@ function buildExecutiveOpeningParagraph(input: {
       humanizeOperatorFacingCopy(input.currentActivityLabel)
     const activity = ensureFirstPerson(humanizeOperatorFacingCopy(input.currentActivityLabel) || "")
     const activitySuffix = activity ? ` ${activity}${replySuffix || "."}` : replySuffix || "."
-    return `I'm advancing ${company} toward a review-ready outreach package that can become a sales opportunity.${activitySuffix}`
+    return `I'm reviewing ${company} and will recommend outreach only when a draft is ready for your approval.${activitySuffix}`
   }
 
   if (input.preparingOutreach > 0) {
@@ -265,11 +283,11 @@ function buildExecutiveOpeningParagraph(input: {
   }
 
   if (input.statusLabel === "Researching companies" || input.primaryMissionLabel === "Prospect Research") {
-    return `I'm advancing the next qualified company toward a review-ready outreach package that can become a sales opportunity${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+    return `I'm reviewing the next company and will prepare an email draft for your approval${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
   }
 
   if (input.statusLabel === "Preparing outreach" || input.primaryMissionLabel === "Draft Factory") {
-    return `I'm preparing the next outreach package so you can review it before anything is sent, keeping sales momentum under your control${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
+    return `I'm preparing the next email draft so you can review it before anything is sent${monitoringReplies ? ", while monitoring replies from earlier outreach in parallel" : ""}.`
   }
 
   if (discoveryActive(input)) {
@@ -300,13 +318,7 @@ function buildExecutiveOpeningParagraph(input: {
 }
 
 function operatorNeedLine(pendingPackages: number): string {
-  if (pendingPackages <= 0) {
-    return "I don't currently need anything from you."
-  }
-  if (pendingPackages === 1) {
-    return "I need your review on one outreach package before I continue."
-  }
-  return `I need your review on ${pendingPackages} outreach packages before I continue.`
+  return formatOperatorDailyBriefNeedLine(pendingPackages)
 }
 
 function executiveNextMilestoneLine(input: {
@@ -320,8 +332,8 @@ function executiveNextMilestoneLine(input: {
 }): string {
   if (input.pendingPackages > 0) {
     return input.pendingPackages === 1
-      ? "After your review, I'll continue progressing the next highest-value opportunity."
-      : "After your review, I'll continue progressing the next highest-value opportunities."
+      ? "After your approval, I'll continue reviewing the next company."
+      : "After your approval, I'll continue reviewing the next companies."
   }
 
   if (input.preparingOutreach > 0) {
@@ -334,14 +346,14 @@ function executiveNextMilestoneLine(input: {
 
   if (/buying committee/.test(detail)) {
     return company
-      ? `Once buying committee verification is complete at ${company}, I'll prepare the outreach package for your approval.`
-      : "Once buying committee verification is complete, I'll prepare the outreach package for your approval."
+      ? `Once I have enough information at ${company}, I'll prepare an email draft for your approval.`
+      : "Once I have enough information, I'll prepare an email draft for your approval."
   }
 
   if (/^waiting on\s+/i.test(detail)) {
     const blocker = detail.replace(/^waiting on\s+/i, "").replace(/\.$/, "")
     if (blocker) {
-      return `Once ${blocker} is complete, I'll prepare the outreach package for your approval.`
+      return `Once ${blocker} is complete, I'll prepare an email draft for your approval.`
     }
   }
 
@@ -349,21 +361,21 @@ function executiveNextMilestoneLine(input: {
     const leadCompany = extractCompanyFromActivityLabel(input.currentActivityLabel)
     if (/researching/i.test(input.currentActivityLabel ?? "")) {
       return leadCompany
-        ? `Once research is complete, I'll prepare a review-ready outreach package for ${leadCompany}.`
-        : "Once research is complete, I'll prepare the next review-ready outreach package for your approval."
+        ? `Once I've finished reviewing ${leadCompany}, I'll prepare an email draft for your approval.`
+        : "Once I've finished reviewing the next company, I'll prepare an email draft for your approval."
     }
-    return "My next step is preparing a review-ready outreach package for your approval."
+    return "My next step is preparing an email draft for your approval."
   }
 
   if (input.portfolioBelowTarget || isDiscoveryExecution({ primaryMissionLabel: input.primaryMissionLabel })) {
-    return "I'll continue qualifying companies until the next review-ready opportunity is available."
+    return "I'll continue reviewing companies until the next recommendation is ready."
   }
 
   if (input.statusLabel === "Idle" || input.primaryMissionLabel === "Portfolio Maintenance") {
-    return "I'll continue qualifying companies until the next review-ready opportunity is available."
+    return "I'll continue reviewing companies until the next recommendation is ready."
   }
 
-  return "My next objective is preparing the next review-ready opportunity for your approval."
+  return "My next objective is preparing the next email draft for your approval."
 }
 
 function ensureFirstPerson(line: string): string {
@@ -579,7 +591,7 @@ export function buildHomeWorkingNowPresentation(input: {
 function describeWorkItemTask(item: AvaWorkItem): string {
   const company = item.company_name?.trim()
   if (item.type === "research" && company) return `Researching ${company}`
-  if (item.type === "outreach" && company) return `Preparing an outreach package for ${company}`
+  if (item.type === "outreach" && company) return `Preparing an email draft for ${company}`
   if (item.type === "reply" && company) return `Following up with ${company}`
   if (item.type === "qualification" && company) return `Qualifying ${company}`
   return humanizeOperatorFacingCopy(item.title.replace(/\.$/, ""))
@@ -621,8 +633,8 @@ export function buildHomeMeasurableProgressPresentation(input: {
 
   if ((input.pendingApprovals ?? 0) > 0) {
     items.push({
-      id: "packages-awaiting-review",
-      label: "Waiting for approval",
+      id: "drafts-awaiting-review",
+      label: "Email drafts awaiting review",
       value: String(input.pendingApprovals),
     })
   }

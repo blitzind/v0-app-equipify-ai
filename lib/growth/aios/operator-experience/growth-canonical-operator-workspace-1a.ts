@@ -185,7 +185,7 @@ export function buildCanonicalOperatorTask(input: {
         channelLabel: top.channelLabel ?? "Email sequence",
         emailDraftCount: top.draftCount,
       }),
-      why: `${teammate} finished research and prepared this opportunity package for your review.`,
+      why: `${teammate} reviewed this company and prepared an email draft for your approval.`,
       whatHappensNext: formatOperatorPriorityRecommendedNextStep(),
       confidenceLabel: null,
       href: top.reviewHref,
@@ -294,7 +294,7 @@ export function projectCanonicalLeadOpportunityNarrative(
     Boolean(hac?.status === "pending")
 
   const currentFocus = packageForLead
-    ? `Review opportunity package for ${input.companyName}`
+    ? `Review recommendation for ${input.companyName}`
     : decision
       ? humanizeOperatorDecisionTitle(decision.whatToDo, decision.primaryAction)
       : `Research and qualify ${input.companyName}`

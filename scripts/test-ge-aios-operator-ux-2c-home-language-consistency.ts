@@ -66,14 +66,14 @@ function snapshot(count: number): GrowthCanonicalOperatorApprovalSnapshot {
 console.log("GE-AIOS-OPERATOR-UX-2C — Home language consistency")
 
 const waitingSummary = formatLivingWaitingSummary({ approvalCount: 2 })
-assert.match(waitingSummary, /2 opportunity packages ready for your review/)
-assert.doesNotMatch(waitingSummary, /outreach drafts/i)
+assert.match(waitingSummary, /2 email drafts ready for your review/)
+assert.doesNotMatch(waitingSummary, /opportunity packages/i)
 assert.doesNotMatch(waitingSummary, /human approval/i)
 
 const canonicalWaiting = buildCanonicalOperatorWaitingSummary({
   approvalSnapshot: snapshot(2),
 })
-assert.match(canonicalWaiting, /2 opportunity packages ready for your review/)
+assert.match(canonicalWaiting, /2 email drafts ready for your review/)
 assert.match(canonicalWaiting, /Once you've reviewed them/i)
 
 const dailyWaiting = buildDailyActivityWaitingLines({
@@ -88,23 +88,24 @@ const dailyWaiting = buildDailyActivityWaitingLines({
   },
   pendingApprovalCount: 2,
 })
-assert.ok(dailyWaiting.some((line) => /2 opportunity packages ready for your review/i.test(line)))
-assert.ok(!dailyWaiting.some((line) => /outreach drafts/i.test(line)))
+assert.ok(dailyWaiting.some((line) => /2 email drafts ready for your review/i.test(line)))
 
 const task = buildCanonicalOperatorTask({ approvalSnapshot: snapshot(1) })
 assert.ok(task)
-assert.match(task!.title, /Review opportunity package — Blitz Industries/)
-assert.match(task!.whatHappensNext ?? "", /proposed outreach strategy/i)
+assert.match(task!.title, /Review recommendation — Blitz Industries/)
+assert.match(task!.whatHappensNext ?? "", /email draft/i)
 
-assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No packages are waiting for review/)
-assert.match(GROWTH_WORKSPACE_PRIORITY_FEED_CAUGHT_UP_TITLE, /No packages are waiting for review/)
-assert.equal(GROWTH_OPERATOR_REVIEW_CTA_LABEL, "Review package")
+assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No email drafts are waiting for review/)
+assert.match(GROWTH_WORKSPACE_PRIORITY_FEED_CAUGHT_UP_TITLE, /No email drafts are waiting for review/)
+assert.equal(GROWTH_OPERATOR_REVIEW_CTA_LABEL, "Review email draft")
 
 const livingSource = readSource("lib/growth/home/growth-home-living-experience-18e.ts")
 assert.match(livingSource, /formatOperatorPackagesReadySummary/)
 
-const heroSource = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
-assert.match(heroSource, /GROWTH_OPERATOR_REVIEW_CTA_LABEL/)
+const waitingSource = readSource(
+  "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
+)
+assert.match(waitingSource, /GROWTH_OPERATOR_REVIEW_CTA_LABEL/)
 
 const queueSource = readSource("lib/growth/daily-work-queue/daily-revenue-work-queue-engine.ts")
 assert.doesNotMatch(queueSource, /Human approval waiting/)

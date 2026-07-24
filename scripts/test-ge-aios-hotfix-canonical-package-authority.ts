@@ -272,7 +272,7 @@ assertHomeApprovalAuthoritySync({
   operatorTasksPendingApprovals: 0,
   reviewPackageCount: 0,
 })
-assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No packages are waiting for review/)
+assert.match(HOME_LIVING_WAITING_EMPTY_MESSAGE, /No email drafts are waiting for review/)
 console.log("  ✓ Test B — zero packages keeps all Home surfaces empty")
 
 const dashboard = buildGrowthHomeExecutiveBriefingCertDashboard()

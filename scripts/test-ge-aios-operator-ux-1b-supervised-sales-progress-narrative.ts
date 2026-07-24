@@ -191,7 +191,7 @@ const waiting = projectSupervisedSalesProgressNarrative({
   }),
 })
 assert.equal(waiting.primaryStage, "waiting_for_authorization")
-assert.match(waiting.headline, /Block Imaging has an opportunity package ready for your review/)
+assert.match(waiting.headline, /Block Imaging has an email draft ready for your review/)
 assert.equal(waiting.href, buildCustomerPackageReviewHref("lead-1"))
 assert.match(waiting.secondaryContext ?? "", /researching 3 additional companies/)
 assert.equal(waiting.headlineSuppressed, true)

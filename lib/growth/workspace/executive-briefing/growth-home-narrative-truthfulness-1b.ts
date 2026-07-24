@@ -7,10 +7,10 @@ export const GROWTH_HOME_NARRATIVE_TRUTHFULNESS_1B_QA_MARKER =
   "ge-aios-home-narrative-truthfulness-1b-v1" as const
 
 const OPERATOR_APPROVAL_NARRATIVE_PATTERN =
-  /ready for your review|waiting for your review|need your approval|review package|packages are ready|outreach packages are ready|I need your review|awaiting your review/i
+  /ready for your review|waiting for your review|need your approval|review email draft|review recommendation|email drafts are ready|email draft is ready|I need your approval|awaiting your review/i
 
 const MISLEADING_PACKAGE_READY_PATTERN =
-  /outreach packages are ready|outreach package is ready|packages are ready for your review|packages need review|approvals waiting/i
+  /email drafts are ready|email draft is ready|recommendations are ready|recommendations need review|approvals waiting/i
 
 /** Admission review backlog — portfolio.health.counts.awaitingReview (21C review state). */
 export function formatAdmissionReviewBacklogSummary(count: number): string {

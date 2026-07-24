@@ -1,13 +1,13 @@
 /**
- * GE-AIOS-OPERATOR-UX-2C — Home + Review operator vocabulary (presentation-only, client-safe).
- * Single package/review lexicon; counts align with pendingApprovalCount authority.
+ * GE-AIOS-OPERATOR-UX-2C / AVA-OPERATOR-EXPERIENCE-2A — Home + Review operator vocabulary.
+ * Single recommendation/review lexicon; counts align with pendingApprovalCount authority.
  */
 
 export const GROWTH_OPERATOR_HOME_LANGUAGE_2C_QA_MARKER =
   "ge-aios-operator-ux-2c-home-language-v1" as const
 
-export const GROWTH_OPERATOR_REVIEW_CTA_LABEL = "Review package" as const
-export const GROWTH_OPERATOR_REVIEW_ALL_CTA_LABEL = "Review packages" as const
+export const GROWTH_OPERATOR_REVIEW_CTA_LABEL = "Review email draft" as const
+export const GROWTH_OPERATOR_REVIEW_ALL_CTA_LABEL = "Review drafts" as const
 export const GROWTH_OPERATOR_VIEW_RESEARCH_CTA_LABEL = "View research" as const
 
 export const GROWTH_OPERATOR_STATUS_READY_FOR_REVIEW = "Ready for review" as const
@@ -16,16 +16,16 @@ export const GROWTH_OPERATOR_STATUS_AWAITING_REVIEW = "Awaiting your review" as 
 export const GROWTH_OPERATOR_PRIORITY_CARD_TITLE = "Ready for your review" as const
 
 export const GROWTH_OPERATOR_PACKAGES_EMPTY_TITLE =
-  "No packages are waiting for review." as const
+  "No email drafts are waiting for review." as const
 
 export const GROWTH_OPERATOR_PACKAGES_EMPTY_DETAIL =
-  "Ava will return here when another opportunity package is ready." as const
+  "Ava will return here when another recommendation is ready." as const
 
 export const GROWTH_OPERATOR_PORTFOLIO_EXPLANATION =
-  "Ava is building your active portfolio from qualified discoveries." as const
+  "Ava is reviewing companies and preparing outreach recommendations." as const
 
 export const GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON =
-  "Once you've reviewed them, I'll continue preparing the remaining opportunities in the background." as const
+  "Once you've reviewed them, I'll continue reviewing the remaining companies in the background." as const
 
 function pluralize(count: number, singular: string, plural: string): string {
   return count === 1 ? singular : plural
@@ -40,10 +40,10 @@ export function formatOperatorPackagesReadySummary(input: {
   const replies = Math.max(input.replyCount ?? 0, 0)
 
   if (packages > 0 && replies > 0) {
-    return `I have ${packages} opportunity ${pluralize(packages, "package", "packages")} ready for your review, and ${replies} ${pluralize(replies, "reply needs", "replies need")} your response.`
+    return `I have ${packages} email ${pluralize(packages, "draft", "drafts")} ready for your review, and ${replies} ${pluralize(replies, "reply needs", "replies need")} your response.`
   }
   if (packages > 0) {
-    return `I have ${packages} opportunity ${pluralize(packages, "package", "packages")} ready for your review.`
+    return `I have ${packages} email ${pluralize(packages, "draft", "drafts")} ready for your review.`
   }
   if (replies > 0) {
     return `${replies} ${pluralize(replies, "reply needs", "replies need")} your response before I can continue.`
@@ -55,8 +55,8 @@ export function formatOperatorPackagesReadySummary(input: {
 export function formatOperatorPackagesReadyHeadline(packageCount: number): string {
   const count = Math.max(packageCount, 0)
   if (count === 0) return GROWTH_OPERATOR_PACKAGES_EMPTY_TITLE
-  if (count === 1) return "1 opportunity package is ready for your review."
-  return `${count} opportunity packages are ready for your review.`
+  if (count === 1) return "1 email draft is ready for your review."
+  return `${count} email drafts are ready for your review.`
 }
 
 /** Daily activity waiting lines — package vocabulary, no draft-as-task wording. */
@@ -72,11 +72,11 @@ export function formatOperatorDailyActivityWaitingFollowOn(packageCount: number)
   return GROWTH_OPERATOR_PACKAGES_READY_FOLLOW_ON
 }
 
-/** Priority card title for a named opportunity package. */
+/** Priority card title for a named recommendation. */
 export function formatOperatorPriorityPackageTitle(companyName: string): string {
   const name = companyName.trim()
-  if (!name) return "Review opportunity package"
-  return `Review opportunity package — ${name}`
+  if (!name) return "Review recommendation"
+  return `Review recommendation — ${name}`
 }
 
 /** Priority card detail — editable content counts use draft only inside package context. */
@@ -99,7 +99,7 @@ export function formatOperatorPriorityPackageDetail(input: {
 }
 
 export function formatOperatorPriorityRecommendedNextStep(): string {
-  return "Review the proposed outreach strategy before authorization."
+  return "Review the email draft and approve, edit, or reject outreach."
 }
 
 /** Opening line when packages need review — replaces fragmented approval phrasing. */
@@ -121,12 +121,12 @@ export function formatOperatorEmployeeStatusLabel(packageCount: number): string 
 
 export function formatOperatorEmployeeActivityLabel(packageCount: number): string {
   if (packageCount <= 0) return "advancing your revenue priorities"
-  return `${packageCount} ${pluralize(packageCount, "package", "packages")} ready for your review`
+  return `${packageCount} email ${pluralize(packageCount, "draft", "drafts")} ready for your review`
 }
 
 export function formatOperatorWaitingActivityLabel(packageCount: number): string {
   if (packageCount <= 0) return GROWTH_OPERATOR_STATUS_AWAITING_REVIEW
-  return `${packageCount} ${pluralize(packageCount, "package", "packages")} ready for review`
+  return `${packageCount} email ${pluralize(packageCount, "draft", "drafts")} ready for review`
 }
 
 export function formatOperatorReviewWorkspaceCaughtUpTitle(): string {

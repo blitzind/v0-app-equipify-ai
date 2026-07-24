@@ -263,10 +263,12 @@ const slussFocus = operatorFocus("Sluss Padgett")
     pendingApprovals: 2,
     operatorApprovalCompanyName: "ABC Mechanical",
   })
-  assert.equal(runtime.primaryMissionLabel, "Operator Review")
-  assert.equal(runtime.currentActivityLabel, "Waiting for approval")
+  assert.equal(runtime.primaryMissionLabel, "Review 2 email drafts")
+  assert.equal(runtime.currentActivityLabel, "Review 2 email drafts")
   assert.equal(runtime.currentLeadCompanyName, "ABC Mechanical")
-  assert.equal(runtime.nextMilestoneLabel, "Review package")
+  assert.equal(runtime.nextMilestoneLabel, "Review email draft")
+  assert.equal(runtime.showLeadPipeline, true)
+  assert.match(runtime.pipelineSteps.find((step) => step.active)?.label ?? "", /Waiting for approval/)
 }
 
 // 5. Idle

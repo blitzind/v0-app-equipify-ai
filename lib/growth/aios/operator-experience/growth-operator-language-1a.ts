@@ -85,7 +85,7 @@ export function humanizeOperatorDecisionTitle(
     case "wait":
       return "Wait until the agreed follow-up date"
     case "approve_package":
-      return "Review opportunity package"
+      return "Review recommendation"
     default:
       return humanizeOperatorFacingLine(title) || title
   }
@@ -102,16 +102,16 @@ export function humanizeOperatorBadgeLabel(label: string): string {
 
 export function formatCanonicalDraftCount(count: number): string {
   const safe = Math.max(0, count)
-  if (safe === 0) return "No editable drafts in this package"
+  if (safe === 0) return "No email draft prepared yet"
   if (safe === 1) return "1 email draft prepared"
   return `${safe} email drafts prepared`
 }
 
 export function formatCanonicalPackageCount(count: number): string {
   const safe = Math.max(0, count)
-  if (safe === 0) return "No opportunity packages waiting"
-  if (safe === 1) return "1 opportunity package ready for review"
-  return `${safe} opportunity packages ready for review`
+  if (safe === 0) return "No recommendations waiting for review"
+  if (safe === 1) return "1 recommendation ready for review"
+  return `${safe} recommendations ready for review`
 }
 
 import { formatTerminalReasonOperatorMessage } from "@/lib/growth/aios/execution/growth-terminal-reason-taxonomy-1a"

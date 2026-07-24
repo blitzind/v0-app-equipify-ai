@@ -12,7 +12,7 @@ export const GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_SUBTITLE =
 export const GROWTH_HOME_OPERATOR_CLOSURE_WHAT_HAPPENS_NEXT_TITLE = "What happens next" as const
 
 export const GROWTH_HOME_OPERATOR_CLOSURE_NO_ACTION_MESSAGE =
-  "I don't need anything from you right now. I'll return when a package is ready for review." as const
+  "I don't need anything from you right now. I'll return when an email draft is ready for review." as const
 
 export function resolvePrimaryOperatorCompanyName(input: {
   canonicalFocusCompanyName?: string | null
@@ -38,7 +38,7 @@ export function buildOperatorWhatHappensNextLines(input: {
 
   if (input.pendingApprovals > 0) {
     lines.push(
-      `Review ${input.pendingApprovals} outreach ${input.pendingApprovals === 1 ? "package" : "packages"} when you're ready.`,
+      `Review ${input.pendingApprovals} email ${input.pendingApprovals === 1 ? "draft" : "drafts"} when you're ready.`,
     )
     return lines
   }

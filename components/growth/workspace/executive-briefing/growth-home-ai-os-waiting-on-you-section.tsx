@@ -17,12 +17,56 @@ import {
   GROWTH_HOME_OPERATOR_CLOSURE_NO_ACTION_MESSAGE,
 } from "@/lib/growth/home/growth-home-operator-closure-1a"
 import {
+  GROWTH_OPERATOR_HOME_AVA_DIRECT_2A_QA_MARKER,
+  GROWTH_OPERATOR_HOME_NEEDS_INFORMATION_TITLE,
+  GROWTH_OPERATOR_HOME_READY_FOR_REVIEW_TITLE,
+  partitionOperatorWaitingItems,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-ava-direct-2a"
+import {
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { Button } from "@/components/ui/button"
 import { GROWTH_OPERATOR_REVIEW_CTA_LABEL } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 
 export const AVA_HOME_WAITING_ON_YOU_TITLE = "What I need from you" as const
+
+function WaitingItemList({
+  items,
+  reviewLabel,
+}: {
+  items: ReturnType<typeof enrichGrowthHomeWaitingOnYouItems>
+  reviewLabel: string
+}) {
+  if (items.length === 0) return null
+  return (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <article
+          key={item.id}
+          className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{item.label}</p>
+              {item.detail ? (
+                <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{item.detail}</p>
+              ) : null}
+            </div>
+            {item.href ? (
+              <Link
+                href={item.href}
+                className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-900 hover:underline dark:text-amber-100"
+              >
+                {reviewLabel}
+                <ArrowRight className="size-3" aria-hidden />
+              </Link>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
 
 type Props = {
   aiOsUx: GrowthHomeAiOsUxViewModel
@@ -44,6 +88,10 @@ export function GrowthHomeAiOsWaitingOnYouSection({
     waitingCompanyByLeadId,
   )
   const visibleWaitingOnYou = operatorClosureMode ? waitingOnYou.slice(0, 1) : waitingOnYou
+  const partitioned = partitionOperatorWaitingItems(visibleWaitingOnYou)
+  const readyForReviewItems =
+    partitioned.readyForReview.length > 0 ? partitioned.readyForReview : visibleWaitingOnYou.filter((item) => !partitioned.needsInformation.includes(item))
+  const needsInformationItems = partitioned.needsInformation
   const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
   const replyCount = waitingOnYou.filter((item) => /reply/i.test(item.label)).length
   const hasItems = approveItemsCount > 0 || replyCount > 0
@@ -63,6 +111,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
       data-home-experience-2b={GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER}
       data-qa-marker-18e={GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER}
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
+      data-qa-marker-ava-direct-2a={GROWTH_OPERATOR_HOME_AVA_DIRECT_2A_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card p-4 space-y-3 sm:p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -88,31 +137,19 @@ export function GrowthHomeAiOsWaitingOnYouSection({
           <p className="text-sm font-medium text-foreground">{emptyMessage}</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {visibleWaitingOnYou.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{item.label}</p>
-                  {item.detail ? (
-                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{item.detail}</p>
-                  ) : null}
-                </div>
-                {item.href ? (
-                  <Link
-                    href={item.href}
-                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-900 hover:underline dark:text-amber-100"
-                  >
-                    Review
-                    <ArrowRight className="size-3" aria-hidden />
-                  </Link>
-                ) : null}
-              </div>
-            </article>
-          ))}
+        <div className="space-y-4">
+          {readyForReviewItems.length > 0 ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">{GROWTH_OPERATOR_HOME_READY_FOR_REVIEW_TITLE}</h3>
+              <WaitingItemList items={readyForReviewItems} reviewLabel={GROWTH_OPERATOR_REVIEW_CTA_LABEL} />
+            </div>
+          ) : null}
+          {needsInformationItems.length > 0 && !operatorClosureMode ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">{GROWTH_OPERATOR_HOME_NEEDS_INFORMATION_TITLE}</h3>
+              <WaitingItemList items={needsInformationItems} reviewLabel="Review" />
+            </div>
+          ) : null}
         </div>
       )}
 

@@ -152,7 +152,7 @@ const narrative = projectCanonicalLeadOpportunityNarrative({
 assert.equal(narrative.packageCount, 1)
 assert.equal(narrative.draftCount, 2)
 assert.equal(narrative.approvalRequired, true)
-assert.equal(narrative.currentFocus, "Review opportunity package for Block Imaging")
+assert.equal(narrative.currentFocus, "Review recommendation for Block Imaging")
 assert.equal(narrative.blockedBy, "Ready for review")
 console.log("  ✓ lead opportunity narrative matches approval + decision state")
 
@@ -170,7 +170,7 @@ assert.equal(task!.whatHappensNext, formatOperatorPriorityRecommendedNextStep())
 console.log("  ✓ canonical operator task collapses duplicate home priorities")
 
 const waitingSummary = buildCanonicalOperatorWaitingSummary({ approvalSnapshot: snapshot })
-assert.match(waitingSummary, /1 opportunity package ready for your review/)
+assert.match(waitingSummary, /1 email draft ready for your review/)
 assert.match(waitingSummary, /Once you've reviewed them/)
 console.log("  ✓ waiting summary uses one canonical draft count")
 

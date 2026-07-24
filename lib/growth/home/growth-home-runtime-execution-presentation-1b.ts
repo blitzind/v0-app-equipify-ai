@@ -18,6 +18,11 @@ import type {
 } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import { humanizeOperatorFacingCopy, parseOperatorFocusConfidenceLine } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
 import { sanitizeMissionSummaryLineForPresentation } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-truthfulness-1b"
+import {
+  buildAvaDirectReviewPipelineSteps,
+  formatOperatorPrimaryMissionLabel,
+} from "@/lib/growth/aios/operator-experience/growth-operator-home-ava-direct-2a"
+import { GROWTH_OPERATOR_REVIEW_CTA_LABEL } from "@/lib/growth/aios/operator-experience/growth-operator-home-language-2c"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 
 export const GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER =
@@ -164,30 +169,7 @@ export function describeWorkItemStep(activeWork: AvaWorkItem | null): string | n
 }
 
 export function buildLeadPipelineSteps(activeWork: AvaWorkItem | null): GrowthHomeRuntimeTrustPipelineStep[] {
-  const type = activeWork?.type ?? null
-  const stepOrder = [
-    { id: "discovery", label: "Discovery", types: ["mission"] as AvaWorkItem["type"][] },
-    { id: "research", label: "Research", types: ["research"] as AvaWorkItem["type"][] },
-    { id: "qualification", label: "Qualification", types: ["qualification"] as AvaWorkItem["type"][] },
-    { id: "decision_maker", label: "Decision maker", types: [] as AvaWorkItem["type"][] },
-    { id: "buying_committee", label: "Buying committee", types: [] as AvaWorkItem["type"][] },
-    { id: "package", label: "Package", types: ["outreach", "approval"] as AvaWorkItem["type"][] },
-    { id: "operator_review", label: "Operator review", types: [] as AvaWorkItem["type"][] },
-  ]
-
-  let activeIndex = -1
-  if (type === "research") activeIndex = 1
-  else if (type === "qualification") activeIndex = 2
-  else if (type === "outreach" || type === "approval") activeIndex = 5
-  else if (type === "mission") activeIndex = 0
-  else if (type === "reply" || type === "meeting") activeIndex = 6
-
-  return stepOrder.map((step, index) => ({
-    id: step.id,
-    label: step.label,
-    complete: activeIndex >= 0 && index < activeIndex,
-    active: index === activeIndex,
-  }))
+  return buildAvaDirectReviewPipelineSteps(activeWork)
 }
 
 function resolveNextLeadPipelineMilestone(activeWork: AvaWorkItem | null): string | null {
@@ -325,15 +307,25 @@ export function resolveRuntimeExecutionPresentation(input: {
     return {
       qaMarker: GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER,
       precedenceRank: 1,
-      primaryMissionLabel: "Operator Review",
+      primaryMissionLabel: formatOperatorPrimaryMissionLabel({
+        pendingDraftCount: input.pendingApprovals,
+        companyName: input.operatorApprovalCompanyName,
+      }),
       primaryMissionKind: "operator_review",
-      currentActivityLabel: "Waiting for approval",
+      currentActivityLabel: formatOperatorPrimaryMissionLabel({
+        pendingDraftCount: input.pendingApprovals,
+        companyName: input.operatorApprovalCompanyName,
+      }),
       currentActivityScope: "operator_wait",
       currentLeadCompanyName: leadCompany,
       currentStepLabel: "Waiting for approval",
-      nextMilestoneLabel: "Review package",
-      pipelineSteps: [],
-      showLeadPipeline: false,
+      nextMilestoneLabel: GROWTH_OPERATOR_REVIEW_CTA_LABEL,
+      pipelineSteps: buildAvaDirectReviewPipelineSteps(null).map((step) => ({
+        ...step,
+        complete: step.id !== "approval",
+        active: step.id === "approval",
+      })),
+      showLeadPipeline: true,
       startedAt: null,
       expectedCompletionMinutes: null,
     }
@@ -350,7 +342,7 @@ export function resolveRuntimeExecutionPresentation(input: {
       currentActivityScope: "lead",
       currentLeadCompanyName: company,
       currentStepLabel: company ? `Researching ${company}` : "Researching company",
-      nextMilestoneLabel: "Qualification",
+      nextMilestoneLabel: "Decision made",
       pipelineSteps:
         input.activeWork?.type === "research"
           ? buildLeadPipelineSteps(input.activeWork)
