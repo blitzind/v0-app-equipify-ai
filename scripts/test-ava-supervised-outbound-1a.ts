@@ -91,6 +91,32 @@ function main(): void {
     assert.doesNotMatch(normalized, /Ava Sinclair/)
     assert.doesNotMatch(normalized, /Growth Advisor/)
     assert.equal(bodyContainsLegacyAvaSignatureMarkers(normalized), false)
+    assert.equal(countPlaintextSignatureSeparators(normalized), 0)
+  })
+
+  runGate("Non-Ava sender-signed draft is normalized before transport", () => {
+    const legacyBody = [
+      "Hi Josh,",
+      "",
+      "Block Imaging looks like a strong fit.",
+      "",
+      "--",
+      "Mike Short",
+      "Founder",
+      "Blitz Industries",
+      "mike@blitzind.com",
+    ].join("\n")
+    const normalized = stripAccidentalAvaSignatureFromBody(legacyBody, SAMPLE_SIGNATURE.text)
+    assert.doesNotMatch(normalized, /Mike Short/)
+    assert.equal(countPlaintextSignatureSeparators(normalized), 0)
+
+    const prepared = appendSignatureToOutboundBody({
+      htmlBody: `<div>${normalized}</div>`,
+      textBody: normalized,
+      signature: SAMPLE_SIGNATURE,
+    })
+    assert.equal(prepared.signatureInjected, true)
+    assert.equal(countPlaintextSignatureSeparators(prepared.textBody), 1)
   })
 
   runGate("Canonical signature is appended exactly once", () => {

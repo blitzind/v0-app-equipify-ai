@@ -68,15 +68,13 @@ export function stripAccidentalAvaSignatureFromBody(
     }
   }
 
-  const separatorIndex = next.search(/\n--\n[\s\S]*$/)
-  if (separatorIndex >= 0) {
-    const tail = next.slice(separatorIndex + 4)
-    if (
-      trailingBlockLooksLikeLegacyAvaSignature(tail) ||
-      trailingBlockLooksLikeSchedulingCta(tail)
-    ) {
-      next = next.slice(0, separatorIndex).trimEnd()
-    }
+  // Supervised outbound stores unsigned body only. Any trailing `--` block is accidental
+  // (GPT leak, legacy draft, or non-Ava sender signature) and must be removed before
+  // transport-time canonical append to avoid duplicate_signature_boundary_violation.
+  let separatorIndex = next.search(/\n--\n[\s\S]*$/)
+  while (separatorIndex >= 0) {
+    next = next.slice(0, separatorIndex).trimEnd()
+    separatorIndex = next.search(/\n--\n[\s\S]*$/)
   }
 
   const lines = next.split("\n")
