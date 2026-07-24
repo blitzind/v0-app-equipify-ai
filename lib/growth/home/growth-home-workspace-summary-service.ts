@@ -36,7 +36,7 @@ import {
   getGrowthEngagementCommandCenterHighIntent,
   parseEngagementCommandCenterFilters,
 } from "@/lib/growth/engagement/growth-engagement-command-center-service"
-import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import {
   buildGrowthWorkspaceDashboardViewModel,
   type GrowthWorkspaceDashboardSourcePayload,
@@ -95,7 +95,6 @@ import { createGrowthAiOsRuntimeContext } from "@/lib/growth/aios/runtime/growth
 import { loadCanonicalOperatorApprovalSnapshotForHome } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-loader"
 import {
   buildCanonicalOperatorTask,
-  emptyCanonicalOperatorApprovalSnapshot,
   resolveCanonicalApprovalQueueCount,
   resolveCanonicalOutreachDraftCount,
 } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
@@ -115,6 +114,12 @@ import { buildGrowthAvaEmploymentStats } from "@/lib/growth/ava-activation/growt
 import { buildGrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-server-1e"
 import { hydrateCanonicalPortfolioAuthority } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-hydration-server-1c"
 import { GROWTH_CANONICAL_PORTFOLIO_AUTHORITY_SNAPSHOT_1F_QA_MARKER } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-snapshot-1f-types"
+import { loadGrowthHomeCriticalExecutiveStage } from "@/lib/growth/home/growth-home-critical-executive-stage-server-2b-1a"
+import {
+  buildGrowthHomeExecutiveLoadMetadata,
+  buildGrowthHomeExecutiveFirstLoadDiagnostics,
+  type GrowthHomeExecutiveSourceAvailability,
+} from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -217,6 +222,21 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     limit: GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
   })
   stageTimings.push({ label: "lead_pool", durationMs: Date.now() - leadPoolStart, timedOut: false })
+
+  const criticalStageStart = Date.now()
+  const criticalExecutiveStage = await loadGrowthHomeCriticalExecutiveStage({
+    admin: input.admin,
+    organizationId,
+    actorUserId: input.actorUserId,
+    generatedAt,
+  })
+  stageTimings.push(...criticalExecutiveStage.timings)
+  stageTimings.push({
+    label: "critical_executive_stage_wall",
+    durationMs: criticalExecutiveStage.durationMs,
+    timedOut: false,
+  })
+
   const leads = leadPoolPage.leads
   const portfolioEligibility = organizationId
     ? buildPortfolioEligibilityContext(organizationId, leads)
@@ -633,7 +653,16 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       })
     : null
 
-  const canonicalOrganizationTrainingStep = organizationId
+  const canonicalOrganizationTrainingStep = criticalExecutiveStage.trainingProjection
+    ? {
+        value: criticalExecutiveStage.trainingProjection,
+        timing: {
+          label: "canonical_organization_training",
+          durationMs: 0,
+          timedOut: false,
+        },
+      }
+    : organizationId
     ? await withGrowthHomeLoaderBudget({
         label: "canonical_organization_training",
         budgetMs: loaderBudgetMs,
@@ -652,11 +681,11 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         fallback: null,
       }).then((step) => {
         stageTimings.push(step.timing)
-        return step.value
+        return step
       })
     : null
 
-  const canonicalOrganizationTraining = canonicalOrganizationTrainingStep
+  const canonicalOrganizationTraining = canonicalOrganizationTrainingStep?.value ?? null
 
   const portfolioManagerBase =
     organizationId
@@ -705,25 +734,14 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
 
   let canonicalOperatorApprovalLoaded: Awaited<
     ReturnType<typeof loadCanonicalOperatorApprovalSnapshotForHome>
-  > | null = null
-  if (organizationId) {
-    const approvalStep = await withGrowthHomeLoaderBudget({
-      label: "canonical_operator_approval",
-      budgetMs: GROWTH_HOME_APPROVAL_SNAPSHOT_LOADER_BUDGET_MS,
-      fn: () =>
-        loadCanonicalOperatorApprovalSnapshotForHome(input.admin, {
-          organizationId,
-          generatedAt,
-        }),
-      fallback: null,
-    })
-    canonicalOperatorApprovalLoaded = approvalStep.value
-    stageTimings.push(approvalStep.timing)
-  }
+  > | null = criticalExecutiveStage.approvalSnapshot
+  let approvalsAvailability: GrowthHomeExecutiveSourceAvailability =
+    criticalExecutiveStage.approvalsAvailability
 
-  const canonicalOperatorApprovalRaw = organizationId
-    ? (canonicalOperatorApprovalLoaded ?? emptyCanonicalOperatorApprovalSnapshot())
-    : null
+  const canonicalOperatorApprovalRaw =
+    organizationId && approvalsAvailability !== "unavailable" && canonicalOperatorApprovalLoaded
+      ? canonicalOperatorApprovalLoaded
+      : null
 
   const revenueQueueLeadIdRaw =
     dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
@@ -839,17 +857,34 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     ])
   }
 
-  const canonicalApprovalCount = resolveCanonicalApprovalQueueCount(canonicalOperatorApproval, 0)
-  const canonicalDraftCount = resolveCanonicalOutreachDraftCount(canonicalOperatorApproval, 0)
+  const canonicalApprovalCount =
+    approvalsAvailability === "unavailable"
+      ? null
+      : resolveCanonicalApprovalQueueCount(canonicalOperatorApproval, 0)
+  const canonicalDraftCount =
+    approvalsAvailability === "unavailable"
+      ? null
+      : resolveCanonicalOutreachDraftCount(canonicalOperatorApproval, 0)
 
-  kpis.approvalQueueCount = canonicalApprovalCount
-  operatorTasks.pendingApprovals = canonicalApprovalCount
-  salesOutcomes.dailySummary.approvals_pending = canonicalApprovalCount
-  salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
-  avaConsole.waitingForApproval =
-    canonicalApprovalCount > 0
-      ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
-      : null
+  if (canonicalApprovalCount != null) {
+    kpis.approvalQueueCount = canonicalApprovalCount
+    operatorTasks.pendingApprovals = canonicalApprovalCount
+    salesOutcomes.dailySummary.approvals_pending = canonicalApprovalCount
+    avaConsole.waitingForApproval =
+      canonicalApprovalCount > 0
+        ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
+        : null
+  }
+  if (canonicalDraftCount != null) {
+    salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
+  }
+
+  if (canonicalOperatorApproval) {
+    approvalsAvailability =
+      canonicalOperatorApproval.pendingApprovalCount > 0 ? "confirmed" : "confirmed_empty"
+  } else if (organizationId) {
+    approvalsAvailability = "unavailable"
+  }
 
   const productionRevenueQueueLead =
     productionLeadsForOperations.find(
@@ -965,7 +1000,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
           objectives: productionObjectives,
           missionDiscovery: productionMissionDiscovery,
           businessProfileApproved: Boolean(approvedBusinessProfile?.profile),
-          pendingApprovalCount: canonicalApprovalCount,
+          pendingApprovalCount: canonicalApprovalCount ?? undefined,
           meetingsThisWeek: meetings.thisWeek,
           openOpportunities: kpis.openOpportunities,
           leadPoolVisible: productionEligibleLeadCount,
@@ -1133,6 +1168,63 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     })
   }
 
+  const missionsAvailability: GrowthHomeExecutiveSourceAvailability =
+    canonicalActiveMissions && (canonicalActiveMissions.totalMissionCount ?? 0) > 0
+      ? "confirmed"
+      : canonicalActiveMissions
+        ? "confirmed_empty"
+        : approvalsAvailability === "unavailable"
+          ? "unavailable"
+          : "confirmed_empty"
+
+  const recommendationAvailability: GrowthHomeExecutiveSourceAvailability =
+    canonicalOperatorTask || canonicalOperatorFocus
+      ? "confirmed"
+      : approvalsAvailability === "unavailable"
+        ? "unavailable"
+        : "confirmed_empty"
+
+  const activationAvailability: GrowthHomeExecutiveSourceAvailability = avaActivation
+    ? "confirmed"
+    : avaActivationStep.timing.timedOut
+      ? "unavailable"
+      : "confirmed_empty"
+
+  const firstLoadDiagnostics = buildGrowthHomeExecutiveFirstLoadDiagnostics({
+    approvalAvailability: approvalsAvailability,
+    approvalSource: criticalExecutiveStage.approvalSource,
+    pendingApprovalCount: canonicalOperatorApproval?.pendingApprovalCount ?? null,
+    approvalLoaderTimedOut: criticalExecutiveStage.approvalLoaderTimedOut,
+    approvalLoaderDurationMs: criticalExecutiveStage.approvalLoaderDurationMs,
+  })
+
+  const executiveLoad = buildGrowthHomeExecutiveLoadMetadata({
+    criticalStageMs: criticalExecutiveStage.durationMs,
+    secondaryStageMs: Math.max(0, Date.now() - startedAt - criticalExecutiveStage.durationMs),
+    approvals: approvalsAvailability,
+    training: criticalExecutiveStage.trainingAvailability,
+    activation: activationAvailability,
+    missions: missionsAvailability,
+    recommendation: recommendationAvailability,
+    firstLoad: firstLoadDiagnostics,
+  })
+
+  logGrowthEngine("growth_home_first_load_executive_state", {
+    organizationId,
+    approvalAvailability: firstLoadDiagnostics.approvalAvailability,
+    approvalSource: firstLoadDiagnostics.approvalSource,
+    pendingApprovalCount: firstLoadDiagnostics.pendingApprovalCount,
+    idleEligible: firstLoadDiagnostics.idleEligible,
+    idleReason: firstLoadDiagnostics.idleEligible
+      ? "confirmed_empty_canonical_approval_snapshot"
+      : firstLoadDiagnostics.approvalAvailability === "unavailable"
+        ? "approval_snapshot_unavailable"
+        : "pending_approvals_present",
+    approvalLoaderTimedOut: firstLoadDiagnostics.approvalLoaderTimedOut,
+    approvalLoaderDurationMs: firstLoadDiagnostics.approvalLoaderDurationMs,
+    executiveLoadApprovals: executiveLoad.approvals,
+  })
+
   return {
     ok: true,
     qaMarker: GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER,
@@ -1182,6 +1274,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     executiveGrowthIntelligence,
     canonicalPortfolioAuthority,
     canonicalOrganizationTraining,
+    executiveLoad,
   }
 }
 

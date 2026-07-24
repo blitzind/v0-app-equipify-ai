@@ -130,6 +130,7 @@ export function normalizeGrowthHomeWorkspaceSummaryPayload(
     missionDiscovery: payload.missionDiscovery ?? null,
     canonicalOperatorFocus: payload.canonicalOperatorFocus ?? null,
     canonicalOrganizationTraining: payload.canonicalOrganizationTraining ?? null,
+    executiveLoad: payload.executiveLoad ?? undefined,
   }
 }
 

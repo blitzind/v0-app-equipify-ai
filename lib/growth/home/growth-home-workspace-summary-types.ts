@@ -175,4 +175,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   canonicalPortfolioAuthority?: GrowthCanonicalPortfolioAuthoritySnapshot | null
   /** AVA-GROWTH-HOTFIX-1F-1D — Canonical organization training + activation readiness projection */
   canonicalOrganizationTraining?: import("@/lib/growth/training/growth-canonical-organization-training-projection-types").GrowthCanonicalOrganizationTrainingProjection | null
+  /** AVA-GROWTH-HOTFIX-2B-1A — critical vs secondary load availability */
+  executiveLoad?: import("@/lib/growth/home/growth-home-critical-executive-load-2b-1a").GrowthHomeExecutiveLoadMetadata
 }

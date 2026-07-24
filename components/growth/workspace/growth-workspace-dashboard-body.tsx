@@ -20,6 +20,10 @@ import {
   type GrowthWorkspaceContinueItem,
   type GrowthWorkspaceRecentView,
 } from "@/lib/growth/workspace/growth-workspace-activity-memory"
+import {
+  GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE,
+  isGrowthHomeExecutiveLoadDegraded,
+} from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
 import { useGrowthWorkspaceDashboard } from "@/components/growth/workspace/use-growth-workspace-dashboard"
 import { GrowthHomeDebugFooter } from "@/components/growth/workspace/growth-home-debug-footer"
 import { useGrowthWorkspaceQuickActionShortcuts } from "@/components/growth/workspace/use-growth-workspace-quick-action-shortcuts"
@@ -140,7 +144,8 @@ function DashboardSectionSkeleton() {
 }
 
 export function GrowthWorkspaceDashboardBody() {
-  const { dashboard, workspaceSummary, avaConsole, loading, error, reload } = useGrowthWorkspaceDashboard()
+  const { dashboard, workspaceSummary, avaConsole, loading, error, reload, refreshing } =
+    useGrowthWorkspaceDashboard()
   const recentViews = useMemo(() => readGrowthWorkspaceRecentViews(), [dashboard?.generatedAt])
   const continueItems = useMemo(() => readGrowthWorkspaceContinueItems(), [dashboard?.generatedAt])
 
@@ -162,7 +167,27 @@ export function GrowthWorkspaceDashboardBody() {
     )
   }
 
-  if (!dashboard) return null
+  if (!dashboard) {
+    if (error) {
+      return (
+        <div
+          className="space-y-6"
+          data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER}
+          data-growth-home-executive-unavailable="true"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+            <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
+            <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing}>
+              <RefreshCw className="mr-2 size-4" />
+              {refreshing ? "Refreshing…" : "Retry"}
+            </Button>
+          </div>
+          <GrowthHomeDebugFooter />
+        </div>
+      )
+    }
+    return null
+  }
 
   // GE-AIOS-HOME-UX-CLOSURE-1A — activated Ava uses the operator briefing surface, not UX-1A priority feed.
   if (isGrowthWorkspacePriorityFeedActive() && !employeeMode) {
@@ -174,14 +199,19 @@ export function GrowthWorkspaceDashboardBody() {
     )
   }
 
+  const executiveLoadDegraded = isGrowthHomeExecutiveLoadDegraded(workspaceSummary?.executiveLoad)
+
   const everythingElse = (
     <>
-      {error ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-          <p>Some dashboard sources were unavailable. Showing graceful fallbacks.</p>
-          <Button variant="outline" size="sm" onClick={() => void reload()}>
+      {error || executiveLoadDegraded ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950"
+          data-growth-home-executive-unavailable={executiveLoadDegraded ? "true" : undefined}
+        >
+          <p>{GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE}</p>
+          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={refreshing}>
             <RefreshCw className="mr-2 size-4" />
-            Retry
+            {refreshing ? "Refreshing…" : "Retry"}
           </Button>
         </div>
       ) : null}

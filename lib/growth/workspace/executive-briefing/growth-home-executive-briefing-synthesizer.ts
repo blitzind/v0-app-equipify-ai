@@ -117,6 +117,11 @@ import type {
   GrowthHomeWorkSummaryCategory,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import {
+  isGrowthHomeExecutiveSourceUnavailable,
+  canSynthesizeGrowthHomeExecutiveIdle,
+  type GrowthHomeExecutiveLoadMetadata,
+} from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
 import type { GrowthRevenueDirectorCommandCenterSnapshot } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
 import { operatorMissionSummary } from "@/lib/workspace/ai-autonomous-revenue-operator"
 import { marketingOperatorSummary } from "@/lib/workspace/ai-autonomous-marketing-operator"
@@ -163,6 +168,7 @@ export type GrowthHomeExecutiveBriefingInput = {
   canonicalOperatorTask?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
   canonicalActiveMissions?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
   canonicalOperatorFocus?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
+  executiveLoad?: GrowthHomeExecutiveLoadMetadata | null
 }
 
 function metricValue(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: string, label: string): number {
@@ -594,8 +600,25 @@ function deriveEmployeeStatus(
     missionDiscovery?: import("@/lib/growth/mission-center/growth-home-mission-discovery-snapshot").GrowthHomeMissionDiscoverySnapshot | null
     portfolioBelowTarget?: boolean
     readyForOutreachReview?: number
+    executiveLoad?: GrowthHomeExecutiveLoadMetadata | null
+    canonicalOperatorApproval?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
   },
 ): GrowthHomeAiEmployeeStatus {
+  const idleEligible = canSynthesizeGrowthHomeExecutiveIdle({
+    executiveLoad: input?.executiveLoad,
+    canonicalOperatorApproval: input?.canonicalOperatorApproval ?? null,
+  })
+  const approvalsUnavailable =
+    isGrowthHomeExecutiveSourceUnavailable(input?.executiveLoad?.approvals) || !idleEligible
+
+  if (approvalsUnavailable && (pendingPackageCount == null || pendingPackageCount === 0)) {
+    return {
+      kind: "working",
+      label: "Refreshing briefing",
+      activityLabel: "confirming your pending approvals and executive state",
+    }
+  }
+
   const briefing = dashboard.briefing
   const legacyPending =
     briefing?.summary.pending_approvals ?? metricValue(dashboard, "campaign-snapshot", "Approval queue")
@@ -648,7 +671,12 @@ function deriveEmployeeStatus(
     (briefing?.revenue.emails_sent ?? 0) > 0 ||
     metricValue(dashboard, "activity", "Emails sent today") > 0
 
-  if (!hasRecentActivity && pendingApprovals === 0 && leads + hot === 0) {
+  if (
+    !hasRecentActivity &&
+    pendingApprovals === 0 &&
+    leads + hot === 0 &&
+    idleEligible
+  ) {
     return {
       kind: "idle",
       label: "Idle",
@@ -1188,6 +1216,8 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     {
       missionDiscovery: input.missionDiscovery ?? null,
       portfolioBelowTarget: input.portfolioBelowTarget,
+      executiveLoad: input.executiveLoad ?? null,
+      canonicalOperatorApproval: input.canonicalOperatorApproval ?? null,
     },
   )
   const completedToday = buildCompletedToday(dashboard)

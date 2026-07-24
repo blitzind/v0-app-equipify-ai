@@ -16,10 +16,12 @@ import {
 } from "@/lib/growth/home/growth-home-workspace-loader-budget"
 import {
   resolveGrowthHomeExecutiveApprovalsAvailability,
+  resolveGrowthHomeExecutiveApprovalSource,
   type GrowthHomeExecutiveSourceAvailability,
 } from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
 import { loadGrowthCanonicalOrganizationTrainingProjection } from "@/lib/growth/training/growth-canonical-organization-training-projection-1d-hotfix"
 import type { GrowthCanonicalOrganizationTrainingProjection } from "@/lib/growth/training/growth-canonical-organization-training-projection-types"
+import { logGrowthEngine } from "@/lib/growth/access"
 
 export type GrowthHomeCriticalExecutiveStageResult = {
   timings: GrowthHomeLoaderTiming[]
@@ -28,6 +30,9 @@ export type GrowthHomeCriticalExecutiveStageResult = {
   approvalsAvailability: GrowthHomeExecutiveSourceAvailability
   trainingProjection: GrowthCanonicalOrganizationTrainingProjection | null
   trainingAvailability: GrowthHomeExecutiveSourceAvailability
+  approvalSource: import("@/lib/growth/home/growth-home-critical-executive-load-2b-1a").GrowthHomeExecutiveApprovalSource
+  approvalLoaderTimedOut: boolean
+  approvalLoaderDurationMs: number
 }
 
 export async function loadGrowthHomeCriticalExecutiveStage(input: {
@@ -47,6 +52,9 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
       approvalsAvailability: "unavailable",
       trainingProjection: null,
       trainingAvailability: "unavailable",
+      approvalSource: "unavailable",
+      approvalLoaderTimedOut: false,
+      approvalLoaderDurationMs: 0,
     }
   }
 
@@ -78,10 +86,27 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
   timings.push(approvalStep.timing, trainingStep.timing)
 
   const approvalLoaded = approvalStep.value
+  const approvalLoadedSuccessfully = Boolean(approvalLoaded)
   const approvalsAvailability = resolveGrowthHomeExecutiveApprovalsAvailability({
-    loaded: Boolean(approvalLoaded),
+    loaded: approvalLoadedSuccessfully,
     timedOut: approvalStep.timing.timedOut,
     pendingApprovalCount: approvalLoaded?.pendingApprovalCount ?? 0,
+  })
+  const approvalSource = resolveGrowthHomeExecutiveApprovalSource({
+    loaded: approvalLoadedSuccessfully,
+    pendingApprovalCount: approvalLoaded?.pendingApprovalCount ?? 0,
+  })
+
+  logGrowthEngine("growth_home_critical_executive_approval_stage", {
+    organizationId: input.organizationId,
+    approvalAvailability: approvalsAvailability,
+    approvalSource,
+    pendingApprovalCount: approvalLoaded?.pendingApprovalCount ?? null,
+    approvalLoaderTimedOut: approvalStep.timing.timedOut,
+    approvalLoaderDurationMs: approvalStep.timing.durationMs,
+    idleEligible:
+      approvalsAvailability === "confirmed_empty" &&
+      (approvalLoaded?.pendingApprovalCount ?? 0) === 0,
   })
 
   const trainingLoaded = trainingStep.value
@@ -99,5 +124,8 @@ export async function loadGrowthHomeCriticalExecutiveStage(input: {
     approvalsAvailability,
     trainingProjection: trainingLoaded,
     trainingAvailability,
+    approvalSource,
+    approvalLoaderTimedOut: approvalStep.timing.timedOut,
+    approvalLoaderDurationMs: approvalStep.timing.durationMs,
   }
 }

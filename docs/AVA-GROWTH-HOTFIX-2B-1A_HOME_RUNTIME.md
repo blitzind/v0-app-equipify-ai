@@ -68,9 +68,30 @@ Secondary loaders (`ai-teammate` 500, `default-views` cancel) compounded the pro
 
 ```bash
 pnpm test:ava-growth-hotfix-2b-1a-home-runtime
+pnpm test:ava-growth-hotfix-2b-1b-false-idle
 pnpm test:ava-growth-operator-2b-routing-convergence
 pnpm test:ava-growth-operator-2a-executive-experience
 pnpm test:ava-growth-hotfix-1f-1d-canonical-training-state
 pnpm test:ava-growth-operator-1f-platform-consolidation
 pnpm build
 ```
+
+---
+
+## AVA-GROWTH-HOTFIX-2B-1B — Remaining false Idle path
+
+### Exact remaining path (pre-2B-1B)
+
+1. `withGrowthHomeLoaderBudget` catches approval loader errors → returns `fallback: null` with `timedOut: false`
+2. `resolveGrowthHomeExecutiveApprovalsAvailability({ loaded: false, timedOut: false })` returned **`confirmed_empty`** (not `unavailable`)
+3. `growth-home-workspace-summary-service` substituted `emptyCanonicalOperatorApprovalSnapshot()` → **`pendingApprovalCount: 0`**
+4. Client first load (no session cache) synthesized **`Idle`** / empty waiting-on-you from zero counts
+
+### Repair (2B-1B)
+
+- `!loaded` approval snapshot → always **`unavailable`**
+- Removed `emptyCanonicalOperatorApprovalSnapshot()` fallback on Home summary path
+- **`canSynthesizeGrowthHomeExecutiveIdle()`** — Idle only when `executiveLoad.approvals === "confirmed_empty"` or a loaded empty canonical snapshot exists
+- First-load client failure without cache no longer builds `EMPTY_SOURCES` dashboard
+- Production logs: `growth_home_critical_executive_approval_stage`, `growth_home_first_load_executive_state` (availability, source, pending count, `idleEligible`, `idleReason`)
+

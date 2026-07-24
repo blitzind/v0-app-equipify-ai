@@ -7,6 +7,8 @@ import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth
 
 export const AVA_GROWTH_HOTFIX_2B_1A_QA_MARKER = "ava-growth-hotfix-2b-1a-home-runtime-v1" as const
 
+export const AVA_GROWTH_HOTFIX_2B_1B_QA_MARKER = "ava-growth-hotfix-2b-1b-false-idle-v1" as const
+
 export const GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE =
   "Ava's latest briefing is still loading. Your existing work and approvals have not been cleared." as const
 
@@ -28,6 +30,22 @@ export type GrowthHomeExecutiveLoadMetadata = {
   activation: GrowthHomeExecutiveSourceAvailability
   missions: GrowthHomeExecutiveSourceAvailability
   recommendation: GrowthHomeExecutiveSourceAvailability
+  firstLoad?: GrowthHomeExecutiveFirstLoadDiagnostics
+}
+
+export type GrowthHomeExecutiveApprovalSource =
+  | "critical_stage_snapshot"
+  | "unavailable"
+  | "confirmed_empty_snapshot"
+
+export type GrowthHomeExecutiveFirstLoadDiagnostics = {
+  qaMarker: typeof AVA_GROWTH_HOTFIX_2B_1B_QA_MARKER
+  approvalAvailability: GrowthHomeExecutiveSourceAvailability
+  approvalSource: GrowthHomeExecutiveApprovalSource
+  pendingApprovalCount: number | null
+  idleEligible: boolean
+  approvalLoaderTimedOut: boolean
+  approvalLoaderDurationMs: number
 }
 
 export function buildGrowthHomeExecutiveLoadMetadata(input: {
@@ -38,6 +56,7 @@ export function buildGrowthHomeExecutiveLoadMetadata(input: {
   activation?: GrowthHomeExecutiveSourceAvailability
   missions?: GrowthHomeExecutiveSourceAvailability
   recommendation?: GrowthHomeExecutiveSourceAvailability
+  firstLoad?: GrowthHomeExecutiveFirstLoadDiagnostics
 }): GrowthHomeExecutiveLoadMetadata {
   return {
     qaMarker: AVA_GROWTH_HOTFIX_2B_1A_QA_MARKER,
@@ -48,6 +67,7 @@ export function buildGrowthHomeExecutiveLoadMetadata(input: {
     activation: input.activation ?? "unavailable",
     missions: input.missions ?? "unavailable",
     recommendation: input.recommendation ?? "unavailable",
+    firstLoad: input.firstLoad,
   }
 }
 
@@ -76,9 +96,50 @@ export function resolveGrowthHomeExecutiveApprovalsAvailability(input: {
   pendingApprovalCount: number
 }): GrowthHomeExecutiveSourceAvailability {
   if (!input.loaded) {
-    return input.timedOut ? "unavailable" : "confirmed_empty"
+    return "unavailable"
   }
   return input.pendingApprovalCount > 0 ? "confirmed" : "confirmed_empty"
+}
+
+export function resolveGrowthHomeExecutiveApprovalSource(input: {
+  loaded: boolean
+  pendingApprovalCount: number
+}): GrowthHomeExecutiveApprovalSource {
+  if (!input.loaded) return "unavailable"
+  return input.pendingApprovalCount > 0 ? "critical_stage_snapshot" : "confirmed_empty_snapshot"
+}
+
+export function canSynthesizeGrowthHomeExecutiveIdle(input: {
+  executiveLoad?: GrowthHomeExecutiveLoadMetadata | null
+  canonicalOperatorApproval?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorApprovalSnapshot | null
+}): boolean {
+  if (input.executiveLoad?.approvals === "confirmed_empty") return true
+  if (input.executiveLoad?.approvals === "confirmed") return false
+  if (input.executiveLoad?.approvals === "unavailable") return false
+  return (
+    input.canonicalOperatorApproval != null &&
+    input.canonicalOperatorApproval.pendingApprovalCount === 0
+  )
+}
+
+export function buildGrowthHomeExecutiveFirstLoadDiagnostics(input: {
+  approvalAvailability: GrowthHomeExecutiveSourceAvailability
+  approvalSource: GrowthHomeExecutiveApprovalSource
+  pendingApprovalCount: number | null
+  approvalLoaderTimedOut: boolean
+  approvalLoaderDurationMs: number
+}): GrowthHomeExecutiveFirstLoadDiagnostics {
+  return {
+    qaMarker: AVA_GROWTH_HOTFIX_2B_1B_QA_MARKER,
+    approvalAvailability: input.approvalAvailability,
+    approvalSource: input.approvalSource,
+    pendingApprovalCount: input.pendingApprovalCount,
+    idleEligible:
+      input.approvalAvailability === "confirmed_empty" &&
+      (input.pendingApprovalCount ?? 0) === 0,
+    approvalLoaderTimedOut: input.approvalLoaderTimedOut,
+    approvalLoaderDurationMs: input.approvalLoaderDurationMs,
+  }
 }
 
 export function readGrowthHomeExecutiveSessionCache(): GrowthHomeWorkspaceSummaryPayload | null {

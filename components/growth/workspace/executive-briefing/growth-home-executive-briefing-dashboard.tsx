@@ -216,8 +216,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
         canonicalOperatorTask: workspaceSummary?.canonicalOperatorTask ?? null,
         canonicalActiveMissions: workspaceSummary?.canonicalActiveMissions ?? null,
         canonicalOperatorFocus: workspaceSummary?.canonicalOperatorFocus ?? null,
+        executiveLoad: workspaceSummary?.executiveLoad ?? null,
       }),
-    [dashboard, recentViews, continueItems, teammate, operatorDisplayName, workspaceSummary?.canonicalOperatorApproval, workspaceSummary?.canonicalOperatorTask, workspaceSummary?.canonicalActiveMissions, workspaceSummary?.canonicalOperatorFocus, workspaceSummary?.missionDiscovery, workspaceSummary?.portfolioManager],
+    [dashboard, recentViews, continueItems, teammate, operatorDisplayName, workspaceSummary?.canonicalOperatorApproval, workspaceSummary?.canonicalOperatorTask, workspaceSummary?.canonicalActiveMissions, workspaceSummary?.canonicalOperatorFocus, workspaceSummary?.executiveLoad, workspaceSummary?.missionDiscovery, workspaceSummary?.portfolioManager],
   )
 
   useEffect(() => {
