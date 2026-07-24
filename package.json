@@ -938,6 +938,8 @@
     "run:ava-direct-production-cutover-1a-five-company-proof": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-direct-production-cutover-1a-five-company-proof.ts",
     "test:ava-persisted-operator-validation-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-persisted-operator-validation-1a.ts",
     "test:ava-operator-experience-2a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-operator-experience-2a.ts",
+    "test:ava-home-projection-cutover-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-home-projection-cutover-1a.ts",
+    "run:ava-home-projection-cutover-1a-production-validation": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-home-projection-cutover-1a-production-validation.ts",
     "run:ava-persisted-operator-validation-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-persisted-operator-validation-1a.ts",
     "test:ava-reasoning-calibration-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-reasoning-calibration-1a.ts",
     "run:ava-reasoning-calibration-1a-ten-company-proof": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ava-reasoning-calibration-1a-ten-company-proof.ts",

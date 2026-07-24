@@ -26,6 +26,7 @@ import type { GrowthProductionMissionAuthority } from "@/lib/growth/mission-purp
 import type { GrowthOrganizationalEvidenceCompletenessSnapshot } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-next-3b-types"
 import type { GrowthHomeRuntimeTrustServerPayload } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import type { GrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-types-1c"
+import type { GrowthSupervisedAvaHomeOperatorAttention } from "@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a-types"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -165,4 +166,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   runtimeTrust?: GrowthHomeRuntimeTrustServerPayload | null
   /** GE-AIOS-LAUNCH-1C — Ava one-time activation + employment history */
   avaActivation?: GrowthAvaActivationState | null
+  /** AVA-HOME-PROJECTION-CUTOVER-1A — supervised Ava operator attention projection */
+  supervisedOperatorAttention?: GrowthSupervisedAvaHomeOperatorAttention | null
 }

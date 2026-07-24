@@ -20,6 +20,8 @@ export type GrowthCanonicalOperatorApprovalPackagePreview = {
   channelLabel: string | null
   statusLabel: string
   reviewHref: string
+  /** AVA-HOME-PROJECTION-CUTOVER-1A — richer operator detail for supervised drafts */
+  operatorDetail?: string | null
 }
 
 export type GrowthCanonicalOperatorApprovalSnapshot = {

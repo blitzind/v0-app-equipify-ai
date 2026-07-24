@@ -104,6 +104,12 @@ import { buildCanonicalOperatorFocus } from "@/lib/growth/aios/operator-experien
 import { loadGrowthOrganizationalEvidenceCompletenessFromProduction } from "@/lib/growth/organizational-effectiveness/growth-organizational-evidence-completeness-production-loader-next-3b"
 import { loadGrowthHomeRuntimeTrustPayload } from "@/lib/growth/home/growth-home-runtime-trust-loader-1b"
 import { ensureScaleResearchBudgetForActivatedOrg, loadGrowthAvaActivationState } from "@/lib/growth/ava-activation/growth-ava-activation-service"
+import {
+  buildSupervisedAvaHomeOperatorAttention,
+  loadSupervisedAvaGenerationsForHome,
+  mergeSupervisedAvaIntoApprovalSnapshot,
+} from "@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a"
+import type { GrowthSupervisedAvaHomeOperatorAttention } from "@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a-types"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -691,6 +697,34 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     ? (canonicalOperatorApprovalLoaded ?? emptyCanonicalOperatorApprovalSnapshot())
     : null
 
+  let supervisedOperatorAttention: GrowthSupervisedAvaHomeOperatorAttention | null = null
+  let canonicalOperatorApprovalWithSupervised = canonicalOperatorApprovalRaw
+
+  if (organizationId && canonicalOperatorApprovalRaw) {
+    const supervisedStart = Date.now()
+    try {
+      const leadIds = leads.map((row) => row.id)
+      const leadsById = new Map(leads.map((row) => [row.id, row.companyName]))
+      const generations = await loadSupervisedAvaGenerationsForHome(input.admin, leadIds)
+      supervisedOperatorAttention = buildSupervisedAvaHomeOperatorAttention({
+        generations,
+        leadsById,
+      })
+      canonicalOperatorApprovalWithSupervised = mergeSupervisedAvaIntoApprovalSnapshot({
+        base: canonicalOperatorApprovalRaw,
+        attention: supervisedOperatorAttention,
+      })
+    } catch {
+      supervisedOperatorAttention = null
+      canonicalOperatorApprovalWithSupervised = canonicalOperatorApprovalRaw
+    }
+    stageTimings.push({
+      label: "supervised_ava_home_projection",
+      durationMs: Date.now() - supervisedStart,
+      timedOut: false,
+    })
+  }
+
   const revenueQueueLeadIdRaw =
     dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
     leads.find((row) => row.id)?.id ??
@@ -708,9 +742,9 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   let productionRevenueQueueSections = revenueQueueSections
   let productionPurposeByLeadId = new Map<string, import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthMissionPurposeResolution>()
 
-  if (organizationId && canonicalOperatorApprovalRaw) {
+  if (organizationId && canonicalOperatorApprovalWithSupervised) {
     const pendingApprovalLeadIds = new Set(
-      (canonicalOperatorApprovalRaw.packages ?? [])
+      (canonicalOperatorApprovalWithSupervised.packages ?? [])
         .map((row) => row.leadId?.trim())
         .filter((leadId): leadId is string => Boolean(leadId)),
     )
@@ -752,11 +786,17 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       leads: canonicalLeads,
       objectives: canonicalObjectives,
       context: missionPurposeContext,
-      approvalSnapshot: canonicalOperatorApprovalRaw,
+      approvalSnapshot: canonicalOperatorApprovalWithSupervised,
       researchLoopSummary: avaResearchLoopSummaryRaw,
     })
 
     canonicalOperatorApproval = productionProjection.productionApproval
+    if (supervisedOperatorAttention) {
+      canonicalOperatorApproval = mergeSupervisedAvaIntoApprovalSnapshot({
+        base: canonicalOperatorApproval ?? emptyCanonicalOperatorApprovalSnapshot(),
+        attention: supervisedOperatorAttention,
+      })
+    }
     productionPortfolioEligibility = productionProjection.portfolioEligibility
     productionAvaResearchLoopSummary = productionProjection.sanitizedResearchLoop
     productionRevenueQueueSections = productionProjection.revenueQueueSections
@@ -814,7 +854,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   salesOutcomes.dailySummary.outreach_prepared = canonicalDraftCount
   avaConsole.waitingForApproval =
     canonicalApprovalCount > 0
-      ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "package" : "packages"} ready for review`
+      ? `${canonicalApprovalCount} ${canonicalApprovalCount === 1 ? "email draft" : "email drafts"} ready for review`
       : null
 
   const productionRevenueQueueLead =
@@ -1030,6 +1070,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     canonicalOperatorTask,
     canonicalActiveMissions,
     canonicalOperatorFocus,
+    supervisedOperatorAttention,
     portfolioLeads: productionLeadsForOperations,
     eligibleLeadCount: productionEligibleLeadCount,
     portfolioManager: productionPortfolioManager,

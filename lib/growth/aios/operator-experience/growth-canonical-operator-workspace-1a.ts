@@ -251,29 +251,44 @@ export function buildCanonicalOperatorTask(input: {
 export function mapCanonicalApprovalPackagesToWaitingOnYou(
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot,
 ): GrowthHomeWaitingOnYouItem[] {
-  return approvalSnapshot.packages.map((pkg) => ({
-    id: `approval:${pkg.itemId}`,
-    label: formatOperatorPriorityPackageTitle(pkg.companyName),
-    detail: formatOperatorPriorityPackageDetail({
-      channelLabel: pkg.channelLabel ?? "Email sequence",
-      emailDraftCount: pkg.draftCount,
-    }),
-    href: pkg.reviewHref,
-  }))
+  return approvalSnapshot.packages.map((pkg) => {
+    const isSupervisedDraft = pkg.itemId.startsWith("supervised-draft:")
+    return {
+      id: `approval:${pkg.itemId}`,
+      label: isSupervisedDraft
+        ? `Review email draft — ${pkg.companyName}`
+        : formatOperatorPriorityPackageTitle(pkg.companyName),
+      detail:
+        pkg.operatorDetail?.trim() ??
+        formatOperatorPriorityPackageDetail({
+          channelLabel: pkg.channelLabel ?? "Email sequence",
+          emailDraftCount: pkg.draftCount,
+        }),
+      href: pkg.reviewHref,
+      category: isSupervisedDraft ? "approval" : undefined,
+    }
+  })
 }
 
 export function resolveCanonicalWaitingOnYouItems(input: {
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined
   legacyItems: GrowthHomeWaitingOnYouItem[]
+  supervisedNeedsInformation?: GrowthHomeWaitingOnYouItem[]
 }): GrowthHomeWaitingOnYouItem[] {
   const packageRows =
     input.approvalSnapshot && input.approvalSnapshot.packages.length > 0
       ? mapCanonicalApprovalPackagesToWaitingOnYou(input.approvalSnapshot)
       : []
 
+  const needsInformationRows = input.supervisedNeedsInformation ?? []
+
   if (input.approvalSnapshot) {
     const replyRows = input.legacyItems.filter((item) => /reply/i.test(item.label))
-    return [...packageRows, ...replyRows]
+    return [...packageRows, ...needsInformationRows, ...replyRows]
+  }
+
+  if (needsInformationRows.length > 0) {
+    return [...needsInformationRows, ...input.legacyItems]
   }
 
   return input.legacyItems

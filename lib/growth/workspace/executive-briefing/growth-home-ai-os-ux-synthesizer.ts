@@ -590,6 +590,7 @@ export function buildAiOsUxViewModel(input: {
   portfolioOperator?: import("@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types").GrowthPortfolioManagerOperatorProjection | null
   productionMissionAuthority?: import("@/lib/growth/mission-purpose/growth-mission-purpose-1a-types").GrowthProductionMissionAuthority | null
   pendingApprovals?: number
+  supervisedNeedsInformation?: GrowthHomeWaitingOnYouItem[]
 }): GrowthHomeAiOsUxViewModel {
   const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
 
@@ -606,6 +607,7 @@ export function buildAiOsUxViewModel(input: {
   const collapsedWaiting = resolveCanonicalWaitingOnYouItems({
     approvalSnapshot: input.canonicalApprovalSnapshot,
     legacyItems: waitingOnYouResult.items,
+    supervisedNeedsInformation: input.supervisedNeedsInformation,
   })
 
   const hasCanonicalPackageList =
@@ -626,7 +628,7 @@ export function buildAiOsUxViewModel(input: {
     portfolioTargetCurrent: input.portfolioTargetCurrent ?? null,
     portfolioTargetGoal: input.portfolioTargetGoal ?? null,
     pendingApprovals: approveItemsCount,
-    operatorApprovalCompanyName: input.canonicalOperatorApproval?.topPackage?.companyName ?? null,
+    operatorApprovalCompanyName: input.canonicalApprovalSnapshot?.topPackage?.companyName ?? null,
     portfolioOperator: input.portfolioOperator ?? null,
     productionMissionAuthority: input.productionMissionAuthority ?? null,
   })

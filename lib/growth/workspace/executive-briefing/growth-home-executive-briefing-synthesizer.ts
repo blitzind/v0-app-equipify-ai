@@ -134,6 +134,7 @@ import {
   type GrowthHomeServiceMissionInput,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-service-mission-synthesizer"
 import { buildAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
+import { supervisedNeedsInformationToWaitingOnYou } from "@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a-types"
 import {
   hasCanonicalDailyWorkQueue,
   pickTopCanonicalQueueActionItem,
@@ -163,6 +164,7 @@ export type GrowthHomeExecutiveBriefingInput = {
   canonicalOperatorTask?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types").GrowthCanonicalOperatorTask | null
   canonicalActiveMissions?: import("@/lib/growth/aios/missions/growth-canonical-mission-1a-types").GrowthCanonicalActiveMissionsProjection | null
   canonicalOperatorFocus?: import("@/lib/growth/aios/operator-experience/growth-canonical-operator-focus-1a-types").GrowthCanonicalOperatorFocus | null
+  supervisedOperatorAttention?: import("@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a-types").GrowthSupervisedAvaHomeOperatorAttention | null
 }
 
 function metricValue(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: string, label: string): number {
@@ -1251,6 +1253,9 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     portfolioTargetGoal: input.portfolioTargetGoal ?? null,
     portfolioOperator: input.portfolioOperator ?? null,
     productionMissionAuthority: input.productionMissionAuthority ?? null,
+    supervisedNeedsInformation: input.supervisedOperatorAttention?.needsInformation
+      ? supervisedNeedsInformationToWaitingOnYou(input.supervisedOperatorAttention.needsInformation)
+      : [],
   })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)
