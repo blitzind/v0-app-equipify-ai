@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Check, ChevronDown, ChevronRight, Copy, Loader2, Mail, Pencil, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
@@ -11,10 +11,25 @@ import {
   formatAvaRecommendsContactHeading,
   formatOperatorDecisionPrompt,
   formatOperatorGenerationStatusLabel,
-  formatOperatorGenerationTypeLabel,
   GROWTH_AVA_OPERATOR_WORKSPACE_3A_QA_MARKER,
   projectAvaRecommendationFromGeneration,
 } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3a"
+import {
+  estimateOperatorReviewTimeLabel,
+  GROWTH_AVA_OPERATOR_SECTION_ESTIMATED_REVIEW_TIME,
+  GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL,
+  GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION,
+  GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION_STATUS,
+  GROWTH_AVA_OPERATOR_SECTION_WHY,
+  GROWTH_AVA_OPERATOR_SECTION_YOUR_DECISION,
+  GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER,
+} from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
+import {
+  isAvaSupervisedOutboundGeneration,
+  readAvaSupervisedOutboundApprovalBinding,
+  readAvaSupervisedOutboundSendReceipt,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import { readAvaSupervisedOutboundSendLifecycle } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1b-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-types"
@@ -45,6 +60,7 @@ type Props = {
   queueItem: GrowthOutreachQueueItem | null
   onApprove: () => void
   onReject: () => void
+  onSend?: () => void
   onQueue?: () => void
   onQueueAndSend?: () => void
 }
@@ -57,14 +73,92 @@ export function GrowthAvaOperatorWorkspaceReview({
   queueItem,
   onApprove,
   onReject,
+  onSend,
   onQueue,
   onQueueAndSend,
 }: Props) {
   const recommendation = projectAvaRecommendationFromGeneration({ generation, lead })
+  const supervisedOutbound = isAvaSupervisedOutboundGeneration(generation)
+  const sendReceipt = useMemo(
+    () => readAvaSupervisedOutboundSendReceipt(generation.classification as Record<string, unknown>),
+    [generation.classification],
+  )
+  const sendLifecycle = useMemo(
+    () => readAvaSupervisedOutboundSendLifecycle(generation.classification as Record<string, unknown>),
+    [generation.classification],
+  )
+  const approvalBinding = useMemo(
+    () => readAvaSupervisedOutboundApprovalBinding(generation.classification as Record<string, unknown>),
+    [generation.classification],
+  )
+  const isDraft = generation.status === "draft"
+  const isApproved = generation.status === "approved"
+  const isSent = Boolean(generation.sentAt || sendReceipt?.status === "sent")
+  const isDeliveryUnknown =
+    sendReceipt?.status === "delivery_unknown" || sendLifecycle?.status === "delivery_unknown"
+  const sendingFromLabel = useMemo(() => {
+    if (!supervisedOutbound) return null
+    if (approvalBinding?.senderEmail?.trim()) {
+      return approvalBinding.senderEmail.trim()
+    }
+    if (isDraft) return "Sender assigned when approved"
+    return null
+  }, [approvalBinding?.senderEmail, isDraft, supervisedOutbound])
   const [editing, setEditing] = useState(false)
   const [editedSubject, setEditedSubject] = useState(generation.generatedSubject ?? "")
   const [editedBody, setEditedBody] = useState(generation.generatedContent)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const [signaturePreview, setSignaturePreview] = useState<{
+    mode: "loading" | "signature" | "message_only" | "unavailable"
+    text: string | null
+    message: string | null
+  }>({ mode: "loading", text: null, message: null })
+
+  useEffect(() => {
+    if (!supervisedOutbound) {
+      setSignaturePreview({ mode: "unavailable", text: null, message: null })
+      return
+    }
+
+    let cancelled = false
+    void fetch(`/api/platform/growth/copilot/generations/${generation.id}/signature-preview`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data: {
+        previewMode?: "signature" | "message_only" | "unavailable"
+        signatureText?: string | null
+        message?: string | null
+      }) => {
+        if (cancelled) return
+        if (data.previewMode === "signature" && data.signatureText?.trim()) {
+          setSignaturePreview({
+            mode: "signature",
+            text: data.signatureText.trim(),
+            message: null,
+          })
+          return
+        }
+        setSignaturePreview({
+          mode: data.previewMode === "message_only" ? "message_only" : "unavailable",
+          text: null,
+          message: data.message ?? "Signature added when sent",
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSignaturePreview({
+            mode: "unavailable",
+            text: null,
+            message: "Signature added when sent",
+          })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [generation.id, supervisedOutbound])
 
   const subject = editing ? editedSubject : generation.generatedSubject ?? ""
   const body = editing ? editedBody : generation.generatedContent
@@ -84,16 +178,17 @@ export function GrowthAvaOperatorWorkspaceReview({
     await navigator.clipboard.writeText(payload)
   }
 
-  const isDraft = generation.status === "draft"
-  const isApproved = generation.status === "approved"
   const diagnostics = buildOperatorWorkspaceDiagnostics(generation)
+  const reviewStatusLabel = formatOperatorGenerationStatusLabel(generation.status)
+  const estimatedReviewTime = estimateOperatorReviewTimeLabel(generation)
 
   return (
     <div
       className="space-y-4"
       data-qa-marker-ava-operator-workspace-3a={GROWTH_AVA_OPERATOR_WORKSPACE_3A_QA_MARKER}
+      data-qa-marker-ava-operator-workspace-3b={GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER}
     >
-      <Section title="Recommendation">
+      <Section title={GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION}>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">{formatAvaRecommendsContactHeading(teammate)}</p>
           <div className="space-y-1">
@@ -106,15 +201,33 @@ export function GrowthAvaOperatorWorkspaceReview({
             <p className="text-sm font-medium text-foreground">{recommendation.companyName}</p>
           </div>
 
-          {recommendation.rationale ? (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reason</p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {recommendation.rationale}
-              </p>
-            </div>
-          ) : null}
+          <div className="rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {GROWTH_AVA_OPERATOR_SECTION_ESTIMATED_REVIEW_TIME}
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">{estimatedReviewTime}</p>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION_STATUS}
+            </p>
+            <GrowthBadge label={recommendation.confidenceLabel} tone="healthy" />
+            <GrowthBadge
+              label={reviewStatusLabel}
+              tone={isDraft ? "warning" : isApproved ? "healthy" : "neutral"}
+            />
+          </div>
+        </div>
+      </Section>
+
+      {recommendation.rationale || recommendation.whatStoodOut ? (
+        <Section title={GROWTH_AVA_OPERATOR_SECTION_WHY}>
+          {recommendation.rationale ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {recommendation.rationale}
+            </p>
+          ) : null}
           {recommendation.whatStoodOut ? (
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What stood out</p>
@@ -123,23 +236,10 @@ export function GrowthAvaOperatorWorkspaceReview({
               </p>
             </div>
           ) : null}
+        </Section>
+      ) : null}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Confidence</p>
-            <GrowthBadge label={recommendation.confidenceLabel} tone="healthy" />
-            <GrowthBadge
-              label={formatOperatorGenerationStatusLabel(generation.status)}
-              tone={isDraft ? "warning" : isApproved ? "healthy" : "neutral"}
-            />
-            <GrowthBadge
-              label={formatOperatorGenerationTypeLabel(generation.generationType)}
-              tone="neutral"
-            />
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Email">
+      <Section title={GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL}>
         <div className="overflow-hidden rounded-lg border border-border/70 bg-muted/10">
           {editing ? (
             <div className="space-y-3 p-3">
@@ -176,9 +276,34 @@ export function GrowthAvaOperatorWorkspaceReview({
             </div>
           )}
         </div>
+        {supervisedOutbound && sendingFromLabel ? (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sending from</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{sendingFromLabel}</p>
+            {approvalBinding?.assignmentSource === "primary_sender" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Primary Ava sender until a sender pool is configured.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {supervisedOutbound ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border/60 bg-muted/10 px-3 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Signature</p>
+            {signaturePreview.mode === "loading" ? (
+              <p className="mt-1 text-sm text-muted-foreground">Loading signature preview…</p>
+            ) : signaturePreview.mode === "signature" && signaturePreview.text ? (
+              <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{signaturePreview.text}</p>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {signaturePreview.message ?? "Signature added when sent"}
+              </p>
+            )}
+          </div>
+        ) : null}
       </Section>
 
-      <Section title="Decision">
+      <Section title={GROWTH_AVA_OPERATOR_SECTION_YOUR_DECISION}>
         <p className="text-sm text-muted-foreground">{formatOperatorDecisionPrompt(teammate)}</p>
         <div className="flex flex-wrap gap-2">
           {isDraft ? (
@@ -208,10 +333,15 @@ export function GrowthAvaOperatorWorkspaceReview({
           </Button>
         </div>
 
-        {isApproved ? (
+        {isApproved && !isSent && !isDeliveryUnknown ? (
           <div className="space-y-2 rounded-lg border border-emerald-200/70 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-            <p className="text-sm font-medium text-foreground">Approved — ready for the next step</p>
-            {queueItem ? (
+            <p className="text-sm font-medium text-foreground">Approved — ready to send</p>
+            {supervisedOutbound && onSend ? (
+              <Button type="button" size="sm" disabled={acting} onClick={onSend}>
+                {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Mail className="mr-2 size-4" />}
+                Send email
+              </Button>
+            ) : queueItem ? (
               <GrowthBadge label={queueItem.status.replace(/_/g, " ")} tone="healthy" />
             ) : onQueue && onQueueAndSend ? (
               <div className="flex flex-wrap gap-2">
@@ -222,6 +352,37 @@ export function GrowthAvaOperatorWorkspaceReview({
                   Queue and send
                 </Button>
               </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isSent ? (
+          <div className="space-y-2 rounded-lg border border-border/70 bg-muted/10 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <GrowthBadge label="Sent" tone="healthy" />
+              {generation.sentAt ? (
+                <p className="text-sm text-muted-foreground">
+                  {new Date(generation.sentAt).toLocaleString()}
+                </p>
+              ) : null}
+            </div>
+            <p className="text-sm text-foreground">
+              To {sendReceipt?.recipientEmail ?? recipientLine}
+            </p>
+          </div>
+        ) : null}
+
+        {isDeliveryUnknown ? (
+          <div className="space-y-2 rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+            <GrowthBadge label="Delivery unknown" tone="attention" />
+            <p className="text-sm text-foreground">
+              Provider delivery may have succeeded, but the platform could not finalize the send receipt.
+              Reconcile before retrying.
+            </p>
+            {sendReceipt?.providerMessageId ? (
+              <p className="text-xs text-muted-foreground">
+                Provider message ID: {sendReceipt.providerMessageId}
+              </p>
             ) : null}
           </div>
         ) : null}

@@ -150,7 +150,10 @@ function validationSuggestedNextStep(
     return "Reconnect Gmail to refresh OAuth tokens."
   }
   if (mailbox.status === "expired") {
-    return "Token expired — reconnect Gmail, then validate again."
+    return "Refresh token missing — reconnect Gmail, then validate again."
+  }
+  if (row.accessTokenRefreshRequired && mailbox.token_configured) {
+    return "Access token will refresh automatically before send. Reconnect only if refresh fails."
   }
   if (mailbox.status === "error") {
     return "Review OAuth connection and provider setup, then retry validation."

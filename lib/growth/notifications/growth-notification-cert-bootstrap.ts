@@ -72,9 +72,10 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
       (jwt ? resolveSupabaseUrlFromJwt(jwt) : null)
   }
 
-  if (!jwt && vercelProductionEnvRun) {
+  const placeholderSupabaseUrl = !url || url.includes("placeholder.supabase.co")
+  if ((placeholderSupabaseUrl || !jwt) && vercelProductionEnvRun) {
     const cliResolution = resolveSupabaseCredentialsFromCliLinkedProject({
-      existingUrl: url,
+      existingUrl: placeholderSupabaseUrl ? null : url,
       env: process.env,
     })
     if (cliResolution) {
@@ -84,7 +85,7 @@ export function bootstrapGrowthOperatorNotificationsCertEnv(input?: {
     }
   }
 
-  if (!jwt || !url?.startsWith("http")) return null
+  if (!jwt || !url?.startsWith("http") || url.includes("placeholder.supabase.co")) return null
 
   process.env.NEXT_PUBLIC_SUPABASE_URL = url
   process.env.SUPABASE_URL = url

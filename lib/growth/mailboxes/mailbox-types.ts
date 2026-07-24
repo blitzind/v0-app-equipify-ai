@@ -40,6 +40,7 @@ export type GrowthMailboxConnectionSummary = {
   display_name: string
   token_expires_at: string | null
   token_configured: boolean
+  refresh_token_configured: boolean
   last_refresh_attempt: string | null
   last_successful_refresh: string | null
   last_validation_at: string | null

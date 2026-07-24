@@ -67,6 +67,8 @@ type GrowthLeadCommandCenterProps = {
   nativeCommunicationStrategy?: import("@/lib/growth/contact-verification/communication-strategy-view").CommunicationStrategyDisplaySummary | null
   /** GE-AIOS-25A-1 — actions strip only; assessment/NBA live in cognitive workspace. */
   cognitiveActionsOnly?: boolean
+  /** AVA-OPERATOR-WORKSPACE-3B — hide CRM workflow chrome in reference section */
+  operatorReferenceMode?: boolean
 }
 
 function formatSource(lead: GrowthLead): string {
@@ -101,6 +103,7 @@ export function GrowthLeadCommandCenter({
   nativeDecision,
   nativeCommunicationStrategy,
   cognitiveActionsOnly = false,
+  operatorReferenceMode = false,
 }: GrowthLeadCommandCenterProps) {
   const [primaryDmName, setPrimaryDmName] = useState<string | null>(null)
   const [touchSaving, setTouchSaving] = useState(false)
@@ -258,20 +261,23 @@ export function GrowthLeadCommandCenter({
       <GrowthEngineCard data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight text-foreground">{lead.companyName}</h2>
-              {[lead.city, lead.state].filter(Boolean).length ? (
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {[lead.city, lead.state].filter(Boolean).join(", ")}
-                </p>
-              ) : null}
-            </div>
+            {operatorReferenceMode ? null : (
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground">{lead.companyName}</h2>
+                {[lead.city, lead.state].filter(Boolean).length ? (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {[lead.city, lead.state].filter(Boolean).join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            )}
             <Button size="sm" variant="outline" onClick={() => setEditContactOpen(true)}>
               <Pencil className="mr-2 size-3.5" />
               Edit Contact Info
             </Button>
           </div>
 
+          {operatorReferenceMode ? null : (
           <div className="flex flex-wrap gap-2">
             {cognitiveActionsOnly ? null : (
               <>
@@ -297,6 +303,7 @@ export function GrowthLeadCommandCenter({
             )}
             <GrowthBadge label={formatSource(lead)} tone="neutral" className="normal-case" />
           </div>
+          )}
 
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <ContactRow icon={<Phone className="size-3.5" />} label="Primary contact" value={lead.contactName} />
@@ -314,7 +321,7 @@ export function GrowthLeadCommandCenter({
             ) : null}
           </dl>
 
-          {cognitiveActionsOnly ? (
+          {cognitiveActionsOnly && !operatorReferenceMode ? (
             <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2">
               <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Ownership
@@ -338,7 +345,7 @@ export function GrowthLeadCommandCenter({
             </p>
           ) : null}
 
-          {cognitiveActionsOnly ? null : (
+          {cognitiveActionsOnly || operatorReferenceMode ? null : (
             <GrowthNextBestActionBanner
               lead={lead}
               nativeDecision={nativeDecision}
@@ -362,6 +369,7 @@ export function GrowthLeadCommandCenter({
             <p className="text-xs text-muted-foreground">{researchProgressMessage}</p>
           ) : null}
 
+          {operatorReferenceMode ? null : (
           <div className="space-y-2">
             {primaryAction.mode === "generate_personalization" || primaryAction.mode === "approve_outreach" ? (
               <Button size="lg" className="h-11 w-full justify-start gap-2" asChild>
@@ -476,8 +484,9 @@ export function GrowthLeadCommandCenter({
               </div>
             </details>
           </div>
+          )}
 
-          {cognitiveActionsOnly || !lead.nextBestAction ? null : (
+          {cognitiveActionsOnly || operatorReferenceMode || !lead.nextBestAction ? null : (
             <p className="text-xs text-muted-foreground">
               Suggested: {GROWTH_NEXT_BEST_ACTION_LABELS[lead.nextBestAction] ?? lead.nextBestAction.replace(/_/g, " ")}
             </p>
@@ -485,7 +494,7 @@ export function GrowthLeadCommandCenter({
         </div>
       </GrowthEngineCard>
 
-      {cognitiveActionsOnly ? null : (
+      {cognitiveActionsOnly || operatorReferenceMode ? null : (
         <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Ownership &amp; assignment</summary>
           <div className="mt-3">

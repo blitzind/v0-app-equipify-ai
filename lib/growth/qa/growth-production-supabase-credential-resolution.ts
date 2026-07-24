@@ -80,11 +80,14 @@ export function resolveSupabaseCredentialsFromCliLinkedProject(input?: {
   const cliKey = sanitizeSupabaseCertEnvValue(fetchServiceRoleKey(projectRef) ?? undefined)
   if (!isSupabaseServiceRoleJwt(cliKey)) return null
 
+  const urlFromJwt = resolveSupabaseUrlFromJwt(cliKey)
+  const urlFromEnv = resolveSupabaseUrlFromEnvRecord(input?.env ?? {})
+  const urlFromExisting = sanitizeSupabaseCertEnvValue(input?.existingUrl ?? undefined)
+  const candidates = [urlFromExisting, urlFromEnv, urlFromJwt, resolveSupabaseUrlForProjectRef(projectRef)]
   const url =
-    sanitizeSupabaseCertEnvValue(input?.existingUrl ?? undefined) ||
-    resolveSupabaseUrlFromEnvRecord(input?.env ?? {}) ||
-    resolveSupabaseUrlFromJwt(cliKey) ||
-    resolveSupabaseUrlForProjectRef(projectRef)
+    candidates.find(
+      (candidate) => candidate.startsWith("http") && !candidate.includes("placeholder.supabase.co"),
+    ) ?? resolveSupabaseUrlForProjectRef(projectRef)
 
   if (!url.startsWith("http")) return null
 

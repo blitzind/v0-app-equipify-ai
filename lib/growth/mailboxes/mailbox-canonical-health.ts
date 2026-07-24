@@ -20,6 +20,8 @@ export type GrowthMailboxCanonicalHealthInput = {
   healthScore?: number | null
   tokenExpiresAt?: string | null
   tokenConfigured?: boolean
+  refreshTokenConfigured?: boolean
+  accessTokenRefreshRequired?: boolean
   validationFailureCount?: number | null
   needsReconnect?: boolean
   signatureStatus?: "configured" | "missing" | "inherited" | null
@@ -79,11 +81,19 @@ export function classifyMailboxCanonicalHealth(
   }
 
   if (isMailboxTokenExpired(input.tokenExpiresAt, now)) {
-    return {
-      state: "unhealthy",
-      warningReasons: ["OAuth token expired"],
-      requiresAction: true,
-      primaryLabel: "Unhealthy",
+    const refreshable =
+      Boolean(input.refreshTokenConfigured) &&
+      !input.needsReconnect &&
+      input.connectionStatus === "connected"
+    if (refreshable || input.accessTokenRefreshRequired) {
+      warningReasons.push("Access token refresh required")
+    } else {
+      return {
+        state: "unhealthy",
+        warningReasons: ["OAuth token expired"],
+        requiresAction: true,
+        primaryLabel: "Unhealthy",
+      }
     }
   }
 

@@ -323,6 +323,156 @@ export async function listGrowthAiCopilotGenerations(
   return (data ?? []).map((row) => mapGeneration(row as GenerationRow))
 }
 
+export async function updateGrowthAiCopilotGenerationRecord(
+  admin: SupabaseClient,
+  generationId: string,
+  input: {
+    generatedContent?: string
+    generatedSubject?: string | null
+    classification?: Record<string, unknown>
+    sentAt?: string | null
+    status?: GrowthAiCopilotGenerationStatus
+  },
+): Promise<GrowthAiCopilotGeneration> {
+  if (input.generatedContent !== undefined || input.generatedSubject !== undefined) {
+    const existing = await fetchGrowthAiCopilotGenerationById(admin, generationId)
+    if (existing) {
+      const invalidated = await invalidateAvaSupervisedApprovalOnContentChange(admin, existing, {
+        generatedContent: input.generatedContent,
+        generatedSubject: input.generatedSubject,
+      })
+      if (invalidated) return invalidated
+    }
+  }
+
+  const patch: Record<string, unknown> = {}
+  if (input.generatedContent !== undefined) patch.generated_content = input.generatedContent
+  if (input.generatedSubject !== undefined) patch.generated_subject = input.generatedSubject
+  if (input.classification !== undefined) patch.classification = input.classification
+  if (input.sentAt !== undefined) patch.sent_at = input.sentAt
+  if (input.status !== undefined) patch.status = input.status
+
+  const { data, error } = await generationsTable(admin)
+    .update(patch)
+    .eq("id", generationId)
+    .select(GENERATION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapGeneration(data as GenerationRow)
+}
+
+export async function invalidateAvaSupervisedApprovalOnContentChange(
+  admin: SupabaseClient,
+  generation: GrowthAiCopilotGeneration,
+  next: {
+    generatedContent?: string
+    generatedSubject?: string | null
+  },
+): Promise<GrowthAiCopilotGeneration | null> {
+  const { isAvaSupervisedOutboundGeneration, readAvaSupervisedOutboundApprovalBinding } =
+    await import("@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types")
+  const { detectAvaSupervisedApprovalContentDrift } = await import(
+    "@/lib/growth/ava-reasoning/ava-supervised-outbound-bundle-verification"
+  )
+  const { stripAccidentalAvaSignatureFromBody } = await import(
+    "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
+  )
+
+  if (!isAvaSupervisedOutboundGeneration(generation) || generation.status !== "approved") {
+    return null
+  }
+
+  const binding = readAvaSupervisedOutboundApprovalBinding(
+    generation.classification as Record<string, unknown>,
+  )
+  if (!binding) return null
+
+  const draft = {
+    ...generation,
+    generatedContent: next.generatedContent ?? generation.generatedContent,
+    generatedSubject:
+      next.generatedSubject === undefined ? generation.generatedSubject : next.generatedSubject,
+  }
+
+  const unsignedBody = stripAccidentalAvaSignatureFromBody(draft.generatedContent)
+  if (
+    !detectAvaSupervisedApprovalContentDrift({
+      generation: draft,
+      binding,
+      unsignedBody,
+    })
+  ) {
+    return null
+  }
+
+  const classification = { ...(generation.classification as Record<string, unknown>) }
+  delete classification.avaSupervisedOutboundApproval
+  delete classification.avaSupervisedOutboundSendReceipt
+  delete classification.avaSupervisedOutboundSendLifecycle
+
+  return updateGrowthAiCopilotGenerationRecord(admin, generation.id, {
+    generatedContent: draft.generatedContent,
+    generatedSubject: draft.generatedSubject,
+    status: "draft",
+    classification,
+    sentAt: null,
+  })
+}
+
+export async function invalidateAvaSupervisedApprovalsForSenderMigration(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    previousAssignmentId: string
+    previousSenderAccountId: string
+    contactEmail: string
+  },
+): Promise<number> {
+  const { isAvaSupervisedOutboundGeneration, readAvaSupervisedOutboundApprovalBinding } =
+    await import("@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types")
+
+  const contactNormalized = input.contactEmail.trim().toLowerCase()
+  const { data, error } = await generationsTable(admin)
+    .select(GENERATION_SELECT)
+    .eq("lead_id", input.leadId)
+    .eq("status", "approved")
+    .is("sent_at", null)
+
+  if (error) throw new Error(error.message)
+  let invalidated = 0
+
+  for (const row of data ?? []) {
+    const generation = mapGeneration(row as GenerationRow)
+    if (!isAvaSupervisedOutboundGeneration(generation)) continue
+
+    const binding = readAvaSupervisedOutboundApprovalBinding(
+      generation.classification as Record<string, unknown>,
+    )
+    if (!binding) continue
+
+    const recipientMatches = binding.recipientEmail.trim().toLowerCase() === contactNormalized
+    const assignmentMatches =
+      binding.senderAssignmentId === input.previousAssignmentId ||
+      binding.senderAccountId === input.previousSenderAccountId
+
+    if (!recipientMatches || !assignmentMatches) continue
+
+    const classification = { ...(generation.classification as Record<string, unknown>) }
+    delete classification.avaSupervisedOutboundApproval
+    delete classification.avaSupervisedOutboundSendReceipt
+    delete classification.avaSupervisedOutboundSendLifecycle
+
+    await updateGrowthAiCopilotGenerationRecord(admin, generation.id, {
+      status: "draft",
+      classification,
+      sentAt: null,
+    })
+    invalidated += 1
+  }
+
+  return invalidated
+}
+
 export async function updateGrowthAiCopilotGenerationStatus(
   admin: SupabaseClient,
   generationId: string,

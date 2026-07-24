@@ -9,6 +9,7 @@ import {
   enforceAvaReasoningEmailPolicy,
   normalizeAvaReasoningResult,
 } from "@/lib/fuzor/ava-reasoning/ava-reasoning-schema"
+import { AVA_SUPERVISED_OUTBOUND_SIGNATURE_PROHIBITION_LINES } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import type { AvaReasoningResult } from "@/lib/fuzor/ava-reasoning/ava-reasoning-types"
 
 export const AVA_DIRECT_GPT_1A_QA_MARKER = "ava-direct-gpt-1a-v1" as const
@@ -48,6 +49,7 @@ export const AVA_DIRECT_GPT_JSON_CONTRACT = [
   "Derive companyUnderstanding directly from the supplied website text.",
   "When decision is hold or reject, email must be null.",
   "Do not invent contacts that were not supplied.",
+  ...AVA_SUPERVISED_OUTBOUND_SIGNATURE_PROHIBITION_LINES,
 ].join("\n")
 
 export function normalizeAvaDirectGptResult(raw: AvaDirectGptModelOutput): AvaDirectGptResult {

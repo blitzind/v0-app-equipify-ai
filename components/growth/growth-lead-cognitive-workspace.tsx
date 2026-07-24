@@ -45,6 +45,7 @@ import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-v
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
 import { completedWorkTitle, reviewCompletedWork } from "@/lib/workspace/ai-teammate-voice"
 
 export type GrowthLeadCognitiveRawDomains = Partial<Record<GrowthAvaRawDomainId, ReactNode>>
@@ -65,6 +66,8 @@ export type GrowthLeadCognitiveWorkspaceProps = {
   researchNotesSlot?: ReactNode
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
   onTimelineRefresh?: () => void
+  /** AVA-OPERATOR-WORKSPACE-3B — collapse CRM sections beneath Ava review */
+  referenceMode?: boolean
 }
 
 export function GrowthLeadCognitiveWorkspace({
@@ -79,6 +82,7 @@ export function GrowthLeadCognitiveWorkspace({
   humanWorkspaceChildren,
   rawDomains = null,
   researchNotesSlot,
+  referenceMode = false,
 }: GrowthLeadCognitiveWorkspaceProps) {
   const { teammate } = useAiTeammateIdentity()
   const [pendingApprovalCount] = useState(0)
@@ -111,6 +115,118 @@ export function GrowthLeadCognitiveWorkspace({
       assessment.objective,
   )
 
+  const sectionDefaultOpen = !referenceMode
+  const assessmentTitle = referenceMode
+    ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.companyDetails
+    : GROWTH_AVA_COGNITIVE_SECTION_TITLES.assessment
+  const progressTitle = referenceMode
+    ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.progress
+    : GROWTH_AVA_COGNITIVE_SECTION_TITLES.execution_plan
+  const evidenceTitle = referenceMode
+    ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.evidence
+    : GROWTH_AVA_COGNITIVE_SECTION_TITLES.evidence
+
+  if (referenceMode) {
+    return (
+      <div
+        className="space-y-4"
+        data-qa-marker={GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER}
+        data-compression-marker={GROWTH_AVA_COGNITIVE_WORKSPACE_COMPRESSION_QA_MARKER}
+        data-refinement-marker={GROWTH_AVA_COGNITIVE_WORKSPACE_REFINEMENT_QA_MARKER}
+        data-ava-operator-reference-mode
+      >
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.assessment}
+          title={assessmentTitle}
+          defaultOpen={false}
+          persistKey="ava-cognitive-assessment"
+        >
+          <GrowthAvaCurrentAssessmentPanel assessment={assessment} />
+        </GrowthCognitiveSection>
+
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.whats_changed}
+          title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.whats_changed}
+          defaultOpen={false}
+          persistKey="ava-cognitive-whats-changed"
+        >
+          <GrowthAvaWhatsChangedPanel projectionInput={projectionInput} />
+        </GrowthCognitiveSection>
+
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.execution_plan}
+          title={progressTitle}
+          defaultOpen={false}
+          persistKey="ava-cognitive-plan"
+        >
+          <div className="space-y-3">
+            <GrowthAvaProgressTimeline steps={progressSteps} />
+            {!hasPlanSignals ? (
+              <p className="text-sm text-muted-foreground">
+                I have not created an execution plan for this account yet.
+              </p>
+            ) : null}
+          </div>
+        </GrowthCognitiveSection>
+
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.human_workspace}
+          title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.human_workspace}
+          defaultOpen={false}
+          persistKey="ava-cognitive-human"
+        >
+          <div className="space-y-3">
+            <GrowthAvaHumanInterventionsSummary leadId={lead.id} />
+            {humanWorkspaceChildren}
+          </div>
+        </GrowthCognitiveSection>
+
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.why_i_believe}
+          title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.why_i_believe}
+          defaultOpen={false}
+          persistKey="ava-cognitive-why"
+        >
+          <GrowthAvaWhyIBelievePanel beliefs={beliefs} />
+        </GrowthCognitiveSection>
+
+        <GrowthCognitiveSection
+          id={GROWTH_AVA_COGNITIVE_SECTION_IDS.evidence}
+          title={evidenceTitle}
+          defaultOpen={false}
+          persistKey="ava-cognitive-evidence"
+        >
+          <GrowthAvaEvidencePanel facts={evidence} />
+        </GrowthCognitiveSection>
+
+        {listAvaRawDomainSlots().map((slot) => {
+          const children = resolveAvaRawDomainChildren(rawDomains, slot.domainId)
+          if (!children) return null
+          const title =
+            slot.domainId === "advanced"
+              ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.activity
+              : slot.domainId === "operations"
+                ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.operations
+                : slot.domainId === "research"
+                  ? GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.research
+                  : slot.title
+          return (
+            <GrowthCognitiveSection
+              key={slot.domainId}
+              id={slot.elementId}
+              title={title}
+              defaultOpen={false}
+              persistKey={slot.persistKey}
+              expandToken={rawDomainExpand === slot.domainId ? rawDomainExpandToken : 0}
+            >
+              {children}
+            </GrowthCognitiveSection>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div
       className="space-y-4"
@@ -120,8 +236,8 @@ export function GrowthLeadCognitiveWorkspace({
     >
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.assessment}
-        title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.assessment}
-        defaultOpen
+        title={assessmentTitle}
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-assessment"
       >
         <GrowthAvaCurrentAssessmentPanel assessment={assessment} />
@@ -130,7 +246,7 @@ export function GrowthLeadCognitiveWorkspace({
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.whats_changed}
         title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.whats_changed}
-        defaultOpen
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-whats-changed"
       >
         <GrowthAvaWhatsChangedPanel projectionInput={projectionInput} />
@@ -138,8 +254,8 @@ export function GrowthLeadCognitiveWorkspace({
 
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.execution_plan}
-        title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.execution_plan}
-        defaultOpen
+        title={progressTitle}
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-plan"
       >
         <div className="space-y-3">
@@ -175,9 +291,9 @@ export function GrowthLeadCognitiveWorkspace({
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.human_workspace}
         title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.human_workspace}
-        defaultOpen
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-human"
-        forceVisible
+        forceVisible={!referenceMode}
       >
         <div className="space-y-3">
           <GrowthAvaOperatorTaskGroup
@@ -243,7 +359,7 @@ export function GrowthLeadCognitiveWorkspace({
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.why_i_believe}
         title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.why_i_believe}
-        defaultOpen
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-why"
       >
         <GrowthAvaWhyIBelievePanel beliefs={beliefs} />
@@ -251,8 +367,8 @@ export function GrowthLeadCognitiveWorkspace({
 
       <GrowthCognitiveSection
         id={GROWTH_AVA_COGNITIVE_SECTION_IDS.evidence}
-        title={GROWTH_AVA_COGNITIVE_SECTION_TITLES.evidence}
-        defaultOpen
+        title={evidenceTitle}
+        defaultOpen={sectionDefaultOpen}
         persistKey="ava-cognitive-evidence"
       >
         <GrowthAvaEvidencePanel facts={evidence} />

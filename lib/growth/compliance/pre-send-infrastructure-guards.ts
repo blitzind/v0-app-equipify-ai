@@ -112,20 +112,56 @@ export async function evaluatePreSendInfrastructureAllowed(
   }
 
   const mailbox = await getMailboxConnectionBySender(admin, input.senderAccountId).catch(() => null)
-  if (mailbox && !["connected", "healthy", "warning"].includes(mailbox.status)) {
+  if (mailbox) {
+    const { ensureMailboxReadyForOutboundSend } = await import(
+      "@/lib/growth/mailboxes/mailbox-pre-send-readiness"
+    )
+    const readiness = await ensureMailboxReadyForOutboundSend(admin, input.senderAccountId)
+    if (!readiness.ok) {
+      await recordInternalOutboundAuditEvent(admin, {
+        eventType: "pre_send_blocked",
+        severity: readiness.reconnectRequired ? "critical" : "high",
+        title: readiness.reconnectRequired
+          ? "Send blocked — mailbox reconnect required"
+          : "Send blocked — mailbox refresh failed",
+        summary: readiness.message,
+        senderAccountId: input.senderAccountId,
+        mailboxConnectionId: mailbox.id,
+        metadata: { block_code: "mailbox_unhealthy", readiness_code: readiness.code },
+      }).catch(() => undefined)
+
+      return {
+        allowed: false,
+        reason: readiness.message,
+        blockCode: "mailbox_unhealthy",
+      }
+    }
+  } else if (input.senderAccountId) {
+    return {
+      allowed: false,
+      reason: "No mailbox connection for sender.",
+      blockCode: "mailbox_unhealthy",
+    }
+  }
+
+  const mailboxAfterRefresh = await getMailboxConnectionBySender(admin, input.senderAccountId).catch(() => null)
+  if (
+    mailboxAfterRefresh &&
+    !["connected", "warning"].includes(mailboxAfterRefresh.status)
+  ) {
     await recordInternalOutboundAuditEvent(admin, {
       eventType: "pre_send_blocked",
       severity: "high",
       title: "Send blocked — unhealthy mailbox",
-      summary: mailbox.health_reason ?? `Mailbox status: ${mailbox.status}`,
+      summary: mailboxAfterRefresh.health_reason ?? `Mailbox status: ${mailboxAfterRefresh.status}`,
       senderAccountId: input.senderAccountId,
-      mailboxConnectionId: mailbox.id,
+      mailboxConnectionId: mailboxAfterRefresh.id,
       metadata: { block_code: "mailbox_unhealthy" },
     }).catch(() => undefined)
 
     return {
       allowed: false,
-      reason: `Mailbox connection unhealthy (${mailbox.status}).`,
+      reason: `Mailbox connection unhealthy (${mailboxAfterRefresh.status}).`,
       blockCode: "mailbox_unhealthy",
     }
   }

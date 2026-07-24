@@ -28,9 +28,12 @@ import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-que
 import { growthAvaPanelTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthSenderProfilesDashboardPayload } from "@/lib/growth/signatures/signature-types"
+import { GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
+import { isAvaSupervisedOutboundGeneration, readAvaSupervisedOutboundSendReceipt } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 
 type GrowthAiCopilotProps = {
   lead: GrowthLead
+  surface?: "drawer-primary" | "embedded"
 }
 
 const EMAIL_TYPES: Array<{ type: GrowthAiCopilotGenerationType; label: string }> = [
@@ -48,7 +51,7 @@ const CALL_TYPES: Array<{ type: GrowthAiCopilotGenerationType; label: string }> 
   { type: "call_summary", label: "Call Summary" },
 ]
 
-export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
+export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotProps) {
   const { teammate } = useAiTeammateIdentity()
   const [generations, setGenerations] = useState<GrowthAiCopilotGeneration[]>([])
   const [loading, setLoading] = useState(true)
@@ -170,6 +173,32 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
     }
   }
 
+  async function sendApproved(generationId: string) {
+    setActingId(generationId)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/copilot/generations/${generationId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ humanApproved: true, humanApprovalConfirmed: true }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        generation?: GrowthAiCopilotGeneration
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok || !data.generation) {
+        throw new Error(data.message ?? data.error ?? "Send failed.")
+      }
+      setGenerations((prev) => prev.map((entry) => (entry.id === generationId ? data.generation! : entry)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Send failed.")
+    } finally {
+      setActingId(null)
+    }
+  }
+
   async function queueGeneration(generationId: string, sendNow = false) {
     setActingId(generationId)
     try {
@@ -210,6 +239,205 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
     return queueItems.find((item) => item.generationId === generationId) ?? null
   }
 
+  const reviewBody = (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{formatOperatorWorkspaceReviewIntro(teammate)}</p>
+
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading Ava&apos;s recommendation…
+        </div>
+      ) : primaryGeneration ? (
+        <GrowthAvaOperatorWorkspaceReview
+          lead={lead}
+          teammate={teammate}
+          generation={primaryGeneration}
+          acting={actingId === primaryGeneration.id}
+          queueItem={queueItemForGeneration(primaryGeneration.id)}
+          onApprove={() => void approve(primaryGeneration.id)}
+          onReject={() => void discard(primaryGeneration.id)}
+          onSend={
+            isAvaSupervisedOutboundGeneration(primaryGeneration) &&
+            primaryGeneration.status === "approved" &&
+            !primaryGeneration.sentAt &&
+            readAvaSupervisedOutboundSendReceipt(primaryGeneration.classification as Record<string, unknown>)
+              ?.status !== "delivery_unknown"
+              ? () => void sendApproved(primaryGeneration.id)
+              : undefined
+          }
+          onQueue={
+            !isAvaSupervisedOutboundGeneration(primaryGeneration) &&
+            primaryGeneration.status === "approved"
+              ? () => void queueGeneration(primaryGeneration.id, false)
+              : undefined
+          }
+          onQueueAndSend={
+            !isAvaSupervisedOutboundGeneration(primaryGeneration) &&
+            primaryGeneration.status === "approved"
+              ? () => void queueGeneration(primaryGeneration.id, true)
+              : undefined
+          }
+        />
+      ) : (
+        <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+          Ava has not prepared a recommendation for this account yet.
+        </div>
+      )}
+
+      {previousGenerations.length > 0 ? (
+        <div className="rounded-lg border border-border/60">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            onClick={() => setPreviousOpen((value) => !value)}
+          >
+            {previousOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            Previous preparations ({previousGenerations.length})
+          </button>
+          {previousOpen ? (
+            <ul className="space-y-2 border-t border-border/60 p-3">
+              {previousGenerations.map((entry) => (
+                <li key={entry.id} className="rounded-md border border-border/60 px-3 py-2 text-sm">
+                  <p className="font-medium text-foreground">
+                    {formatOperatorGenerationTypeLabel(entry.generationType)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.generatedSubject?.trim() || "No subject"} ·{" "}
+                    {entry.status === "draft"
+                      ? "Ready for your review"
+                      : entry.status === "approved"
+                        ? "Approved"
+                        : "Declined"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="rounded-lg border border-border/60">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          onClick={() => setPrepareOpen((value) => !value)}
+        >
+          {prepareOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          Ask Ava to prepare another message
+        </button>
+        {prepareOpen ? (
+          <div className="space-y-4 border-t border-border/60 p-3">
+            {senderProfiles.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Write as</p>
+                <Select value={selectedSenderAccountId} onValueChange={setSelectedSenderAccountId}>
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue placeholder="Default sender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__default__">Default sender</SelectItem>
+                    {senderProfiles.map((row) => (
+                      <SelectItem key={row.profile.id} value={row.profile.sender_account_id}>
+                        {row.profile.display_name}
+                        {row.profile.title ? ` — ${row.profile.title}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</p>
+              <div className="flex flex-wrap gap-2">
+                {EMAIL_TYPES.map((entry) => (
+                  <Button
+                    key={entry.type}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={generating !== null}
+                    onClick={() => void generate(entry.type)}
+                  >
+                    {generating === entry.type ? (
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 size-3.5" />
+                    )}
+                    {entry.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Reply</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={generating !== null}
+                onClick={() => void generate("response_draft")}
+              >
+                {generating === "response_draft" ? (
+                  <Loader2 className="mr-1 size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1 size-3.5" />
+                )}
+                Reply Draft
+              </Button>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Call prep</p>
+              <div className="flex flex-wrap gap-2">
+                {CALL_TYPES.map((entry) => (
+                  <Button
+                    key={entry.type}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={generating !== null}
+                    onClick={() => void generate(entry.type)}
+                  >
+                    {generating === entry.type ? (
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 size-3.5" />
+                    )}
+                    {entry.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  if (surface === "drawer-primary") {
+    return (
+      <section
+        id="growth-ai-copilot"
+        className="space-y-2"
+        data-qa-marker-ava-operator-workspace-3b={GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER}
+      >
+        <div className="flex items-center gap-2">
+          <Bot className="size-4 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-foreground">{growthAvaPanelTitle(teammate)}</h3>
+            <p className="text-xs text-muted-foreground">{summarizeOperatorWorkspaceHeader(generations)}</p>
+          </div>
+        </div>
+        {reviewBody}
+      </section>
+    )
+  }
+
   return (
     <GrowthCollapsibleEngineCard
       id="growth-ai-copilot"
@@ -221,172 +449,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
       defaultOpen
       persistKey={GROWTH_DRAWER_CARD_KEYS.aiCopilot}
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">{formatOperatorWorkspaceReviewIntro(teammate)}</p>
-
-        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading Ava&apos;s recommendation…
-          </div>
-        ) : primaryGeneration ? (
-          <GrowthAvaOperatorWorkspaceReview
-            lead={lead}
-            teammate={teammate}
-            generation={primaryGeneration}
-            acting={actingId === primaryGeneration.id}
-            queueItem={queueItemForGeneration(primaryGeneration.id)}
-            onApprove={() => void approve(primaryGeneration.id)}
-            onReject={() => void discard(primaryGeneration.id)}
-            onQueue={
-              primaryGeneration.status === "approved"
-                ? () => void queueGeneration(primaryGeneration.id, false)
-                : undefined
-            }
-            onQueueAndSend={
-              primaryGeneration.status === "approved"
-                ? () => void queueGeneration(primaryGeneration.id, true)
-                : undefined
-            }
-          />
-        ) : (
-          <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
-            Ava has not prepared a recommendation for this account yet.
-          </div>
-        )}
-
-        {previousGenerations.length > 0 ? (
-          <div className="rounded-lg border border-border/60">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              onClick={() => setPreviousOpen((value) => !value)}
-            >
-              {previousOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-              Previous preparations ({previousGenerations.length})
-            </button>
-            {previousOpen ? (
-              <ul className="space-y-2 border-t border-border/60 p-3">
-                {previousGenerations.map((entry) => (
-                  <li key={entry.id} className="rounded-md border border-border/60 px-3 py-2 text-sm">
-                    <p className="font-medium text-foreground">
-                      {formatOperatorGenerationTypeLabel(entry.generationType)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {entry.generatedSubject?.trim() || "No subject"} ·{" "}
-                      {entry.status === "draft"
-                        ? "Ready for your review"
-                        : entry.status === "approved"
-                          ? "Approved"
-                          : "Declined"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="rounded-lg border border-border/60">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
-            onClick={() => setPrepareOpen((value) => !value)}
-          >
-            {prepareOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-            Ask Ava to prepare another message
-          </button>
-          {prepareOpen ? (
-            <div className="space-y-4 border-t border-border/60 p-3">
-              {senderProfiles.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Write as</p>
-                  <Select value={selectedSenderAccountId} onValueChange={setSelectedSenderAccountId}>
-                    <SelectTrigger className="max-w-md">
-                      <SelectValue placeholder="Default sender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">Default sender</SelectItem>
-                      {senderProfiles.map((row) => (
-                        <SelectItem key={row.profile.id} value={row.profile.sender_account_id}>
-                          {row.profile.display_name}
-                          {row.profile.title ? ` — ${row.profile.title}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</p>
-                <div className="flex flex-wrap gap-2">
-                  {EMAIL_TYPES.map((entry) => (
-                    <Button
-                      key={entry.type}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={generating !== null}
-                      onClick={() => void generate(entry.type)}
-                    >
-                      {generating === entry.type ? (
-                        <Loader2 className="mr-1 size-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-1 size-3.5" />
-                      )}
-                      {entry.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Reply</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={generating !== null}
-                  onClick={() => void generate("response_draft")}
-                >
-                  {generating === "response_draft" ? (
-                    <Loader2 className="mr-1 size-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-1 size-3.5" />
-                  )}
-                  Reply Draft
-                </Button>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Call prep</p>
-                <div className="flex flex-wrap gap-2">
-                  {CALL_TYPES.map((entry) => (
-                    <Button
-                      key={entry.type}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={generating !== null}
-                      onClick={() => void generate(entry.type)}
-                    >
-                      {generating === entry.type ? (
-                        <Loader2 className="mr-1 size-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-1 size-3.5" />
-                      )}
-                      {entry.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
+      {reviewBody}
     </GrowthCollapsibleEngineCard>
   )
 }

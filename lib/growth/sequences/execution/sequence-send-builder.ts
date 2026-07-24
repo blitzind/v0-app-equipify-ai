@@ -24,6 +24,7 @@ import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-si
 import { resolveTransportAuthority } from "@/lib/growth/sequences/execution/growth-transport-authority-1c"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { getSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
+import { fetchActiveOutboundSenderAssignment } from "@/lib/growth/outbound-sender-affinity/outbound-sender-affinity-repository"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -39,6 +40,9 @@ export async function resolveSequenceExecutionSender(
     allowAutoRotation?: boolean
     manualSenderAccountId?: string | null
     sequenceExecutionJobId?: string | null
+    organizationId?: string | null
+    leadId?: string | null
+    contactEmail?: string | null
   },
 ): Promise<{
   senderAccountId: string
@@ -49,6 +53,27 @@ export async function resolveSequenceExecutionSender(
   rotationReason?: string | null
   rotationRiskLevel?: string | null
 } | null> {
+  const organizationId = options?.organizationId?.trim() || getGrowthEngineAiOrgId() || null
+  const contactEmail = options?.contactEmail?.trim() || null
+  if (organizationId && options?.leadId && contactEmail) {
+    const affinity = await fetchActiveOutboundSenderAssignment(admin, {
+      organizationId,
+      leadId: options.leadId,
+      contactEmail,
+    })
+    if (affinity) {
+      return {
+        senderAccountId: affinity.senderAccountId,
+        providerId: null,
+        senderPoolId: affinity.senderPoolId,
+        allowAutoRotation: false,
+        manualSenderAccountId: affinity.senderAccountId,
+        rotationReason: "existing_affinity",
+        rotationRiskLevel: "low",
+      }
+    }
+  }
+
   if (options?.senderPoolId && options.allowAutoRotation !== false) {
     const rotation = await resolveSenderRotationForPool(admin, {
       senderPoolId: options.senderPoolId,
@@ -151,6 +176,9 @@ export async function buildSequenceExecutionSendPayload(
     allowAutoRotation: authority.allowAutoRotation,
     manualSenderAccountId: authority.manualSenderAccountId ?? input.manualSenderAccountId ?? null,
     sequenceExecutionJobId: input.sequenceExecutionJobId,
+    organizationId,
+    leadId: input.leadId,
+    contactEmail: lead.contactEmail,
   })
   if (!resolvedSender) return { error: "no_sender_route" }
 

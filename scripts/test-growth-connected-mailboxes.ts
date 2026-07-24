@@ -38,6 +38,7 @@ function baseRow(overrides: Partial<GrowthConnectedMailboxRow> = {}): GrowthConn
     deliveryRouteEnabled: true,
     providerFamily: "google",
     needsReconnect: false,
+    accessTokenRefreshRequired: false,
     operationalPaused: false,
     signatureStatus: "configured",
     ...overrides,
@@ -88,7 +89,7 @@ async function main(): Promise<void> {
   assert.match(readModelSource, /classifyMailboxCanonicalHealth/)
   assert.match(readModelSource, /canonicalHealthState/)
   assert.match(uiSource, /warningReasons/)
-  assert.match(uiSource, /canonicalHealthLabel/)
+  assert.match(uiSource, /cardHealth\.label/)
   assert.match(uiSource, /warningMailboxes/)
 
   assert.match(readModelSource, /signatureStatus/)

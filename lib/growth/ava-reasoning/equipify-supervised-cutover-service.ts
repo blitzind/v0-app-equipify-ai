@@ -9,7 +9,6 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import {
-  applyEquipifyApprovedSignatureToEmail,
   enrichOrganizationKnowledgeWithSenderIdentity,
   loadEquipifyApprovedSenderBundle,
 } from "@/lib/growth/ava-reasoning/equipify-approved-sender"
@@ -18,6 +17,7 @@ import {
   AVA_DIRECT_PRODUCTION_PROMPT_VERSION,
   runEquipifyAvaDirectReasoning,
 } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-direct-reasoning"
+import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
 import { persistAvaUnderstandingMemory } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-understanding-memory"
 import {
   retrieveWebsiteTextForAvaDirect,
@@ -399,19 +399,13 @@ export async function runEquipifySupervisedAvaOutreach(
   }
 
   let email = reasoned.result.email
-  let signatureApplied = false
-  if (
-    reasoned.result.decision === "pursue" &&
-    email &&
-    senderBundle.senderAccountId
-  ) {
-    const signed = await applyEquipifyApprovedSignatureToEmail(input.admin, {
-      senderAccountId: senderBundle.senderAccountId,
-      email,
-    })
-    email = signed.email
-    signatureApplied = signed.signatureInjected
+  if (email?.body) {
+    email = {
+      ...email,
+      body: stripAccidentalAvaSignatureFromBody(email.body),
+    }
   }
+  const signatureApplied = false
 
   const { companyUnderstanding, ...reasoningFields } = reasoned.result
   const result: AvaReasoningResult = {

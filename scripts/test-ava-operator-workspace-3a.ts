@@ -16,6 +16,10 @@ import {
   resolvePrimaryOperatorReviewGeneration,
   resolveOperatorConfidenceLabel,
 } from "../lib/growth/aios/operator-experience/growth-ava-operator-workspace-3a"
+import {
+  GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL,
+  GROWTH_AVA_OPERATOR_SECTION_WHY,
+} from "../lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
 
 const CERTIFICATION_ID = "ava-operator-workspace-3a-v1" as const
 
@@ -156,9 +160,10 @@ function main(): void {
     assert.match(copilot, /resolvePrimaryOperatorReviewGeneration/)
     assert.match(presentation, /recommends contacting/)
     assert.match(review, /formatAvaRecommendsContactHeading/)
-    assert.match(review, /Recommendation/)
-    assert.match(review, /Email/)
-    assert.match(review, /Decision/)
+    assert.match(review, /GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION/)
+    assert.match(review, new RegExp(`GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL|${GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`))
+    assert.match(review, new RegExp(`GROWTH_AVA_OPERATOR_SECTION_WHY|${GROWTH_AVA_OPERATOR_SECTION_WHY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`))
+    assert.match(review, /GROWTH_AVA_OPERATOR_SECTION_YOUR_DECISION/)
     assert.match(review, /Approve/)
     assert.match(review, /Edit/)
     assert.match(review, /Reject/)

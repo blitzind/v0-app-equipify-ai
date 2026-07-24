@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { classifyMailboxCanonicalHealth } from "@/lib/growth/mailboxes/mailbox-canonical-health"
 import { listMailboxConnections } from "@/lib/growth/mailboxes/mailbox-repository"
+import { readMailboxOAuthMetadata } from "@/lib/growth/mailboxes/mailbox-oauth-failure-types"
 import {
   GROWTH_CONNECTED_MAILBOXES_QA_MARKER,
   type GrowthConnectedMailboxRow,
@@ -153,12 +154,13 @@ export async function buildConnectedMailboxesDashboard(
     )
 
     const connectionStatus = mailbox?.status ?? "no_mailbox"
-    const needsReconnect =
-      sender.provider_family === "google" &&
-      (!mailbox ||
-        !mailbox.token_configured ||
-        isDisconnectedMailbox(mailbox.status) ||
-        mailbox.status === "warning")
+    const oauthMeta = readMailboxOAuthMetadata(mailbox?.provider_metadata)
+    const needsReconnect = Boolean(
+      oauthMeta.reconnectRequired ||
+        oauthMeta.oauthFailure?.reconnectRequired ||
+        (sender.provider_family === "google" &&
+          (!mailbox || !mailbox.refresh_token_configured || mailbox.status === "error")),
+    )
 
     const canonicalHealth = classifyMailboxCanonicalHealth({
       connectionStatus,
@@ -166,6 +168,8 @@ export async function buildConnectedMailboxesDashboard(
       healthScore: mailbox?.connection_health ?? sender.sender_score,
       tokenExpiresAt: mailbox?.token_expires_at ?? null,
       tokenConfigured: mailbox?.token_configured ?? false,
+      refreshTokenConfigured: mailbox?.refresh_token_configured ?? false,
+      accessTokenRefreshRequired: oauthMeta.accessTokenRefreshRequired ?? false,
       validationFailureCount: mailbox?.validation_failure_count ?? 0,
       needsReconnect,
       signatureStatus: resolveMailboxSignatureStatus(sender.id, mailbox?.id ?? null),
@@ -197,6 +201,7 @@ export async function buildConnectedMailboxesDashboard(
       deliveryRouteEnabled: routesBySender.get(sender.id) ?? false,
       providerFamily: sender.provider_family,
       needsReconnect,
+      accessTokenRefreshRequired: oauthMeta.accessTokenRefreshRequired ?? false,
       operationalPaused,
       signatureStatus: resolveMailboxSignatureStatus(sender.id, mailbox?.id ?? null),
     }

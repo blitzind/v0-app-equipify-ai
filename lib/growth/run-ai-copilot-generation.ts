@@ -15,7 +15,10 @@ import {
   insertGrowthAiCopilotEffectiveness,
   insertGrowthAiCopilotGeneration,
   listGrowthAiCopilotRules,
+  updateGrowthAiCopilotGenerationRecord,
 } from "@/lib/growth/ai-copilot-repository"
+import { bindAvaSupervisedOutboundApproval } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-service"
+import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import {
   computeGrowthAiCopilotEffectivenessScore,
   evaluateGrowthAiCopilotRules,
@@ -552,29 +555,41 @@ export async function approveGrowthAiCopilotGeneration(
     approvedBy: input.actingUserId,
   })
 
+  let approvedGeneration = updated
+  if (isAvaSupervisedOutboundGeneration(updated)) {
+    const bound = await bindAvaSupervisedOutboundApproval(admin, {
+      generation: updated,
+      actingUserId: input.actingUserId,
+    })
+    approvedGeneration = await updateGrowthAiCopilotGenerationRecord(admin, updated.id, {
+      generatedContent: bound.unsignedBody,
+      classification: bound.classification,
+    })
+  }
+
   await insertGrowthAiCopilotEffectiveness(admin, {
-    generationId: updated.id,
-    leadId: updated.leadId,
-    generationType: updated.generationType,
-    promptVariant: updated.promptVariant,
-    promptVersion: updated.promptVersion,
+    generationId: approvedGeneration.id,
+    leadId: approvedGeneration.leadId,
+    generationType: approvedGeneration.generationType,
+    promptVariant: approvedGeneration.promptVariant,
+    promptVersion: approvedGeneration.promptVersion,
     outcome: "approved",
-    classificationPrimary: updated.classification.primary ?? null,
+    classificationPrimary: approvedGeneration.classification.primary ?? null,
     effectivenessScore: computeGrowthAiCopilotEffectivenessScore({
       outcome: "approved",
-      classificationConfidence: updated.classification.confidence,
+      classificationConfidence: approvedGeneration.classification.confidence,
     }),
   })
 
   await emitGrowthLeadAiCopilotGenerationApprovedTimeline(admin, {
-    leadId: updated.leadId,
-    generationId: updated.id,
-    generationType: updated.generationType,
-    summary: updated.generatedSubject ?? "Approved draft",
+    leadId: approvedGeneration.leadId,
+    generationId: approvedGeneration.id,
+    generationType: approvedGeneration.generationType,
+    summary: approvedGeneration.generatedSubject ?? "Approved draft",
     actor: { userId: input.actingUserId, email: input.actingUserEmail },
   })
 
-  return updated
+  return approvedGeneration
 }
 
 export async function discardGrowthAiCopilotGeneration(

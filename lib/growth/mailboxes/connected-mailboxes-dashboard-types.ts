@@ -33,6 +33,7 @@ export type GrowthConnectedMailboxRow = {
   deliveryRouteEnabled: boolean
   providerFamily: string
   needsReconnect: boolean
+  accessTokenRefreshRequired: boolean
   operationalPaused: boolean
   signatureStatus: "configured" | "missing" | "inherited"
 }

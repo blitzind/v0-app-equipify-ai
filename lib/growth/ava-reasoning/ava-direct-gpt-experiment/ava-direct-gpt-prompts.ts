@@ -7,6 +7,7 @@ import type {
   AvaOrganizationKnowledge,
   AvaRoleKnowledge,
 } from "@/lib/fuzor/ava-reasoning/ava-reasoning-types"
+import { AVA_SUPERVISED_OUTBOUND_SIGNATURE_PROHIBITION_LINES } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 
 function compactOrganizationKnowledge(knowledge: AvaOrganizationKnowledge) {
   return {
@@ -58,6 +59,9 @@ export function buildAvaDirectGptSystemPrompt(roleKnowledge: AvaRoleKnowledge): 
     "- identify the strongest honest angle",
     "- choose the best available contact",
     "- write a first-touch email when pursuit is justified and a contactable recipient exists",
+    "",
+    "Email body rules:",
+    ...AVA_SUPERVISED_OUTBOUND_SIGNATURE_PROHIBITION_LINES.map((line) => `- ${line}`),
     "",
     "Use only supplied information. Do not fabricate facts.",
     "Record your understanding in companyUnderstanding — this may be persisted as organizational memory later.",

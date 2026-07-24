@@ -24,6 +24,8 @@ import { GrowthVoiceRetentionIntelligencePassiveCard } from "@/components/growth
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
 import { GrowthOperationalCapacityIntelligence } from "@/components/growth/growth-operational-capacity-intelligence"
 import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
+import { GrowthAvaOperatorDrawerReferenceDivider } from "@/components/growth/growth-ava-operator-drawer-reference-divider"
+import { GrowthCognitiveSection } from "@/components/growth/cognitive-workspace/growth-cognitive-section"
 import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
 import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realtime-call-intelligence"
@@ -54,6 +56,7 @@ import {
   GROWTH_AVA_RAW_INTELLIGENCE_FOCUS_TARGETS,
   type GrowthAvaRawDomainId,
 } from "@/lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
+import { GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-types"
 import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 
@@ -202,17 +205,28 @@ export function GrowthLeadDrawer({
     >
       <div className={DRAWER_INNER_SCROLL_CANVAS}>
         <GrowthCallWorkflowProvider>
-          <GrowthLeadCommandCenter
-            lead={activeLead}
-            researchEnqueueing={researchEnqueueing}
-            onLeadUpdated={handleLeadUpdated}
-            onLeadSaved={onLeadSaved}
-            onAddDecisionMaker={handleAddDecisionMaker}
-            onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
-            nativeDecision={nativeDecision}
-            nativeCommunicationStrategy={nativeCommunicationStrategy}
-            cognitiveActionsOnly
-          />
+          <GrowthAiCopilot lead={activeLead} surface="drawer-primary" />
+
+          <GrowthAvaOperatorDrawerReferenceDivider />
+
+          <GrowthCognitiveSection
+            id="growth-lead-contact-reference"
+            title={GROWTH_AVA_OPERATOR_REFERENCE_SECTION_TITLES.contact}
+            defaultOpen={false}
+            persistKey="ava-reference-contact"
+          >
+            <GrowthLeadCommandCenter
+              lead={activeLead}
+              researchEnqueueing={researchEnqueueing}
+              onLeadUpdated={handleLeadUpdated}
+              onLeadSaved={onLeadSaved}
+              onAddDecisionMaker={handleAddDecisionMaker}
+              onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+              nativeDecision={nativeDecision}
+              nativeCommunicationStrategy={nativeCommunicationStrategy}
+              operatorReferenceMode
+            />
+          </GrowthCognitiveSection>
 
           <GrowthLeadCognitiveWorkspace
             lead={activeLead}
@@ -225,6 +239,7 @@ export function GrowthLeadDrawer({
             rawDomainExpandToken={rawDomainExpandToken}
             onLeadUpdated={handleLeadUpdated}
             onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+            referenceMode
             rawDomains={{
               research: (
                 <>
@@ -319,12 +334,7 @@ export function GrowthLeadDrawer({
                   <GrowthLeadCompliance lead={activeLead} />
                 </>
               ),
-              advanced: (
-                <>
-                  <GrowthLeadActivityStream lead={activeLead} />
-                  <GrowthAiCopilot lead={activeLead} />
-                </>
-              ),
+              advanced: <GrowthLeadActivityStream lead={activeLead} />,
             }}
           />
         </GrowthCallWorkflowProvider>

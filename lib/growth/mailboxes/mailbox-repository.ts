@@ -67,6 +67,7 @@ function mapSummary(row: MailboxRow): GrowthMailboxConnectionSummary {
     display_name: asString(row.display_name),
     token_expires_at: asString(row.token_expires_at) || null,
     token_configured: Boolean(row.encrypted_access_token || row.encrypted_refresh_token),
+    refresh_token_configured: Boolean(row.encrypted_refresh_token),
     last_refresh_attempt: asString(row.last_refresh_attempt) || null,
     last_successful_refresh: asString(row.last_successful_refresh) || null,
     last_validation_at: asString(row.last_validation_at) || null,
@@ -93,10 +94,27 @@ async function recomputeMailboxHealth(
   let nextStatus = status
   const tokenExpiresAt = asString(row.token_expires_at) || null
   const tokenExpired = isMailboxTokenExpired(tokenExpiresAt)
+  const hasRefreshToken = Boolean(asString(row.encrypted_refresh_token))
+  const providerMetadata =
+    row.provider_metadata && typeof row.provider_metadata === "object"
+      ? (row.provider_metadata as Record<string, unknown>)
+      : {}
+  const { readMailboxOAuthMetadata } = await import("@/lib/growth/mailboxes/mailbox-oauth-failure-types")
+  const { writeMailboxAccessTokenRefreshRequired } = await import(
+    "@/lib/growth/mailboxes/mailbox-oauth-diagnostics"
+  )
+  const oauthMeta = readMailboxOAuthMetadata(providerMetadata)
+  const reconnectRequired = Boolean(oauthMeta.reconnectRequired || oauthMeta.oauthFailure?.reconnectRequired)
 
-  if (tokenExpired && status !== "disabled") {
-    nextStatus = "expired"
-  } else if (status === "expired" && !tokenExpired) {
+  if (reconnectRequired && status !== "disabled") {
+    nextStatus = status === "connected" ? "error" : status
+  } else if (tokenExpired && status !== "disabled") {
+    if (!hasRefreshToken) {
+      nextStatus = "expired"
+    } else if (status === "expired" || status === "error") {
+      nextStatus = "connected"
+    }
+  } else if ((status === "expired" || status === "error") && !tokenExpired && !reconnectRequired) {
     nextStatus = "connected"
   }
 
@@ -105,21 +123,34 @@ async function recomputeMailboxHealth(
     token_expires_at: tokenExpiresAt,
     validation_failure_count: asNumber(row.validation_failure_count, 0),
   })
-  const health_reason = buildMailboxHealthReason({
+  let health_reason = buildMailboxHealthReason({
     status: nextStatus,
     token_expires_at: tokenExpiresAt,
     validation_failure_count: asNumber(row.validation_failure_count, 0),
     score,
   })
 
+  if (tokenExpired && hasRefreshToken && !reconnectRequired) {
+    health_reason = health_reason
+      ? `${health_reason}; Access token refresh required`
+      : "Access token refresh required"
+  }
+
   const previousScore = asNumber(row.connection_health, 100)
   const now = new Date().toISOString()
+  const nextProviderMetadata =
+    tokenExpired && hasRefreshToken && !reconnectRequired
+      ? sanitizeMailboxMetadataForApi(
+          writeMailboxAccessTokenRefreshRequired(providerMetadata, true),
+        )
+      : sanitizeMailboxMetadataForApi(providerMetadata)
 
   const { data, error } = await connectionsTable(admin)
     .update({
       status: nextStatus,
       connection_health: score,
       health_reason,
+      provider_metadata: nextProviderMetadata,
       updated_at: now,
     })
     .is("deleted_at", null)
@@ -130,7 +161,7 @@ async function recomputeMailboxHealth(
   if (error) throw new Error(error.message)
   const updated = mapSummary(data as MailboxRow)
 
-  if (nextStatus === "expired" && status !== "expired") {
+  if (nextStatus === "expired" && status !== "expired" && !hasRefreshToken) {
     await appendMailboxTimelineEvent(admin, {
       eventType: "mailbox_token_expired",
       title: `Mailbox token expired: ${updated.email_address}`,
@@ -277,6 +308,14 @@ export async function updateMailboxConnection(
   const existing = await getMailboxConnection(admin, mailboxId)
   if (!existing) throw new Error("mailbox_not_found")
 
+  const { data: existingRow } = await activeConnectionsQuery(admin)
+    .select("encrypted_refresh_token")
+    .eq("id", mailboxId)
+    .maybeSingle()
+  const existingEncryptedRefresh = asString(
+    (existingRow as { encrypted_refresh_token?: string } | null)?.encrypted_refresh_token,
+  )
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (input.display_name != null) patch.display_name = input.display_name.trim()
   if (input.status != null) patch.status = input.status
@@ -285,7 +324,12 @@ export async function updateMailboxConnection(
     patch.provider_metadata = sanitizeMailboxMetadataForApi(input.provider_metadata)
   }
   if (input.access_token !== undefined) patch.encrypted_access_token = encryptMailboxToken(input.access_token)
-  if (input.refresh_token !== undefined) patch.encrypted_refresh_token = encryptMailboxToken(input.refresh_token)
+  if (input.refresh_token !== undefined) {
+    const nextRefresh = encryptMailboxToken(input.refresh_token)
+    if (nextRefresh || !existingEncryptedRefresh) {
+      patch.encrypted_refresh_token = nextRefresh
+    }
+  }
   if (input.validation_failure_count !== undefined) patch.validation_failure_count = input.validation_failure_count
 
   const { data, error } = await connectionsTable(admin)
@@ -389,6 +433,7 @@ export async function validateMailboxConnection(
 
   let tokenExpiresAt = asString(row.token_expires_at) || null
   let encryptedAccessToken = asString(row.encrypted_access_token) || null
+  let encryptedRefreshToken = asString(row.encrypted_refresh_token) || null
 
   if (
     validation.valid &&
@@ -401,8 +446,11 @@ export async function validateMailboxConnection(
         : await refreshMicrosoftMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
     if (liveRefresh.ok) {
       refreshResult = "supported"
-      encryptedAccessToken = encryptMailboxToken(liveRefresh.accessToken)
+      encryptedAccessToken = encryptMailboxToken(liveRefresh.accessToken) ?? encryptedAccessToken
       tokenExpiresAt = liveRefresh.expiresAt
+      if (liveRefresh.refreshToken?.trim()) {
+        encryptedRefreshToken = encryptMailboxToken(liveRefresh.refreshToken) ?? encryptedRefreshToken
+      }
     } else {
       refreshResult = "failed"
       validation = {
@@ -425,6 +473,7 @@ export async function validateMailboxConnection(
       last_validation_at: validation.checked_at,
       validation_failure_count: failureCount,
       encrypted_access_token: encryptedAccessToken,
+      encrypted_refresh_token: encryptedRefreshToken,
       token_expires_at: tokenExpiresAt,
       last_refresh_attempt: refreshResult !== "unsupported" ? now : asString(row.last_refresh_attempt) || null,
       last_successful_refresh: refreshResult === "supported" ? now : asString(row.last_successful_refresh) || null,

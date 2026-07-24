@@ -6,6 +6,9 @@ import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { GrowthReplyDraft } from "@/lib/growth/replies/reply-draft-types"
 import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
+import { fetchActiveOutboundSenderAssignment } from "@/lib/growth/outbound-sender-affinity/outbound-sender-affinity-repository"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -29,12 +32,44 @@ export async function buildApprovedReplySendPayload(
   const lead = await fetchGrowthLeadById(admin, input.draft.leadId)
   if (!lead?.contactEmail) return { error: "missing_recipient_email" }
 
-  const sender = await resolveSequenceExecutionSender(admin)
-  if (!sender) return { error: "no_sender_route" }
+  const organizationId = lead.promotedOrganizationId?.trim() || getGrowthEngineAiOrgId() || null
+  let senderAccountId: string | null = null
+  let providerId: string | null = null
+
+  if (organizationId) {
+    const affinity = await fetchActiveOutboundSenderAssignment(admin, {
+      organizationId,
+      leadId: lead.id,
+      contactEmail: lead.contactEmail,
+    })
+    if (affinity) {
+      senderAccountId = affinity.senderAccountId
+    }
+  }
+
+  if (!senderAccountId) {
+    const sender = await resolveSequenceExecutionSender(admin, {
+      organizationId,
+      leadId: lead.id,
+      contactEmail: lead.contactEmail,
+    })
+    if (!sender) {
+      const routes = await listDeliveryRoutes(admin)
+      const enabledRoute = routes.find((route) => route.enabled)
+      if (!enabledRoute) return { error: "no_sender_route" }
+      senderAccountId = enabledRoute.sender_account_id
+      providerId = enabledRoute.provider_id
+    } else {
+      senderAccountId = sender.senderAccountId
+      providerId = sender.providerId
+    }
+  }
+
+  if (!senderAccountId) return { error: "no_sender_route" }
 
   const body = input.draft.draftBody.trim()
   const prepared = await prepareOutboundEmailContent(admin, {
-    senderAccountId: sender.senderAccountId,
+    senderAccountId,
     subject: input.draft.draftSubject ?? "Re: follow up",
     bodyText: body,
     unsubscribeFooterHtml: UNSUBSCRIBE_FOOTER,
@@ -51,7 +86,7 @@ export async function buildApprovedReplySendPayload(
     subject: prepared.subject.slice(0, 500),
     html: html.slice(0, 20000),
     text: prepared.textBody.slice(0, 10000),
-    senderAccountId: sender.senderAccountId,
-    providerId: sender.providerId,
+    senderAccountId,
+    providerId,
   }
 }
