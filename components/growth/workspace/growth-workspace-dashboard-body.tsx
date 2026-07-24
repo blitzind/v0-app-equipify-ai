@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { ArrowRight, Clock3, RefreshCw } from "lucide-react"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import {
@@ -24,7 +24,9 @@ import {
   GROWTH_HOME_EXECUTIVE_UNAVAILABLE_MESSAGE,
   isGrowthHomeExecutiveLoadDegraded,
 } from "@/lib/growth/home/growth-home-critical-executive-load-2b-1a"
+import { logGrowthHomeMountStage } from "@/lib/growth/home/growth-home-mount-diagnostics-2b-1d"
 import { useGrowthWorkspaceDashboard } from "@/components/growth/workspace/use-growth-workspace-dashboard"
+import { GrowthHomeDashboardErrorBoundary } from "@/components/growth/workspace/growth-home-dashboard-error-boundary"
 import { GrowthHomeDebugFooter } from "@/components/growth/workspace/growth-home-debug-footer"
 import { useGrowthWorkspaceQuickActionShortcuts } from "@/components/growth/workspace/use-growth-workspace-quick-action-shortcuts"
 import { GrowthHomeExecutiveBriefingDashboard } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard"
@@ -143,11 +145,15 @@ function DashboardSectionSkeleton() {
   return <Skeleton className="h-40 rounded-xl" />
 }
 
-export function GrowthWorkspaceDashboardBody() {
+function GrowthWorkspaceDashboardBodyInner() {
   const { dashboard, workspaceSummary, avaConsole, loading, error, reload, refreshing, lastRetryOutcome } =
     useGrowthWorkspaceDashboard()
   const recentViews = useMemo(() => readGrowthWorkspaceRecentViews(), [dashboard?.generatedAt])
   const continueItems = useMemo(() => readGrowthWorkspaceContinueItems(), [dashboard?.generatedAt])
+
+  useEffect(() => {
+    logGrowthHomeMountStage("dashboard_body_rendered")
+  }, [])
 
   useGrowthWorkspaceQuickActionShortcuts(Boolean(dashboard))
 
@@ -244,5 +250,17 @@ export function GrowthWorkspaceDashboardBody() {
       />
       <GrowthHomeDebugFooter />
     </div>
+  )
+}
+
+export function GrowthWorkspaceDashboardBody() {
+  useEffect(() => {
+    logGrowthHomeMountStage("shell_rendered")
+  }, [])
+
+  return (
+    <GrowthHomeDashboardErrorBoundary>
+      <GrowthWorkspaceDashboardBodyInner />
+    </GrowthHomeDashboardErrorBoundary>
   )
 }

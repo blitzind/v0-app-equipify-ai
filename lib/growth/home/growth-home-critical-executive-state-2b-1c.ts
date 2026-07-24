@@ -130,7 +130,6 @@ export function mergeGrowthHomeWorkspaceSummaryWithCriticalState(input: {
       emailsSentToday: 0,
       repliesToday: 0,
       callsToday: 0,
-      meetingsToday: 0,
       openOpportunities: 0,
       hotCompanies: 0,
       approvalQueueCount: 0,
@@ -140,6 +139,7 @@ export function mergeGrowthHomeWorkspaceSummaryWithCriticalState(input: {
 
   const operatorTasks = {
     ...(base?.operatorTasks ?? {
+      callTasksDue: 0,
       pendingApprovals: 0,
       leadsNeedingAction: 0,
     }),
@@ -184,9 +184,10 @@ export function mergeGrowthHomeWorkspaceSummaryWithCriticalState(input: {
       },
       dashboard: null,
       revenueQueue: { total: 0, queueSource: "canonical" as const, sectionCounts: [] },
-      callQueue: { total: 0, readyCount: 0, sections: [] },
-      meetings: { today: 0, thisWeek: 0, upcoming: [] },
-      inbox: { unread: 0, requiringReply: 0 },
+      callQueue: { readyCount: 0, nextLabel: null },
+      meetings: { today: 0, thisWeek: 0, scheduled: 0 },
+      inbox: { repliesNeedingAttention: 0, threadsOpen: 0, newReplies: 0 },
+      operatorTasks,
       dailyRevenueWorkQueue: { enabled: false, queue: null, display: null },
       kpis,
       avaConsole,

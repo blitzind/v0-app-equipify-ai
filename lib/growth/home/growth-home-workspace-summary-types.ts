@@ -29,7 +29,6 @@ import type { GrowthAvaActivationState } from "@/lib/growth/ava-activation/growt
 import type { GrowthCanonicalOpportunityAuthorityMap } from "@/lib/growth/aios/authority/growth-canonical-opportunity-authority-types-1b"
 import type { GrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-types-1e"
 import type { GrowthCanonicalPortfolioAuthoritySnapshot } from "@/lib/growth/aios/authority/growth-canonical-portfolio-authority-snapshot-1f-types"
-import { buildGrowthExecutiveGrowthIntelligenceReadModel } from "@/lib/growth/aios/growth-intelligence/growth-executive-growth-intelligence-server-1e"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 

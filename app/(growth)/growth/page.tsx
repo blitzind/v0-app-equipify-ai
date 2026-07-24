@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Home, LayoutGrid } from "lucide-react"
 import { GrowthWorkspaceDashboardBody } from "@/components/growth/workspace/growth-workspace-dashboard-body"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -9,10 +10,15 @@ import { AI_OS_HOME_NAV_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import { teammateHomePageDescription } from "@/lib/workspace/ai-teammate-voice"
 import { isGrowthWorkspaceFirstUx1aEnabledClient } from "@/lib/growth/navigation/growth-workspace-first-ux-1a-feature"
 import { GROWTH_WORKSPACE_FIRST_UX_1A_NAV_LABELS } from "@/lib/growth/navigation/growth-workspace-first-ux-1a-labels"
+import { logGrowthHomeMountStage } from "@/lib/growth/home/growth-home-mount-diagnostics-2b-1d"
 
 export default function GrowthWorkspaceDashboardPage() {
   const { teammate } = useAiTeammateIdentity()
   const ux1aActive = isGrowthWorkspaceFirstUx1aEnabledClient()
+
+  useEffect(() => {
+    logGrowthHomeMountStage("route_entered")
+  }, [])
 
   return (
     <GrowthWorkspacePageContent>

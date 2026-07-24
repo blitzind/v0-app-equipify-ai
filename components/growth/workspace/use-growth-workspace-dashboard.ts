@@ -18,6 +18,7 @@ import {
   mergeGrowthHomeWorkspaceSummaryWithCriticalState,
   type GrowthHomeCriticalExecutiveStatePayload,
 } from "@/lib/growth/home/growth-home-critical-executive-state-2b-1c"
+import { logGrowthHomeMountStage } from "@/lib/growth/home/growth-home-mount-diagnostics-2b-1d"
 import {
   normalizeGrowthHomeWorkspaceSummaryPayload,
 } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
@@ -77,6 +78,18 @@ function applyCriticalExecutivePayload(input: {
 
 function readInitialExecutiveCache(): GrowthHomeWorkspaceSummaryPayload | null {
   return readGrowthHomeExecutiveSessionCache()
+}
+
+function buildInitialAppliedFromCache(): ReturnType<typeof applyWorkspaceSummaryPayload> | null {
+  try {
+    const cached = readInitialExecutiveCache()
+    return cached ? applyWorkspaceSummaryPayload(cached) : null
+  } catch (error) {
+    logGrowthHomeMountStage("hook_initialized", {
+      cache_apply_error: error instanceof Error ? error.message : "unknown",
+    })
+    return null
+  }
 }
 
 async function fetchJsonWithTimeout<T>(input: {
@@ -171,8 +184,7 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
 }
 
 export function useGrowthWorkspaceDashboard() {
-  const initialCache = readInitialExecutiveCache()
-  const initialApplied = initialCache ? applyWorkspaceSummaryPayload(initialCache) : null
+  const [initialApplied] = useState(buildInitialAppliedFromCache)
 
   const [dashboard, setDashboard] = useState<GrowthWorkspaceDashboardViewModel | null>(
     initialApplied?.dashboard ?? null,
@@ -255,6 +267,11 @@ export function useGrowthWorkspaceDashboard() {
     const attempt = retryAttemptRef.current
     setRetryAttempt(attempt)
 
+    logGrowthHomeMountStage("critical_request_started", {
+      request_generation: requestGeneration,
+      retry_attempt: attempt,
+    })
+
     const hasConfirmedExecutiveState = Boolean(workspaceSummaryRef.current)
     if (hasConfirmedExecutiveState) {
       setRefreshing(true)
@@ -332,6 +349,13 @@ export function useGrowthWorkspaceDashboard() {
   }, [abortInflightRequests, loadSecondaryWorkspaceSummary])
 
   useEffect(() => {
+    logGrowthHomeMountStage("hook_initialized", {
+      has_cached_executive_state: Boolean(initialApplied),
+    })
+  }, [initialApplied])
+
+  useEffect(() => {
+    logGrowthHomeMountStage("critical_effect_registered")
     void reload()
     return () => {
       abortInflightRequests("all")
