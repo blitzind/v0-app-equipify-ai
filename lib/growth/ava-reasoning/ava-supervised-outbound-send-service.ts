@@ -28,6 +28,10 @@ import {
   releaseAvaSupervisedOutboundSendClaim,
 } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-send-claim"
 import { touchOutboundSenderAssignmentLastUsed } from "@/lib/growth/outbound-sender-affinity/outbound-sender-affinity-repository"
+import {
+  AvaSupervisedOutboundTransportPrepError,
+  prepareAvaSupervisedOutboundTransportEmail,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary"
 
 export type SendApprovedAvaSupervisedGenerationResult =
   | { ok: true; generation: GrowthAiCopilotGeneration; receipt: AvaSupervisedOutboundSendReceipt }
@@ -275,7 +279,18 @@ export async function sendApprovedAvaSupervisedGeneration(
       unsignedBody: binding.unsignedBody,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const structuredCode =
+      error instanceof AvaSupervisedOutboundTransportPrepError
+        ? error.code
+        : error instanceof Error
+          ? error.message
+          : String(error)
+    const operatorMessage =
+      error instanceof AvaSupervisedOutboundTransportPrepError
+        ? error.message
+        : structuredCode === "prepareAvaSupervisedOutboundTransportEmail is not defined"
+          ? "Outbound send preparation is unavailable in the current deployment. Contact support."
+          : "Could not prepare outbound content with a single signature boundary."
     const receipt = buildReceipt({
       generationId: generation.id,
       deliveryAttemptId: "",
@@ -289,22 +304,22 @@ export async function sendApprovedAvaSupervisedGeneration(
       signatureInjected: false,
       sentAt: new Date().toISOString(),
       status: "failed",
-      errorCode: message,
-      errorMessage: "Could not prepare outbound content with a single signature boundary.",
+      errorCode: structuredCode,
+      errorMessage: operatorMessage,
     })
     await releaseAvaSupervisedOutboundSendClaim(admin, {
       generation,
       sendAttemptId,
       actingUserId: input.actingUserId,
       lifecycleStatus: "failed",
-      errorCode: message,
-      errorMessage: receipt.errorMessage,
+      errorCode: structuredCode,
+      errorMessage: operatorMessage,
       receipt,
     })
     return {
       ok: false,
-      code: message,
-      message: receipt.errorMessage ?? message,
+      code: structuredCode,
+      message: operatorMessage,
       generation,
     }
   }

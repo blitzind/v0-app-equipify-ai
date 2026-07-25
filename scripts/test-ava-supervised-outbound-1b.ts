@@ -206,8 +206,12 @@ function main(): void {
     const sendService = readSource("lib/growth/ava-reasoning/ava-supervised-outbound-send-service.ts")
     const boundary = readSource("lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary.ts")
     assert.match(sendService, /prepareAvaSupervisedOutboundTransportEmail/)
+    assert.match(
+      sendService,
+      /from "@\/lib\/growth\/ava-reasoning\/ava-supervised-outbound-signature-boundary"/,
+    )
     assert.match(boundary, /stripAccidentalAvaSignatureFromBody/)
-    assert.match(boundary, /duplicate_signature_boundary_violation/)
+    assert.match(boundary, /plaintext_signature_boundary_count_invalid/)
     assert.match(sendService, /binding\.unsignedBody/)
   })
 
