@@ -45,6 +45,15 @@ export function buildCustomerPackageReviewHref(leadId: string): string {
   return `${GROWTH_CUSTOMER_LEADS_CRM_HREF}?${params.toString()}`
 }
 
+export type GrowthOperatorPackageReviewSource =
+  | "supervised_ava_generation"
+  | "legacy_hac_package"
+  | "unknown"
+
+export function isSupervisedAvaHomePackageItemId(itemId: string | null | undefined): boolean {
+  return (itemId ?? "").trim().startsWith("supervised-draft:")
+}
+
 const LEAD_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -95,6 +104,14 @@ export function parseLeadIdFromPackageReviewRoute(route: string | undefined): st
       if (open) return open
     }
 
+    const isReviewOrApprovalPath =
+      url.pathname.includes("/review") ||
+      url.pathname.includes("/os/approvals") ||
+      url.pathname.includes("/os/pilot/")
+
+    // Review/approval `item` and `packageId` params identify packages — not lead ids.
+    if (isReviewOrApprovalPath) return null
+
     const item = decodeRouteParam(url.searchParams.get("item"))
     if (item && isLeadUuid(item)) return item
 
@@ -126,7 +143,9 @@ export function resolveCustomerPackageReviewHref(input: {
 export type ResolveOperatorPackageReviewHrefInput = {
   leadId?: string | null
   packageId?: string | null
+  itemId?: string | null
   route?: string | null
+  packageSource?: GrowthOperatorPackageReviewSource | null
 }
 
 /** Canonical operator package review entry — customer CRM drawer when lead id is known. */
@@ -137,13 +156,28 @@ export function resolveOperatorPackageReviewHref(
     return buildGrowthReviewHref({ tab: "packages" })
   }
 
+  const leadId = input?.leadId?.trim() || null
+  const packageSource = input?.packageSource ?? null
+  const supervisedByItemId = isSupervisedAvaHomePackageItemId(input?.itemId)
+  if (leadId && (packageSource === "supervised_ava_generation" || supervisedByItemId)) {
+    return buildCustomerPackageReviewHref(leadId)
+  }
+
   const customerHref = resolveCustomerPackageReviewHref({
-    leadId: input?.leadId,
+    leadId,
     route: input?.route,
   })
   if (customerHref) return customerHref
 
   return buildGrowthReviewHref({ tab: "packages" })
+}
+
+/** Map legacy review URLs that carry a supervised generation id to the CRM drawer. */
+export function resolveSupervisedGenerationReviewHref(input: {
+  generationId: string
+  leadId: string
+}): string {
+  return buildCustomerPackageReviewHref(input.leadId)
 }
 
 function extractPackageIdFromHref(href: string, params: URLSearchParams): string | null {

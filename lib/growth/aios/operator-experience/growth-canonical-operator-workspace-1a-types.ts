@@ -8,6 +8,8 @@ import type { GrowthCanonicalOperatorDecisionProjection } from "@/lib/growth/aio
 export const GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER =
   "ge-aios-operator-experience-1a-v1" as const
 
+import type { GrowthOperatorPackageReviewSource } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+
 export type GrowthCanonicalOperatorApprovalPackagePreview = {
   itemId: string
   packageId: string
@@ -20,6 +22,7 @@ export type GrowthCanonicalOperatorApprovalPackagePreview = {
   channelLabel: string | null
   statusLabel: string
   reviewHref: string
+  packageSource?: GrowthOperatorPackageReviewSource
   /** AVA-HOME-PROJECTION-CUTOVER-1A — richer operator detail for supervised drafts */
   operatorDetail?: string | null
 }

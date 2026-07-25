@@ -283,7 +283,8 @@ function readyItemToPackagePreview(item: GrowthSupervisedAvaHomeReadyItem): Grow
     preparedAgoLabel: relativePreparedLabel(item.preparedAt),
     channelLabel: item.subject,
     statusLabel: "Ready for review",
-    reviewHref: item.reviewHref,
+    reviewHref: buildCustomerPackageReviewHref(item.leadId),
+    packageSource: "supervised_ava_generation",
     operatorDetail: detailParts.join(" · "),
   }
 }

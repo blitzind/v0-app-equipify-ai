@@ -94,11 +94,27 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
         ok?: boolean
         generations?: GrowthAiCopilotGeneration[]
         message?: string
+        error?: string
+        reviewHref?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load Ava recommendations.")
+      if (res.status === 409 && data.error === "approval_package_source_mismatch" && data.reviewHref) {
+        window.location.replace(data.reviewHref)
+        return
+      }
+      if (!res.ok || !data.ok) {
+        const code = data.error ?? "approval_response_invalid"
+        if (code === "approval_generation_not_found") {
+          throw new Error("This review package could not be loaded.")
+        }
+        if (code === "approval_request_unauthorized") {
+          throw new Error("You do not have access to review this package.")
+        }
+        throw new Error(data.message ?? "Could not load Ava recommendations.")
+      }
       setGenerations(data.generations ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed.")
+      const message = e instanceof Error ? e.message : "Load failed."
+      setError(message === "Failed to fetch" ? "Could not reach the review service. Refresh and try again." : message)
     } finally {
       setLoading(false)
     }

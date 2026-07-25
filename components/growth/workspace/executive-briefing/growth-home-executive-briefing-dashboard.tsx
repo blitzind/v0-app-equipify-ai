@@ -82,9 +82,38 @@ import { GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER } from "@/lib/g
 import { GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
 import {
   GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER,
-  GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_SUBTITLE,
-  GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_TITLE,
 } from "@/lib/growth/home/growth-home-operator-closure-1a"
+import {
+  buildGrowthHomeCurrentFocusPresentation,
+  buildGrowthHomeDailyBriefPresentation,
+  buildGrowthHomeMissionOpportunityPresentation,
+  buildGrowthHomeSimplifiedProgressCards,
+  GROWTH_HOME_SIMPLIFICATION_1A_QA_MARKER,
+  GROWTH_HOME_SIMPLIFICATION_ACTIVITY_LOG_SUBTITLE,
+  GROWTH_HOME_SIMPLIFICATION_ACTIVITY_LOG_TITLE,
+  GROWTH_HOME_SIMPLIFICATION_LEARNING_SUBTITLE,
+  GROWTH_HOME_SIMPLIFICATION_LEARNING_TITLE,
+  GROWTH_HOME_SIMPLIFICATION_MISSION_TITLE,
+  GROWTH_HOME_SIMPLIFICATION_PIPELINE_HEALTH_SUBTITLE,
+  GROWTH_HOME_SIMPLIFICATION_PIPELINE_HEALTH_TITLE,
+  mergeActivityLogEntries,
+} from "@/lib/growth/home/growth-home-simplification-1a"
+import { inferDailyBriefReviewCounts } from "@/lib/growth/aios/operator-experience/growth-operator-home-ava-direct-2a"
+import {
+  buildGrowthHomeReviewQueueDailyBrief,
+  buildGrowthHomeReviewQueuePresentation,
+  buildGrowthHomeReviewQueueProgressCards,
+  buildLeadsByIdMap,
+  buildSupervisedReadyByLeadIdMap,
+  GROWTH_HOME_REVIEW_QUEUE_1B_QA_MARKER,
+  shouldHideSingleCompanyFocus,
+} from "@/lib/growth/home/growth-home-review-queue-1b"
+import { enrichGrowthHomeWaitingOnYouItems } from "@/lib/growth/home/growth-home-runtime-presenter"
+import { GrowthHomeAvaDailyBriefSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-daily-brief-section"
+import { GrowthHomeAvaOutreachReviewQueueSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-outreach-review-queue-section"
+import { GrowthHomeAvaCurrentFocusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-current-focus-section"
+import { GrowthHomeAvaMissionOpportunitySection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-mission-opportunity-section"
+import { GrowthHomeAvaSimplifiedProgressSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-simplified-progress-section"
 import { GrowthHomeMissionCenterSection } from "@/components/growth/workspace/executive-briefing/growth-home-mission-center-section"
 import { GrowthHomeMarketingMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-marketing-missions-section"
 import { GrowthHomeThroughputSection } from "@/components/growth/workspace/executive-briefing/growth-home-throughput-section"
@@ -224,6 +253,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
   const canonicalPendingApprovals = aiOsUx.approveItemsCount ?? 0
   const employeeMode = workspaceSummary?.avaActivation?.activated === true
   const operatorClosureMode = employeeMode
+  const homeSimplificationMode = employeeMode
 
   const previousSnapshot = useMemo(() => readAvaNarrativeMetricsSnapshot(), [dashboard.generatedAt, homeRefreshVersion])
   const persistedMemoryStore = useMemo(
@@ -486,6 +516,82 @@ export function GrowthHomeExecutiveBriefingDashboard({
         avaHero.recommendationExperience?.recommendations?.[0]?.headline ??
         null,
     })
+
+    const primaryRecommendation = avaHero.recommendationExperience?.recommendations?.[0] ?? null
+    const waitingOnYouItems = enrichGrowthHomeWaitingOnYouItems(
+      aiOsUx.waitingOnYou,
+      workspaceSummary?.relationshipSnapshots?.byLeadId,
+      waitingCompanyByLeadId,
+    )
+    const primaryWaitingItem = waitingOnYouItems[0] ?? null
+    const recommendationWhyBullets = [
+      ...(avaHero.executiveReasoning?.primary?.evidence ?? []),
+      ...(primaryRecommendation?.explanation?.whyChosen ?? primaryRecommendation?.whyReasons ?? []),
+    ].filter(Boolean)
+
+    const dailyBrief = buildGrowthHomeDailyBriefPresentation({
+      pendingApprovals: canonicalPendingApprovals,
+      readyForOutreachReview: avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0,
+      dailyActivityNarrative: avaHero.dailyActivityNarrative,
+      completedTodayLines: completedToday.map((entry) => entry.summary),
+      recommendation: primaryRecommendation,
+      waitingItem: primaryWaitingItem,
+      runtimeTrust,
+      fitBullets: [...new Set(recommendationWhyBullets)],
+    })
+    const currentFocus = buildGrowthHomeCurrentFocusPresentation({
+      pendingApprovals: canonicalPendingApprovals,
+      recommendation: primaryRecommendation,
+      waitingItem: primaryWaitingItem,
+      runtimeTrust,
+    })
+    const missionOpportunity = buildGrowthHomeMissionOpportunityPresentation({
+      missions: aiOsUx.canonicalActiveMissions?.missions ?? [],
+      overflowMissionCount: aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0,
+      currentCompanyName: currentFocus?.companyName ?? null,
+    })
+    const simplifiedProgressCards = buildGrowthHomeSimplifiedProgressCards({
+      progressItems: measurableProgress.items,
+      emailsSentToday: workspaceSummary?.kpis?.emailsSentToday,
+      activeOutreachCount: runtimeTrust.pipelinePace?.activeConversations,
+      pipelineHealthLabel: workspaceSummary?.portfolioManager?.operator?.healthLabel ?? null,
+    })
+    const activityLogEntries = mergeActivityLogEntries({
+      completedToday,
+      activityFeedSummaries: runtimeTrust.activityFeed.map((entry) => entry.summary),
+    })
+
+    const leadsById = buildLeadsByIdMap(workspaceSummary?.portfolioLeads)
+    const supervisedReadyByLeadId = buildSupervisedReadyByLeadIdMap(
+      workspaceSummary?.supervisedOperatorAttention?.readyForReview,
+    )
+    const reviewQueue = buildGrowthHomeReviewQueuePresentation({
+      packages: workspaceSummary?.canonicalOperatorApproval?.packages ?? aiOsUx.canonicalApprovalSnapshot?.packages ?? [],
+      needsInformation: workspaceSummary?.supervisedOperatorAttention?.needsInformation,
+      leadsById,
+      supervisedReadyByLeadId,
+      reviewOutreachHref: aiOsUx.approveItemsHref ?? null,
+    })
+    const reviewQueueDailyBrief = buildGrowthHomeReviewQueueDailyBrief({
+      companiesReviewedToday: inferDailyBriefReviewCounts({
+        pendingDraftCount: canonicalPendingApprovals,
+        completedTodayLines: completedToday.map((entry) => entry.summary),
+      }).companiesReviewedToday,
+      queue: reviewQueue,
+    })
+    const reviewQueueProgressCards = buildGrowthHomeReviewQueueProgressCards({
+      companiesReviewedToday: inferDailyBriefReviewCounts({
+        pendingDraftCount: canonicalPendingApprovals,
+        completedTodayLines: completedToday.map((entry) => entry.summary),
+      }).companiesReviewedToday,
+      packagesPrepared: reviewQueue.packagesPrepared,
+      awaitingReview: reviewQueue.awaitingReviewCount,
+      approvedCount: reviewQueue.approvedCount,
+      emailsSentToday: workspaceSummary?.kpis?.emailsSentToday,
+      activeOutreachCount: runtimeTrust.pipelinePace?.activeConversations,
+    })
+    const hideSingleCompanyFocus = shouldHideSingleCompanyFocus({ queue: reviewQueue })
+
     return {
       workingNow: deduped.workingNow,
       measurableProgress,
@@ -495,11 +601,25 @@ export function GrowthHomeExecutiveBriefingDashboard({
       narrativeOverlap,
       suppressRecommendationHeadline: deduped.suppressRecommendationHeadline,
       runtimeTrust,
+      dailyBrief,
+      currentFocus,
+      missionOpportunity,
+      simplifiedProgressCards,
+      activityLogEntries,
+      reviewQueue,
+      reviewQueueDailyBrief,
+      reviewQueueProgressCards,
+      hideSingleCompanyFocus,
     }
   }, [
+    aiOsUx,
+    aiOsUx.canonicalActiveMissions?.missions,
+    aiOsUx.canonicalActiveMissions?.overflowMissionCount,
+    aiOsUx.waitingOnYou,
     avaHero.businessObjectiveLeadership?.primaryObjective?.title,
     avaHero.dailyActivityNarrative,
     avaHero.discoveryNarrativeTarget,
+    avaHero.executiveReasoning?.primary?.evidence,
     avaHero.recommendationExperience?.recommendations,
     avaHero.statusLabel,
     avaHero.workManager,
@@ -508,16 +628,24 @@ export function GrowthHomeExecutiveBriefingDashboard({
     dashboard,
     relationshipSnapshotCount,
     setupIncomplete,
+    waitingCompanyByLeadId,
     workspaceSummary?.generatedAt,
     workspaceSummary?.missionDiscovery,
     workspaceSummary?.operatorTasks?.leadsNeedingAction,
     workspaceSummary?.portfolioManager?.operator,
     workspaceSummary?.productionMissionAuthority,
     workspaceSummary?.canonicalOperatorFocus,
+    workspaceSummary?.canonicalOperatorApproval?.topPackage?.companyName,
+    workspaceSummary?.kpis?.emailsSentToday,
     workspaceSummary?.kpis?.repliesToday,
     workspaceSummary?.avaActivation,
     workspaceSummary?.runtimeTrust,
     workspaceSummary?.salesOutcomes,
+    workspaceSummary?.relationshipSnapshots?.byLeadId,
+    workspaceSummary?.supervisedOperatorAttention,
+    workspaceSummary?.portfolioLeads,
+    aiOsUx.approveItemsHref,
+    aiOsUx.canonicalApprovalSnapshot?.packages,
   ])
 
   return (
@@ -540,21 +668,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-runtime-authority-1b={GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER}
       data-employee-mode={employeeMode ? "true" : "false"}
       data-operator-closure-mode={operatorClosureMode ? "true" : "false"}
+      data-home-simplification-mode={homeSimplificationMode ? "true" : "false"}
+      data-qa-marker-simplification-1a={GROWTH_HOME_SIMPLIFICATION_1A_QA_MARKER}
+      data-qa-marker-review-queue-1b={GROWTH_HOME_REVIEW_QUEUE_1B_QA_MARKER}
       data-home-narrative-overlap={operatorExperience.narrativeOverlap.join(",") || "none"}
     >
       <div data-qa-section="home-canonical-surface" className="space-y-6">
-        <GrowthHomeAvaHeroSection
-          hero={avaHero}
-          executiveBriefing={operatorExperience.heroBriefing}
-          lastUpdateLabel={lastUpdateLabel}
-          pendingApprovals={canonicalPendingApprovals}
-          readyForOutreachReview={avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0}
-          missionDiscovery={workspaceSummary?.missionDiscovery ?? null}
-          organizationId={sessionIdentity?.authUserId ?? null}
-          onBriefingAcknowledged={() => setBriefingCursorVersion((value) => value + 1)}
-          compact={operatorClosureMode}
-        />
-
         {workspaceSummary?.avaActivation ? (
           <GrowthHomeAvaActivationSection
             activation={workspaceSummary.avaActivation}
@@ -565,34 +684,118 @@ export function GrowthHomeExecutiveBriefingDashboard({
           />
         ) : null}
 
-        {operatorClosureMode ? (
-          <GrowthHomeAiOsWaitingOnYouSection
-            aiOsUx={aiOsUx}
-            relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
-            waitingCompanyByLeadId={waitingCompanyByLeadId}
-            operatorClosureMode={operatorClosureMode}
-          />
-        ) : null}
+        {homeSimplificationMode ? (
+          <>
+            <GrowthHomeAvaDailyBriefSection
+              hero={avaHero}
+              dailyBrief={operatorExperience.dailyBrief}
+              queueBrief={operatorExperience.reviewQueueDailyBrief}
+              lastUpdateLabel={lastUpdateLabel}
+            />
+
+            <GrowthHomeAvaOutreachReviewQueueSection
+              queue={operatorExperience.reviewQueue}
+              onRefresh={() => {
+                setHomeRefreshVersion((value) => value + 1)
+                onResearchLoopCompleted?.()
+              }}
+            />
+
+            {!operatorExperience.hideSingleCompanyFocus && operatorExperience.currentFocus ? (
+              <GrowthHomeAvaCurrentFocusSection focus={operatorExperience.currentFocus} />
+            ) : null}
+
+            {!operatorExperience.hideSingleCompanyFocus && avaHero.recommendationExperience ? (
+              <GrowthHomeAvaRecommendationExperienceSection
+                experience={avaHero.recommendationExperience}
+                organizationId={sessionIdentity?.authUserId ?? null}
+                companyCandidates={companyCandidates}
+                activeMissionLabel={workspaceSummary?.missionDiscovery?.audienceName ?? workspaceSummary?.missionDiscovery?.activityLabel ?? null}
+                strategicAdvisorContext={workspaceSummary?.strategicAdvisorContext ?? null}
+                executiveReasoning={avaHero.executiveReasoning ?? null}
+                suppressPrimaryHeadline
+                simplifiedMode
+              />
+            ) : null}
+
+            <GrowthHomeAvaSimplifiedProgressSection
+              cards={
+                operatorExperience.reviewQueue.rows.length > 0
+                  ? operatorExperience.reviewQueueProgressCards
+                  : operatorExperience.simplifiedProgressCards
+              }
+            />
+
+            {operatorExperience.missionOpportunity ? (
+              <GrowthHomeCollapsibleSection
+                sectionId="simplification-mission"
+                title={GROWTH_HOME_SIMPLIFICATION_MISSION_TITLE}
+                subtitle="Current mission and opportunity queue."
+              >
+                <GrowthHomeAvaMissionOpportunitySection presentation={operatorExperience.missionOpportunity} />
+              </GrowthHomeCollapsibleSection>
+            ) : null}
+
+            <GrowthHomeCollapsibleSection
+              sectionId="simplification-activity-log"
+              title={GROWTH_HOME_SIMPLIFICATION_ACTIVITY_LOG_TITLE}
+              subtitle={GROWTH_HOME_SIMPLIFICATION_ACTIVITY_LOG_SUBTITLE}
+            >
+              <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.activityLogEntries} />
+            </GrowthHomeCollapsibleSection>
+
+            <GrowthHomeCollapsibleSection
+              sectionId="simplification-learning"
+              title={GROWTH_HOME_SIMPLIFICATION_LEARNING_TITLE}
+              subtitle={GROWTH_HOME_SIMPLIFICATION_LEARNING_SUBTITLE}
+            >
+              <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
+            </GrowthHomeCollapsibleSection>
+
+            <GrowthHomeCollapsibleSection
+              sectionId="simplification-pipeline-health"
+              title={GROWTH_HOME_SIMPLIFICATION_PIPELINE_HEALTH_TITLE}
+              subtitle={GROWTH_HOME_SIMPLIFICATION_PIPELINE_HEALTH_SUBTITLE}
+            >
+              <div className="space-y-5">
+                <GrowthHomeWorkspaceHealthSection presentation={operatorExperience.workspaceHealth} />
+                <GrowthHomePortfolioManagerSection
+                  portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
+                />
+              </div>
+            </GrowthHomeCollapsibleSection>
+          </>
+        ) : (
+          <>
+        <GrowthHomeAvaHeroSection
+          hero={avaHero}
+          executiveBriefing={operatorExperience.heroBriefing}
+          lastUpdateLabel={lastUpdateLabel}
+          pendingApprovals={canonicalPendingApprovals}
+          readyForOutreachReview={avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0}
+          missionDiscovery={workspaceSummary?.missionDiscovery ?? null}
+          organizationId={sessionIdentity?.authUserId ?? null}
+          onBriefingAcknowledged={() => setBriefingCursorVersion((value) => value + 1)}
+          compact={false}
+        />
 
         <GrowthHomeAvaRuntimeTrustSection
           runtimeTrust={operatorExperience.runtimeTrust}
-          operatorClosureMode={operatorClosureMode}
+          operatorClosureMode={false}
           onActivated={() => {
             setHomeRefreshVersion((value) => value + 1)
             onResearchLoopCompleted?.()
           }}
         />
 
-        {!operatorClosureMode ? (
-          <GrowthHomeAiOsWaitingOnYouSection
-            aiOsUx={aiOsUx}
-            relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
-            waitingCompanyByLeadId={waitingCompanyByLeadId}
-            operatorClosureMode={operatorClosureMode}
-          />
-        ) : null}
+        <GrowthHomeAiOsWaitingOnYouSection
+          aiOsUx={aiOsUx}
+          relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+          waitingCompanyByLeadId={waitingCompanyByLeadId}
+          operatorClosureMode={false}
+        />
 
-        {!operatorClosureMode && avaHero.recommendationExperience ? (
+        {avaHero.recommendationExperience ? (
           <GrowthHomeAvaRecommendationExperienceSection
             experience={avaHero.recommendationExperience}
             organizationId={sessionIdentity?.authUserId ?? null}
@@ -604,81 +807,37 @@ export function GrowthHomeExecutiveBriefingDashboard({
           />
         ) : null}
 
-        {!operatorClosureMode && avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
+        {avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
           <GrowthHomeAvaStrategicInsightSection leadership={avaHero.strategicLeadership} />
         ) : null}
 
-        {!operatorClosureMode ? (
-          <GrowthHomeAvaWorkingNowSection presentation={operatorExperience.workingNow} />
-        ) : null}
+        <GrowthHomeAvaWorkingNowSection presentation={operatorExperience.workingNow} />
 
-        {!operatorClosureMode && avaHero.businessObjectiveLeadership ? (
+        {avaHero.businessObjectiveLeadership ? (
           <GrowthHomeAvaBusinessObjectiveSection leadership={avaHero.businessObjectiveLeadership} />
         ) : null}
 
-        {!operatorClosureMode ? (
-          <>
-            <GrowthHomeAvaWorkSection
-              progress={operatorExperience.measurableProgress}
-              eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
-            />
+        <GrowthHomeAvaWorkSection
+          progress={operatorExperience.measurableProgress}
+          eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
+        />
 
-            <GrowthHomePortfolioManagerSection
-              portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
-            />
+        <GrowthHomePortfolioManagerSection
+          portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
+        />
 
-            <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
+        <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
 
-            <GrowthHomeWorkspaceHealthSection presentation={operatorExperience.workspaceHealth} />
+        <GrowthHomeWorkspaceHealthSection presentation={operatorExperience.workspaceHealth} />
 
-            <GrowthHomeCanonicalMissionsSection
-              missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
-              overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
-              totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
-            />
+        <GrowthHomeCanonicalMissionsSection
+          missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
+          overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
+          totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
+        />
 
-            <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
+        <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
           </>
-        ) : (
-          <GrowthHomeCollapsibleSection
-            sectionId="operator-work-details"
-            title={GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_TITLE}
-            subtitle={GROWTH_HOME_OPERATOR_CLOSURE_WORK_DETAILS_SUBTITLE}
-          >
-            <div className="space-y-5">
-              <GrowthHomeAvaWorkSection
-                progress={operatorExperience.measurableProgress}
-                eligibleLeadCount={workspaceSummary?.eligibleLeadCount ?? null}
-              />
-              <GrowthHomeCompletedTodayTimelineSection entries={operatorExperience.completedToday} />
-              <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
-              <GrowthHomePortfolioManagerSection
-                portfolio={workspaceSummary?.portfolioManager?.operator ?? null}
-              />
-              {avaHero.recommendationExperience ? (
-                <GrowthHomeAvaRecommendationExperienceSection
-                  experience={avaHero.recommendationExperience}
-                  organizationId={sessionIdentity?.authUserId ?? null}
-                  companyCandidates={companyCandidates}
-                  activeMissionLabel={workspaceSummary?.missionDiscovery?.audienceName ?? workspaceSummary?.missionDiscovery?.activityLabel ?? null}
-                  strategicAdvisorContext={workspaceSummary?.strategicAdvisorContext ?? null}
-                  executiveReasoning={null}
-                  suppressPrimaryHeadline={operatorExperience.suppressRecommendationHeadline}
-                />
-              ) : null}
-              {avaHero.strategicLeadership?.hasInsight && avaHero.strategicLeadership.insight ? (
-                <GrowthHomeAvaStrategicInsightSection leadership={avaHero.strategicLeadership} />
-              ) : null}
-              {avaHero.businessObjectiveLeadership ? (
-                <GrowthHomeAvaBusinessObjectiveSection leadership={avaHero.businessObjectiveLeadership} />
-              ) : null}
-              <GrowthHomeCanonicalMissionsSection
-                missions={aiOsUx.canonicalActiveMissions?.missions ?? []}
-                overflowMissionCount={aiOsUx.canonicalActiveMissions?.overflowMissionCount ?? 0}
-                totalMissionCount={aiOsUx.canonicalActiveMissions?.totalMissionCount}
-              />
-            </div>
-          </GrowthHomeCollapsibleSection>
         )}
 
         {!employeeMode ? (

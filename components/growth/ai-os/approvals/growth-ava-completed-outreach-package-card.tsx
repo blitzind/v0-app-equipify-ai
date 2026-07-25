@@ -126,13 +126,20 @@ export function GrowthAvaCompletedOutreachPackageCard({
           `/api/platform/growth/ai-os/completed-work/packages/${encodeURIComponent(card.packageId)}?leadId=${encodeURIComponent(card.leadId)}`,
           { cache: "no-store" },
         )
-        if (!response.ok) return
         const body = (await response.json()) as {
           ok?: boolean
           packet?: Approvals2AOperatorReviewPacket
           executionReadiness?: AvaOutreachPackageReadiness
           executionRequest?: GrowthAvaOutreachExecutionRequest | null
+          error?: string
+          message?: string
+          reviewHref?: string
         }
+        if (response.status === 409 && body.reviewHref) {
+          window.location.replace(body.reviewHref)
+          return
+        }
+        if (!response.ok) return
         if (!cancelled && body.ok && body.packet) setPacket(body.packet)
         if (!cancelled && body.ok && body.executionReadiness) {
           setExecutionReadiness(body.executionReadiness)

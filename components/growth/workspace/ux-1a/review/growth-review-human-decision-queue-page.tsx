@@ -132,6 +132,24 @@ export function GrowthReviewHumanDecisionQueuePage() {
     setDrawerOpen(Boolean(itemId && selectedItem))
   }, [itemId, selectedItem])
 
+  useEffect(() => {
+    if (!itemId || loading || selectedItem || tab !== "packages") return
+    let cancelled = false
+    void fetch(`/api/platform/growth/copilot/generations/${encodeURIComponent(itemId)}/review-entry`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; reviewHref?: string }
+        if (!cancelled && res.ok && data.ok && data.reviewHref) {
+          window.location.replace(data.reviewHref)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [itemId, loading, selectedItem, tab])
+
   const closeDrawer = useCallback(
     (open: boolean) => {
       setDrawerOpen(open)

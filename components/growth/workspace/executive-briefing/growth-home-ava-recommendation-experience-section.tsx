@@ -37,6 +37,13 @@ import {
 } from "@/lib/growth/ava-home/recommendations/growth-home-ava-recommendation-outcome-next-1d-types"
 import { GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER } from "@/lib/growth/ava-home/recommendations/growth-home-ava-business-objective-next-1e-types"
 import {
+  GROWTH_HOME_SIMPLIFICATION_1A_QA_MARKER,
+  GROWTH_HOME_SIMPLIFICATION_ASK_WHY_CTA,
+  GROWTH_HOME_SIMPLIFICATION_REVIEW_PACKAGE_CTA,
+  GROWTH_HOME_SIMPLIFICATION_SKIP_CTA,
+  GROWTH_HOME_SIMPLIFICATION_SUGGEST_DIRECTION_CTA,
+} from "@/lib/growth/home/growth-home-simplification-1a"
+import {
   GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE,
   GROWTH_HOME_SECTION_RECOMMENDATION_TITLE,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-operator-experience-live-3b"
@@ -55,6 +62,8 @@ type Props = {
   strategicAdvisorContext?: GrowthHomeAvaStrategicAdvisorContextPayload | null
   executiveReasoning?: GrowthHomeAvaExecutiveReasoningPayload | null
   suppressPrimaryHeadline?: boolean
+  /** AVA-HOME-SIMPLIFICATION-1A — unified CTAs, reduced intro repetition */
+  simplifiedMode?: boolean
 }
 
 function displayHeadline(item: GrowthHomeAvaRecommendationItem, activeIndex: number): string {
@@ -285,6 +294,7 @@ export function GrowthHomeAvaRecommendationExperienceSection({
   strategicAdvisorContext = null,
   executiveReasoning = null,
   suppressPrimaryHeadline = false,
+  simplifiedMode = false,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
   const [activeIndex, setActiveIndex] = useState(0)
@@ -453,15 +463,19 @@ export function GrowthHomeAvaRecommendationExperienceSection({
       data-qa-marker-next-1c={GROWTH_AIOS_NEXT_1C_STRATEGIC_ADVISOR_QA_MARKER}
       data-qa-marker-next-1d={GROWTH_AIOS_NEXT_1D_AVA_OUTCOME_PLANNING_QA_MARKER}
       data-qa-marker-next-1e={GROWTH_AIOS_NEXT_1E_AVA_BUSINESS_OBJECTIVE_QA_MARKER}
+      data-qa-marker-simplification-1a={simplifiedMode ? GROWTH_HOME_SIMPLIFICATION_1A_QA_MARKER : undefined}
       className="space-y-4 rounded-xl border border-indigo-200/70 bg-indigo-50/30 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20 sm:p-5"
     >
       <div className="border-b border-border/40 pb-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {GROWTH_HOME_SECTION_RECOMMENDATION_TITLE}
         </h2>
-        <p className="text-sm text-muted-foreground">{GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE}</p>
+        {!simplifiedMode ? (
+          <p className="text-sm text-muted-foreground">{GROWTH_HOME_SECTION_RECOMMENDATION_SUBTITLE}</p>
+        ) : null}
       </div>
 
+      {!simplifiedMode ? (
       <div className="space-y-2">
         <p className="text-sm leading-relaxed text-muted-foreground">{experience.sinceLastVisitLine}</p>
         <p className="text-sm font-medium text-foreground">{experience.recommendationIntro}</p>
@@ -476,6 +490,7 @@ export function GrowthHomeAvaRecommendationExperienceSection({
           </p>
         ) : null}
       </div>
+      ) : null}
 
       {activeRecommendation ? (
         <article className="space-y-4 rounded-lg border border-border/60 bg-card/80 p-4">
@@ -487,7 +502,7 @@ export function GrowthHomeAvaRecommendationExperienceSection({
                   {displayHeadline(activeRecommendation, activeIndex)}
                 </p>
               ) : null}
-              {whyBullets.length > 0 ? (
+              {!simplifiedMode && whyBullets.length > 0 ? (
                 <ul className="space-y-1.5 text-sm text-foreground" data-qa-field="recommendation-supporting-reasons">
                   {whyBullets.map((line) => (
                     <li key={line} className="flex gap-2">
@@ -559,25 +574,27 @@ export function GrowthHomeAvaRecommendationExperienceSection({
             {activeRecommendation.href ? (
               <Button asChild size="sm" onClick={handleContinue}>
                 <Link href={activeRecommendation.href}>
-                  Continue
+                  {simplifiedMode ? GROWTH_HOME_SIMPLIFICATION_REVIEW_PACKAGE_CTA : "Continue"}
                   <ArrowRight className="ml-1.5 size-4" />
                 </Link>
               </Button>
             ) : (
               <Button type="button" size="sm" disabled>
-                Continue
+                {simplifiedMode ? GROWTH_HOME_SIMPLIFICATION_REVIEW_PACKAGE_CTA : "Continue"}
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" onClick={() => setShowWhy((value) => !value)}>
-              Why this recommendation?
+              {simplifiedMode ? GROWTH_HOME_SIMPLIFICATION_ASK_WHY_CTA : "Why this recommendation?"}
             </Button>
             {activeIndex < experience.recommendations.length - 1 ? (
               <Button type="button" size="sm" variant="ghost" onClick={handleSuggestAnother}>
-                Suggest something else
+                {simplifiedMode ? GROWTH_HOME_SIMPLIFICATION_SKIP_CTA : "Suggest something else"}
               </Button>
             ) : null}
             <Button type="button" size="sm" variant="ghost" onClick={() => setShowAssignment((value) => !value)}>
-              Tell {teammate.name} what to do...
+              {simplifiedMode
+                ? GROWTH_HOME_SIMPLIFICATION_SUGGEST_DIRECTION_CTA
+                : `Tell ${teammate.name} what to do...`}
             </Button>
           </div>
 

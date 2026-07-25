@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getGrowthEngineAiOrgId, logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { fetchGrowthLeadById, updateGrowthLead, archiveGrowthLeads } from "@/lib/growth/lead-repository"
+import { buildCustomerPackageReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { mapGrowthLeadArchiveApiError } from "@/lib/growth/lead-archive-api-errors"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
@@ -67,7 +69,28 @@ export async function GET(
   try {
     const lead = await fetchGrowthLeadById(access.admin, leadId)
     if (!lead) {
-      return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
+      const generation = await fetchGrowthAiCopilotGenerationById(access.admin, leadId)
+      if (generation) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "approval_package_source_mismatch",
+            message: "This review link used a recommendation id instead of the account id.",
+            reviewHref: buildCustomerPackageReviewHref(generation.leadId),
+            generationId: generation.id,
+            leadId: generation.leadId,
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "approval_generation_not_found",
+          message: "This review package could not be loaded.",
+        },
+        { status: 404 },
+      )
     }
     const decisionMakers = await listGrowthLeadDecisionMakers(access.admin, leadId)
     return NextResponse.json({ ok: true, lead, decisionMakers })

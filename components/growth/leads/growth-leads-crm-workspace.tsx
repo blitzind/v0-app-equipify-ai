@@ -129,10 +129,44 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
   useEffect(() => {
     if (!deepLinkLeadId || loading) return
     const lead = leads.find((item) => item.id === deepLinkLeadId)
-    if (!lead) return
-    if (drawerFocus) applyGrowthCommandLeadFocusExpand(drawerFocus)
-    setSelectedLead(lead)
-    setDrawerOpen(true)
+    if (lead) {
+      if (drawerFocus) applyGrowthCommandLeadFocusExpand(drawerFocus)
+      setSelectedLead(lead)
+      setDrawerOpen(true)
+      return
+    }
+
+    let cancelled = false
+    void fetch(`/api/platform/growth/leads/${encodeURIComponent(deepLinkLeadId)}`, { cache: "no-store" })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          lead?: GrowthLead
+          error?: string
+          message?: string
+          reviewHref?: string
+        }
+        if (cancelled) return
+        if (res.status === 409 && data.error === "approval_package_source_mismatch" && data.reviewHref) {
+          window.location.replace(data.reviewHref)
+          return
+        }
+        if (!res.ok || !data.ok || !data.lead) {
+          throw new Error(data.message ?? "This review package could not be loaded.")
+        }
+        if (drawerFocus) applyGrowthCommandLeadFocusExpand(drawerFocus)
+        setSelectedLead(data.lead)
+        setDrawerOpen(true)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "This review package could not be loaded.")
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [deepLinkLeadId, drawerFocus, leads, loading])
 
   useEffect(() => {

@@ -116,7 +116,8 @@ export function useGrowthReviewDecisionQueue(teammateName: string): UseGrowthRev
       setSoloApprovalEnabled(solo)
       setQueue(synthesized)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load review queue.")
+      const message = loadError instanceof Error ? loadError.message : "Could not load review queue."
+      setError(message === "Failed to fetch" ? "Could not reach the review service. Refresh and try again." : message)
       setQueue(null)
     } finally {
       setLoading(false)

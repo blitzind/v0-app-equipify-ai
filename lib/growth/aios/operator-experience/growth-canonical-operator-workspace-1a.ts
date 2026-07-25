@@ -107,7 +107,9 @@ function packagePreviewFromItem(input: {
       resolveOperatorPackageReviewHref({
         leadId,
         packageId,
+        itemId: input.item.id,
         route: input.item.route ?? undefined,
+        packageSource: "legacy_hac_package",
       }),
   }
 }
