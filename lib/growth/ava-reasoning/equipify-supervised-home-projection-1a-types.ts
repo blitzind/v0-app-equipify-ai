@@ -30,6 +30,8 @@ export type GrowthSupervisedAvaHomeOperatorAttention = {
   qaMarker: typeof AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER
   readyForReview: GrowthSupervisedAvaHomeReadyItem[]
   needsInformation: GrowthSupervisedAvaHomeNeedsInformationItem[]
+  /** Lead IDs with a completed supervised outbound send — excluded from review queues. */
+  sentLeadIds: string[]
   rejectedCount: number
 }
 

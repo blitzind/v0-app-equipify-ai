@@ -12,6 +12,8 @@ import type { GrowthCanonicalOperatorApprovalSnapshot } from "@/lib/growth/aios/
 import { GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a-types"
 import { buildCustomerPackageReviewHref } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
 import { AVA_SUPERVISED_CUTOVER_GENERATION_MODE } from "@/lib/growth/ava-reasoning/equipify-supervised-cutover-service"
+import { readAvaSupervisedOutboundSendReceipt } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import { readAvaSupervisedOutboundSendLifecycle } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1b-types"
 import {
   AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER,
   type GrowthSupervisedAvaHomeNeedsInformationItem,
@@ -59,6 +61,21 @@ function hasContactableRecipient(generation: GrowthAiCopilotGeneration): boolean
   return contactNameFromGeneration(generation) != null
 }
 
+export function isSupervisedAvaGenerationSent(
+  generation: GrowthAiCopilotGeneration,
+): boolean {
+  if (generation.sentAt?.trim()) return true
+
+  const classification = classificationRecord(generation)
+  const lifecycle = readAvaSupervisedOutboundSendLifecycle(classification)
+  if (lifecycle?.status === "sent") return true
+
+  const receipt = readAvaSupervisedOutboundSendReceipt(classification)
+  if (receipt?.status === "sent") return true
+
+  return false
+}
+
 export function isReviewableSupervisedAvaGeneration(
   generation: GrowthAiCopilotGeneration,
 ): boolean {
@@ -66,6 +83,7 @@ export function isReviewableSupervisedAvaGeneration(
   if (generation.promptVariant !== SUPERVISED_PROMPT_VARIANT) return false
   if (generation.status !== "draft" && generation.status !== "approved") return false
   if (!generation.generatedSubject?.trim() || !generation.generatedContent?.trim()) return false
+  if (isSupervisedAvaGenerationSent(generation)) return false
 
   const classification = classificationRecord(generation)
   if (classification.primary !== "pursue") return false
@@ -200,6 +218,13 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
   generations: GrowthAiCopilotGeneration[]
   leadsById: LeadLookup
 }): GrowthSupervisedAvaHomeOperatorAttention {
+  const sentLeadIds = new Set<string>()
+  for (const generation of input.generations) {
+    if (isSupervisedAvaGenerationSent(generation)) {
+      sentLeadIds.add(generation.leadId)
+    }
+  }
+
   const seenReady = new Set<string>()
   const seenNeeds = new Set<string>()
   const readyForReview: GrowthSupervisedAvaHomeReadyItem[] = []
@@ -207,6 +232,8 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
   let rejectedCount = 0
 
   for (const generation of input.generations) {
+    if (sentLeadIds.has(generation.leadId)) continue
+
     const companyName = input.leadsById.get(generation.leadId) ?? "Account"
     const classification = classificationRecord(generation)
     if (classification.primary === "reject") {
@@ -233,6 +260,7 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
     qaMarker: AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER,
     readyForReview,
     needsInformation,
+    sentLeadIds: [...sentLeadIds],
     rejectedCount,
   }
 }
@@ -272,17 +300,22 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
   attention: GrowthSupervisedAvaHomeOperatorAttention
 }): GrowthCanonicalOperatorApprovalSnapshot {
   const supervisedReady = input.attention.readyForReview
-  if (supervisedReady.length === 0 && input.attention.needsInformation.length === 0) {
+  const sentLeadIds = new Set(input.attention.sentLeadIds ?? [])
+  const hasSupervisedAttention =
+    supervisedReady.length > 0 || input.attention.needsInformation.length > 0
+
+  if (!hasSupervisedAttention && sentLeadIds.size === 0) {
     return input.base
   }
 
-  const supervisedLeadIds = new Set([
+  const excludedLeadIds = new Set([
     ...supervisedReady.map((row) => row.leadId),
     ...input.attention.needsInformation.map((row) => row.leadId),
+    ...sentLeadIds,
   ])
 
   const legacyPackages = input.base.packages.filter((pkg) => {
-    if (supervisedLeadIds.has(pkg.leadId)) return false
+    if (excludedLeadIds.has(pkg.leadId)) return false
     if (supervisedReady.length > 0 && isLegacyHoldLikePackage(pkg)) return false
     return true
   })
