@@ -42,6 +42,7 @@ import {
   buildGrowthReviewHref,
   resolveOperatorPackageReviewHref,
 } from "@/lib/growth/workspace/ux-1a/review/growth-review-routes"
+import { isActionableHomeReviewPackagePreview } from "@/lib/growth/home/growth-home-review-queue-1b"
 import {
   GROWTH_OPERATOR_PACKAGE_AUTHORIZE_PROMISE_TASK,
 } from "@/lib/growth/workspace/ux-1a/review/growth-operator-package-review-copy-1a"
@@ -111,6 +112,7 @@ function packagePreviewFromItem(input: {
         route: input.item.route ?? undefined,
         packageSource: "legacy_hac_package",
       }),
+    packageSource: "legacy_hac_package",
   }
 }
 
@@ -143,7 +145,8 @@ export function buildCanonicalOperatorApprovalSnapshot(input: {
     (item) => resolveCompletedWorkOperatorBucket(item) === "ready_outreach",
   )
 
-  const packages: GrowthCanonicalOperatorApprovalPackagePreview[] = outreachItems.map((item) => {
+  const packages: GrowthCanonicalOperatorApprovalPackagePreview[] = outreachItems
+    .map((item) => {
     const decodedPackageId = parsePackageIdFromApprovalRoute(item.route ?? undefined)
     const pkg =
       (decodedPackageId ? input.packagesById?.get(decodedPackageId) : null) ??
@@ -153,6 +156,7 @@ export function buildCanonicalOperatorApprovalSnapshot(input: {
       null
     return packagePreviewFromItem({ item, pkg })
   })
+    .filter((pkg) => isActionableHomeReviewPackagePreview({ pkg }))
 
   const outreachDraftCount = packages.reduce((sum, row) => sum + Math.max(row.draftCount, 0), 0)
 

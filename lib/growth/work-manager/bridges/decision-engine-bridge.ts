@@ -24,10 +24,15 @@ export function nextBestActionToWorkItem(action: NextBestAction, timestamp: stri
   const blocked = action.blocked_by.length > 0
   const requiresOperator = action.requires_operator || action.kind === "review_approval"
   const requiresLeadTarget = action.kind === "research_company" && !action.href?.trim()
+  const genericMissionWithoutTarget =
+    action.kind === "continue_mission" &&
+    !action.id.startsWith("discovery:") &&
+    !action.href?.trim()
   const canExecuteAutonomously =
     !requiresOperator &&
     !blocked &&
     !requiresLeadTarget &&
+    !genericMissionWithoutTarget &&
     action.kind !== "wait" &&
     action.kind !== "review_reply"
 

@@ -7,6 +7,7 @@ import {
   mapReviewQueueClientError,
   type GrowthHomeReviewQueueRow,
 } from "@/lib/growth/home/growth-home-review-queue-1b"
+import { parseOutreachPrepPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-id"
 
 export const GROWTH_HOME_REVIEW_QUEUE_PREVIEW_CLIENT_1B_QA_MARKER =
   "ava-home-review-queue-preview-client-1b-v1" as const
@@ -129,7 +130,71 @@ export async function fetchReviewQueueGeneration(
   return generation
 }
 
+function isLegacyOutreachPrepPackageId(packageId: string): boolean {
+  return Boolean(parseOutreachPrepPackageId(packageId))
+}
+
+async function fetchLegacyReviewQueuePreview(
+  row: GrowthHomeReviewQueueRow,
+): Promise<GrowthHomeReviewQueuePreviewData> {
+  const response = await fetch(
+    `/api/platform/growth/ai-os/completed-work/packages/${encodeURIComponent(row.packageId)}?leadId=${encodeURIComponent(row.leadId)}`,
+    { cache: "no-store" },
+  )
+  const payload = (await response.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+    message?: string
+    packet?: {
+      company?: { name?: string }
+      decisionMaker?: { name?: string | null; email?: string | null }
+      drafts?: Array<{ channel?: string; preview?: string | null; label?: string }>
+      explainability?: { whyPursue?: string }
+    }
+  }
+
+  if (!response.ok || !payload.ok || !payload.packet) {
+    throw new Error(
+      mapReviewQueueClientError({
+        error: payload.error ?? "approval_generation_not_found",
+        message: payload.message,
+        status: response.status,
+      }),
+    )
+  }
+
+  const packet = payload.packet
+  const emailDraft =
+    packet.drafts?.find((draft) => draft.channel === "email") ?? packet.drafts?.[0] ?? null
+  const recipient =
+    packet.decisionMaker?.name && packet.decisionMaker.email
+      ? `${packet.decisionMaker.name} <${packet.decisionMaker.email}>`
+      : packet.decisionMaker?.email ?? packet.decisionMaker?.name ?? null
+
+  return {
+    qaMarker: GROWTH_HOME_REVIEW_QUEUE_PREVIEW_CLIENT_1B_QA_MARKER,
+    companyName: row.companyName || packet.company?.name || "Account",
+    websiteLabel: row.website.label,
+    websiteHref: row.website.href,
+    recipient,
+    subject: emailDraft?.label?.trim() || row.subject || "Prepared outreach",
+    body: emailDraft?.preview?.trim() || "",
+    mailboxLabel: "Legacy package — open account review for send authorization",
+    confidenceLabel: row.fitPercent != null ? `${row.fitPercent}%` : null,
+    rationale: row.rationale ?? packet.explainability?.whyPursue ?? null,
+    warnings: ["Legacy Growth 5F package — approve from account review drawer."],
+    approvalStateLabel: "Awaiting approval",
+    generationStatus: "draft",
+    generationId: row.packageId,
+    leadId: row.leadId,
+  }
+}
+
 export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Promise<GrowthHomeReviewQueuePreviewData> {
+  if (row.packageSource === "legacy_hac_package" || isLegacyOutreachPrepPackageId(row.packageId)) {
+    return fetchLegacyReviewQueuePreview(row)
+  }
+
   const generation = await fetchReviewQueueGeneration(row.leadId, row.packageId)
 
   const signatureResponse = await fetch(

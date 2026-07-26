@@ -60,6 +60,10 @@ import {
   isAdmissionDownstreamReconcileState,
   isAdmissionReconcileCorrectedOutcome,
 } from "@/lib/growth/draft-factory/draft-factory-admission-downstream-reconcile-2a"
+import {
+  GROWTH_DRAFT_FACTORY_ORPHAN_APPROVAL_RECONCILE_1A_QA_MARKER,
+  reconcileOrphanApprovalPackagesForOrganization,
+} from "@/lib/growth/draft-factory/draft-factory-orphan-approval-package-reconcile-service-1a"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { evaluateGrowthPortfolioLeadEligibility } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
@@ -112,6 +116,16 @@ export type DraftFactoryDueSchedulerTickResult = {
   due_tick_runtime_ms?: number
   budget_exhausted_phase?: string | null
   admission_reconcile?: DraftFactoryAdmissionReconcileTickStats
+  orphan_approval_reconcile?: DraftFactoryOrphanApprovalReconcileTickStats
+}
+
+export type DraftFactoryOrphanApprovalReconcileTickStats = {
+  qa_marker: typeof GROWTH_DRAFT_FACTORY_ORPHAN_APPROVAL_RECONCILE_1A_QA_MARKER
+  candidates_found: number
+  attempted: number
+  corrected: number
+  skipped: number
+  failed: number
 }
 
 type BudgetPhase =
@@ -120,6 +134,7 @@ type BudgetPhase =
   | "enrichment"
   | "advancement"
   | "admission_reconcile"
+  | "orphan_approval_reconcile"
   | "capacity_wake"
 
 async function projectInvestmentForDueLead(
@@ -537,6 +552,14 @@ export async function tickDraftFactoryDueStatesForScheduler(
     reconcile_started: false,
     reconcile_completed: false,
   }
+  const orphanApprovalReconcileAggregate: DraftFactoryOrphanApprovalReconcileTickStats = {
+    qa_marker: GROWTH_DRAFT_FACTORY_ORPHAN_APPROVAL_RECONCILE_1A_QA_MARKER,
+    candidates_found: 0,
+    attempted: 0,
+    corrected: 0,
+    skipped: 0,
+    failed: 0,
+  }
 
   for (const organizationId of organizationIds) {
     if (Date.now() - startedAt >= maxRuntimeMs) {
@@ -593,6 +616,19 @@ export async function tickDraftFactoryDueStatesForScheduler(
       if (reconcileResult.budgetExhaustedDuringReconcile) {
         budgetExhaustedPhase = budgetExhaustedPhase ?? "admission_reconcile"
       }
+
+      const orphanReconcile = await reconcileOrphanApprovalPackagesForOrganization(admin, {
+        organizationId,
+        repository,
+        now,
+        workerId: `df-orphan-approval-reconcile:${organizationId}`,
+        dryRun: false,
+      })
+      orphanApprovalReconcileAggregate.candidates_found += orphanReconcile.candidatesFound
+      orphanApprovalReconcileAggregate.attempted += orphanReconcile.attempted
+      orphanApprovalReconcileAggregate.corrected += orphanReconcile.corrected
+      orphanApprovalReconcileAggregate.skipped += orphanReconcile.skipped
+      orphanApprovalReconcileAggregate.failed += orphanReconcile.failed
 
       // GE-AIOS-CONTACT-1B — resume pending DataMoon DM discovery polls (no new cron).
       try {
@@ -983,6 +1019,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
     budget_exhausted_phase: budgetExhaustedPhase,
     runtime_ms: dueTickRuntimeMs,
     admission_reconcile: admissionReconcileAggregate,
+    orphan_approval_reconcile: orphanApprovalReconcileAggregate,
   })
 
   return {
@@ -1000,5 +1037,6 @@ export async function tickDraftFactoryDueStatesForScheduler(
     due_tick_runtime_ms: dueTickRuntimeMs,
     budget_exhausted_phase: budgetExhaustedPhase,
     admission_reconcile: admissionReconcileAggregate,
+    orphan_approval_reconcile: orphanApprovalReconcileAggregate,
   }
 }

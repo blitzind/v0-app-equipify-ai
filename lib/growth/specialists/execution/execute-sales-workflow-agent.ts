@@ -26,7 +26,10 @@ import { mapAslWorkflowAgentToActionKind } from "@/lib/growth/aios/execution/gro
 import {
   executeDiscoveryMissionWorkItem,
 } from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-execution-launch-1d"
-import { isDiscoveryMissionWorkItem } from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-work-items-launch-1d"
+import {
+  isDiscoveryMissionWorkItem,
+  resolveDiscoveryMissionSourceId,
+} from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-work-items-launch-1d"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { assertGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
@@ -67,7 +70,13 @@ export async function executeSalesWorkflowAgent(
   const { workflow_agent: workflowAgent } = delegation
   const leadId = extractLeadIdFromWorkItem(workItem)
 
-  if (isDiscoveryMissionWorkItem(workItem)) {
+  if (
+    isDiscoveryMissionWorkItem(workItem) ||
+    (workItem.type === "mission" &&
+      !extractLeadIdFromWorkItem(workItem) &&
+      !resolveDiscoveryMissionSourceId(workItem) &&
+      workItem.source === "decision_engine")
+  ) {
     return executeDiscoveryMissionWorkItem(input.admin, {
       organizationId: input.organizationId,
       workItem,

@@ -26,8 +26,10 @@ import {
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import {
   GE_AIOS_LIVE_8B_WORK_MANAGER_RESEARCH_PROJECTION_QA_MARKER,
+  selectRevenueQueueResearchCandidates,
   selectRevenueQueueReviewResearchCandidates,
 } from "@/lib/growth/research/growth-revenue-queue-research-selection"
+import { shouldAutoQueueLeadResearch } from "@/lib/growth/research/growth-lead-research-readiness"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export type BuildDecisionContextInput = {
@@ -145,6 +147,35 @@ function buildResearchCandidates(input: BuildDecisionContextInput): DecisionCand
         requiresHumanApproval: ready,
       }
     })
+}
+
+function buildPortfolioResearchCandidates(
+  portfolioLeads: GrowthLead[] | null | undefined,
+  portfolioEligibility?: GrowthPortfolioEligibilityContext | null,
+): DecisionCandidate[] {
+  if (!portfolioLeads?.length) return []
+
+  const leadsById = new Map(portfolioLeads.map((lead) => [lead.id, lead]))
+  return selectRevenueQueueResearchCandidates(portfolioLeads)
+    .filter((card) => {
+      if (portfolioEligibility && !portfolioEligibility.eligibleLeadIds.has(card.id)) return false
+      const lead = leadsById.get(card.id)
+      return lead ? shouldAutoQueueLeadResearch(lead) : false
+    })
+    .slice(0, 5)
+    .map((card) => ({
+      id: `research:portfolio:${card.id}`,
+      kind: "research_company" as const,
+      title: `Research company — ${card.company_name}`,
+      detail: "Portfolio research priority — autonomous prospect research.",
+      href: `/growth/leads/${card.id}`,
+      companyName: card.company_name,
+      source: "revenue_queue" as const,
+      queuePriority: "high" as const,
+      hotCompany: true,
+      confidencePercent: 82,
+      estimatedMinutes: 20,
+    }))
 }
 
 function buildReviewResearchProjectionCandidates(
@@ -405,6 +436,10 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     .filter((row): row is DecisionCandidate => row != null)
   const research = buildResearchCandidates(input)
   const reviewResearchProjection = buildReviewResearchProjectionCandidates(input.portfolioLeads)
+  const portfolioResearch = buildPortfolioResearchCandidates(
+    input.portfolioLeads,
+    input.portfolioEligibility,
+  )
   const missions = [
     ...buildMissionCandidates(input),
     ...buildScaleAwarenessCandidates(input),
@@ -430,6 +465,7 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     missions: [...missions, ...businessCandidates.filter((row) => row.kind === "continue_mission")],
     inbox: [...inbox, ...approvals.filter((row) => row.kind === "review_reply")],
     research: [
+      ...portfolioResearch,
       ...reviewResearchProjection,
       ...research,
       ...businessCandidates.filter((row) => row.kind !== "continue_mission"),

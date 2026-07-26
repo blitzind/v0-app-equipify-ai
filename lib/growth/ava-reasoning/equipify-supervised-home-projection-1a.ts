@@ -20,6 +20,7 @@ import {
   type GrowthSupervisedAvaHomeOperatorAttention,
   type GrowthSupervisedAvaHomeReadyItem,
 } from "@/lib/growth/ava-reasoning/equipify-supervised-home-projection-1a-types"
+import { isActionableHomeReviewPackagePreview } from "@/lib/growth/home/growth-home-review-queue-1b"
 
 const SUPERVISED_PROMPT_VARIANT = "ava_direct_production_cutover_1a" as const
 
@@ -318,7 +319,7 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
   const legacyPackages = input.base.packages.filter((pkg) => {
     if (excludedLeadIds.has(pkg.leadId)) return false
     if (supervisedReady.length > 0 && isLegacyHoldLikePackage(pkg)) return false
-    return true
+    return isActionableHomeReviewPackagePreview({ pkg })
   })
 
   const supervisedPackages = supervisedReady.map(readyItemToPackagePreview)

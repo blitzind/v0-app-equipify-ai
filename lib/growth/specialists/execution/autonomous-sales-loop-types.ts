@@ -9,10 +9,23 @@ export const AUTONOMOUS_SALES_LOOP_DEFAULT_MAX_ITERATIONS = 5 as const
 export const AUTONOMOUS_SALES_LOOP_DEFAULT_DAILY_BUDGET_MINUTES = 120 as const
 export const AUTONOMOUS_SALES_LOOP_DEFAULT_ESTIMATED_MINUTES = 15 as const
 
+export type AutonomousSalesLoopNonExecutionReason =
+  | "no_candidates"
+  | "no_qualified_candidates"
+  | "waiting_for_research"
+  | "waiting_for_contact"
+  | "waiting_for_approval"
+  | "stop_investment"
+  | "capacity_limited"
+  | "stale_state"
+  | "generation_deferred"
+  | "no_executable_work"
+
 export type AutonomousSalesLoopStopReason =
   | "daily_budget_exhausted"
   | "max_iterations_reached"
   | "no_executable_work"
+  | AutonomousSalesLoopNonExecutionReason
   | "autonomy_disabled"
   | "context_unavailable"
   | "org_work_timeout"
@@ -41,6 +54,8 @@ export type AutonomousSalesLoopResult = ExecuteReadyWorkItemsResult & {
   outcomes_completed: number
   minutes_spent: number
   stop_reason: AutonomousSalesLoopStopReason | null
+  /** Granular reason when executed=false and no outcomes completed. */
+  non_execution_reason?: AutonomousSalesLoopNonExecutionReason | null
   iteration_log: AutonomousSalesLoopIterationResult[]
   queue_reprioritized: boolean
   memory_events_persisted: number
@@ -65,6 +80,7 @@ export type AutonomousSalesSchedulerTickResult = {
     outcomes_completed: number
     outcomes_reconciled: number
     stop_reason: AutonomousSalesLoopStopReason | null
+    non_execution_reason?: AutonomousSalesLoopNonExecutionReason | null
     selected_work_count?: number
   }>
 }

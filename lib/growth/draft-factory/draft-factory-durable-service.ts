@@ -314,6 +314,8 @@ export async function advanceDraftFactoryForLead(
     })
 
     let nextEvidence = plan.nextEvidence
+    /** AVA-OUTREACH-PIPELINE-RECOVERY-1A — waiting_for_approval only after Growth 5F confirms durable package. */
+    let generationPackageConfirmed = false
 
     // Auto-complete stage facts from completion wakes (map wake → stage explicitly).
     const wakeStageCompletion: Partial<
@@ -334,9 +336,9 @@ export async function advanceDraftFactoryForLead(
         mappedStage ??
         plan.stageEvaluated ??
         resolveEarliestIncompleteDurableStage(nextEvidence)
-      // AUTONOMY-1F — when Growth 5F is injected, do not stub-complete generation
-      // before the generator runs (would skip generateViaGrowth5F entirely).
-      const deferGenerationToGrowth5F = stage === "generation" && Boolean(input.generateViaGrowth5F)
+      // AUTONOMY-1F / RECOVERY-1A — generation never auto-completes from wake hints;
+      // only a confirmed Growth 5F return may mark draftValid + packageId.
+      const deferGenerationToGrowth5F = stage === "generation"
       if (
         stage &&
         !deferGenerationToGrowth5F &&
@@ -415,6 +417,7 @@ export async function advanceDraftFactoryForLead(
           pkg.pendingHumanApproval === true &&
           pkg.transportBlocked === true
         ) {
+          generationPackageConfirmed = true
           nextEvidence = applyStageCompletionFact(nextEvidence, "generation", {
             packageId: pkg.packageId,
           })
@@ -435,19 +438,34 @@ export async function advanceDraftFactoryForLead(
             nextEvidence: { ...nextEvidence, failed: true },
             nextEligibleWakeAt: null,
           }
+        } else {
+          nextEvidence = {
+            ...nextEvidence,
+            draftValid: false,
+            packageId: null,
+          }
+          plan = {
+            stageEvaluated: "generation",
+            outcome: "deferred",
+            reason:
+              "Growth 5F did not produce a durable approval package — remain retryable at generation.",
+            nextEvidence,
+            nextEligibleWakeAt: now,
+            incrementAttempt: "generation",
+          }
         }
-      } else if (hints.completeCurrentStage || wakeType === "generation_completed" || wakeType === "capacity_available") {
-        // Cert path without live 5F — still mark as Growth-5F-only contract when hint supplies package.
-        const packageId = hints.packageId ?? `growth5f:${input.leadId}:${now}`
-        nextEvidence = applyStageCompletionFact(nextEvidence, "generation", { packageId })
-        await repo.incrementPackagesProduced(input.organizationId, now)
+      } else if (
+        hints.completeCurrentStage ||
+        wakeType === "generation_completed" ||
+        wakeType === "capacity_available"
+      ) {
         plan = {
           stageEvaluated: "generation",
-          outcome: "completed",
-          reason: "Growth 5F-only generation path completed (injected/stub).",
-          nextEvidence,
-          nextEligibleWakeAt: null,
-          incrementAttempt: "generation",
+          outcome: "deferred",
+          reason:
+            "Generation requires Growth 5F durable package persistence — refusing synthetic package_id.",
+          nextEvidence: { ...nextEvidence, draftValid: false, packageId: null },
+          nextEligibleWakeAt: now,
         }
       }
       }
@@ -457,6 +475,7 @@ export async function advanceDraftFactoryForLead(
     const finalStateName = projectDurableStateFromStage(finalStage, nextEvidence)
     // Terminal approval stop
     const stoppedAtApproval =
+      generationPackageConfirmed &&
       nextEvidence.draftValid &&
       Boolean(nextEvidence.packageId) &&
       !nextEvidence.approved &&

@@ -14,6 +14,9 @@ import { buildCustomerPackageReviewHref } from "@/lib/growth/workspace/ux-1a/rev
 export const GROWTH_HOME_REVIEW_QUEUE_1B_QA_MARKER =
   "ava-home-review-queue-1b-outreach-queue-v1" as const
 
+export const GROWTH_HOME_REVIEW_QUEUE_ACTIONABLE_INVARIANT =
+  "Home Outreach Review Queue rows must be preview-resolvable operator work only." as const
+
 export const GROWTH_HOME_REVIEW_QUEUE_TITLE = "Outreach Review Queue" as const
 export const GROWTH_HOME_REVIEW_QUEUE_SUBTITLE =
   "Scan, preview, and approve prepared outreach without leaving Home." as const
@@ -113,6 +116,24 @@ function resolveFitPercent(lead: GrowthLead | null | undefined): number | null {
   return Math.round(Math.min(100, Math.max(0, score)))
 }
 
+/** AVA-OUTREACH-PIPELINE-RECOVERY-1A — exclude orphan/non-resolvable packages from Home queue counts. */
+export function isActionableHomeReviewPackagePreview(input: {
+  pkg: GrowthCanonicalOperatorApprovalPackagePreview
+  supervisedReady?: GrowthSupervisedAvaHomeReadyItem | null
+}): boolean {
+  if (input.supervisedReady) return true
+  if (input.pkg.packageSource === "supervised_ava_generation") {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.pkg.packageId,
+    )
+  }
+  // Supervised cutover Home queue is generation-backed only — legacy HAC packages belong on Completed Work.
+  if (input.pkg.packageSource === "legacy_hac_package") return false
+  if (/approved|authorized/i.test(input.pkg.statusLabel)) return true
+  if ((input.pkg.draftCount ?? 0) > 0) return true
+  return false
+}
+
 function mapPackageStatus(input: {
   pkg: GrowthCanonicalOperatorApprovalPackagePreview
   supervisedReady?: GrowthSupervisedAvaHomeReadyItem | null
@@ -196,11 +217,20 @@ export function buildGrowthHomeReviewQueuePresentation(input: {
 
   const rows: GrowthHomeReviewQueueRow[] = []
   for (const pkg of input.packages) {
+    const supervisedReady = supervisedReadyByLeadId.get(pkg.leadId) ?? null
+    if (
+      !isActionableHomeReviewPackagePreview({
+        pkg,
+        supervisedReady,
+      })
+    ) {
+      continue
+    }
     rows.push(
       buildRowFromPackage({
         pkg,
         lead: leadsById.get(pkg.leadId),
-        supervisedReady: supervisedReadyByLeadId.get(pkg.leadId) ?? null,
+        supervisedReady,
       }),
     )
   }

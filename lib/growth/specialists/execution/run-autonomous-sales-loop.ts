@@ -31,6 +31,13 @@ import {
   logAutonomousSalesLoopEvent,
 } from "@/lib/growth/specialists/execution/autonomous-sales-loop-observability"
 import { selectNextExecutableWorkItem } from "@/lib/growth/specialists/execution/select-next-executable-work-item"
+import {
+  diagnoseAutonomousSalesLoopWorkManager,
+  loadDraftFactorySignalCounts,
+} from "@/lib/growth/specialists/execution/autonomous-sales-loop-diagnosis-1a"
+import type {
+  AutonomousSalesLoopNonExecutionReason,
+} from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
 import type {
   AutonomousSalesLoopSelectedWorkItem,
 } from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
@@ -134,6 +141,7 @@ async function loadAutonomousSalesLoopContext(
   salesOutcomes: SalesOutcome[]
   organizationalKnowledge: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[]
   persistedMemoryStore: import("@/lib/growth/memory/types").AvaOrganizationalMemoryStore
+  portfolioLeads: import("@/lib/growth/types").GrowthLead[]
 } | null> {
   const canonicalOrganizationId = getGrowthEngineAiOrgId()
   if (canonicalOrganizationId && input.organizationId !== canonicalOrganizationId) {
@@ -262,6 +270,7 @@ export async function runAutonomousSalesLoop(
             events: [],
             preferences: [],
           },
+          portfolioLeads: [] as import("@/lib/growth/types").GrowthLead[],
         }
       : await loadAutonomousSalesLoopContext(input.admin, {
           organizationId: input.organizationId,
@@ -291,6 +300,31 @@ export async function runAutonomousSalesLoop(
   let memoryEventsPersisted = 0
   let knowledgeItemsCount = loadedContext.organizationalKnowledge.length
   let stopReason: AutonomousSalesLoopStopReason | null = null
+  let nonExecutionReason: AutonomousSalesLoopNonExecutionReason | null = null
+
+  const draftFactorySignals = await loadDraftFactorySignalCounts(input.admin, input.organizationId).catch(
+    () => null,
+  )
+
+  function resolvePortfolioLeadsFromContext(): import("@/lib/growth/types").GrowthLead[] {
+    return loadedContext.portfolioLeads ?? []
+  }
+
+  function diagnoseCurrentWorkResult(
+    workResult: AvaWorkManagerResult,
+  ): AutonomousSalesLoopNonExecutionReason {
+    const diagnosis = diagnoseAutonomousSalesLoopWorkManager({
+      organizationId: input.organizationId,
+      generatedAt,
+      workManagerInput: loadedContext.workManagerInput,
+      portfolioLeads: resolvePortfolioLeadsFromContext(),
+      salesOutcomes,
+      organizationalKnowledge: loadedContext.organizationalKnowledge,
+      persistedMemoryStore: loadedContext.persistedMemoryStore,
+      draftFactorySignals: draftFactorySignals ?? undefined,
+    })
+    return diagnosis.non_execution_reason
+  }
 
   try {
     while (iterations < maxIterations && minutesSpent < dailyBudgetMinutes) {
@@ -399,6 +433,7 @@ export async function runAutonomousSalesLoop(
           persistedMemoryStore: loadedContext.persistedMemoryStore,
           organizationId: input.organizationId,
           generatedAt,
+          portfolioLeads: resolvePortfolioLeadsFromContext(),
         })
         workResult = nextState.workResult
 
@@ -415,10 +450,16 @@ export async function runAutonomousSalesLoop(
 
       const nextItem = selectNextExecutableWorkItem(workResult, { excludeWorkItemIds: skippedWorkItemIds })
       if (!nextItem) {
-        stopReason = "no_executable_work"
+        nonExecutionReason = diagnoseCurrentWorkResult(workResult)
+        stopReason = nonExecutionReason
         logAutonomousSalesLoopEvent(
           AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS.NO_EXECUTABLE_WORK,
-          { organization_id: input.organizationId, dry_run: dryRun, skipped_count: skippedWorkItemIds.size },
+          {
+            organization_id: input.organizationId,
+            dry_run: dryRun,
+            skipped_count: skippedWorkItemIds.size,
+            non_execution_reason: nonExecutionReason,
+          },
         )
         break
       }
@@ -611,6 +652,7 @@ export async function runAutonomousSalesLoop(
         persistedMemoryStore: loadedContext.persistedMemoryStore,
         organizationId: input.organizationId,
         generatedAt,
+        portfolioLeads: resolvePortfolioLeadsFromContext(),
       })
       workResult = nextState.workResult
 
@@ -646,7 +688,8 @@ export async function runAutonomousSalesLoop(
   }
 
   if (!stopReason && outcomesCompleted === 0 && !dryRun) {
-    stopReason = "no_executable_work"
+    nonExecutionReason = diagnoseCurrentWorkResult(workResult)
+    stopReason = nonExecutionReason
   }
   if (dryRun && selectedWork.length > 0) {
     stopReason = null
@@ -667,6 +710,7 @@ export async function runAutonomousSalesLoop(
     outcomes_completed: outcomesCompleted,
     minutes_spent: minutesSpent,
     stop_reason: stopReason,
+    non_execution_reason: outcomesCompleted > 0 ? null : nonExecutionReason,
     iteration_log: iterationLog,
     queue_reprioritized: queueReprioritized,
     memory_events_persisted: memoryEventsPersisted,
@@ -682,6 +726,7 @@ export async function runAutonomousSalesLoop(
     iterations: loopResult.iterations,
     outcomes_completed: loopResult.outcomes_completed,
     stop_reason: loopResult.stop_reason,
+    non_execution_reason: loopResult.non_execution_reason ?? null,
     selected_work_count: selectedWork.length,
     runtime_ms: Date.now() - startedAt,
   })
@@ -822,6 +867,7 @@ export async function tickAutonomousSalesLoopForScheduler(
       outcomes_completed: loopResult.outcomes_completed,
       outcomes_reconciled: reconciled.count,
       stop_reason: loopResult.stop_reason,
+      non_execution_reason: loopResult.non_execution_reason ?? null,
       selected_work_count: loopResult.selected_work?.length ?? 0,
     })
 
