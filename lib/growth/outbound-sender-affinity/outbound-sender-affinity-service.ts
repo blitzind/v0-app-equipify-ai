@@ -71,9 +71,10 @@ async function selectSenderForNewOutboundRelationship(
     }
   }
 
+  // Draft snapshot sender is prompt identity only — canonical Ava fallback ignores it.
   const primary = await resolveSupervisedApprovedSenderAccountId(admin, {
     organizationId: input.organizationId,
-    explicitSenderAccountId: input.explicitSenderAccountId ?? null,
+    explicitSenderAccountId: null,
   })
   if (!primary) return null
 

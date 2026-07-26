@@ -71,12 +71,6 @@ export async function bindAvaSupervisedOutboundApproval(
   const subject = input.generation.generatedSubject?.trim()
   if (!subject) throw new Error("approved_subject_unavailable")
 
-  const snapshot = input.generation.inputSnapshot ?? {}
-  const snapshotSender =
-    snapshot.approvedSender && typeof snapshot.approvedSender === "object"
-      ? (snapshot.approvedSender as { senderAccountId?: string | null }).senderAccountId?.trim() || null
-      : null
-
   const organizationId = lead.promotedOrganizationId?.trim() || getGrowthEngineAiOrgId() || null
   if (!organizationId) throw new Error("organization_unavailable")
 
@@ -84,7 +78,8 @@ export async function bindAvaSupervisedOutboundApproval(
     organizationId,
     leadId: input.generation.leadId,
     recipientEmail,
-    explicitSenderAccountId: snapshotSender,
+    // inputSnapshot.approvedSender is draft prompt identity only — affinity uses pool or canonical fallback.
+    explicitSenderAccountId: null,
   })
   if (!senderResolution.ok) {
     throw new Error(senderResolution.code)
