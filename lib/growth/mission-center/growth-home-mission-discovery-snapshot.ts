@@ -76,7 +76,8 @@ export function resolveAutonomousLeadDiscoveryAction(input: {
   researchingCount: number
   pendingApprovals: number
 }): AutonomousLeadDiscoveryAction {
-  if (input.pendingApprovals > 0) return "prepare_outreach"
+  // Operator approvals must not block pipeline replenishment when the audience is nearly exhausted.
+  if (input.pendingApprovals > 0 && !input.pipelineLow) return "prepare_outreach"
   if (input.lifecycleState === "researching" || input.researchingCount > 0) return "begin_research"
   if (input.lifecycleState === "preparing_recommendations") return "prepare_outreach"
   if (input.lifecycleState === "finding_leads") {
@@ -87,6 +88,9 @@ export function resolveAutonomousLeadDiscoveryAction(input: {
     return "refresh_audience"
   }
   if (input.recordsImported === 0 && input.leadPoolVisible === 0) return "run_prospect_search"
+  if (input.recordsImported === 0 && input.leadPoolVisible > 0 && input.hasBoundSearch) {
+    return "begin_research"
+  }
   if (input.recordsImported > 0 && input.leadPoolVisible > 0) return "begin_research"
   return input.lifecycleState === "monitoring" ? "monitoring" : "idle"
 }

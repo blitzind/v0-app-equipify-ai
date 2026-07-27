@@ -82,7 +82,7 @@ console.log("AVA-AUTONOMOUS-EXECUTION-RECOVERY-1A certification")
   console.log("  ✓ generic mission banner is not falsely executable")
 }
 
-// 3. Discovery mission remains executable
+// 3. Actionable discovery missions remain executable; observational monitoring does not
 {
   const item = nextBestActionToWorkItem(
     action({
@@ -93,16 +93,25 @@ console.log("AVA-AUTONOMOUS-EXECUTION-RECOVERY-1A certification")
     new Date().toISOString(),
   )
   assert.equal(item.can_execute_autonomously, false, "research without href stays gated")
-  const discovery = nextBestActionToWorkItem(
+  const refreshAudience = nextBestActionToWorkItem(
+    action({
+      id: "discovery:refresh_audience",
+      kind: "continue_mission",
+      title: "Refresh audience — ICP",
+    }),
+    new Date().toISOString(),
+  )
+  assert.equal(refreshAudience.can_execute_autonomously, true)
+  const monitoring = nextBestActionToWorkItem(
     action({
       id: "discovery:monitor_audience",
-      kind: "continue_mission",
+      kind: "wait",
       title: "Monitor audience — ICP",
     }),
     new Date().toISOString(),
   )
-  assert.equal(discovery.can_execute_autonomously, true)
-  console.log("  ✓ discovery mission work remains executable")
+  assert.equal(monitoring.can_execute_autonomously, false)
+  console.log("  ✓ actionable discovery missions executable; monitoring-only wait is not")
 }
 
 // 4. Operator approval outreach stays gated

@@ -40,6 +40,8 @@ function baseEvidence(
     draftValid: false,
     approved: false,
     rejected: false,
+    investmentState: "increase_investment",
+    spendAuthorized: true,
     ...overrides,
   }
 }

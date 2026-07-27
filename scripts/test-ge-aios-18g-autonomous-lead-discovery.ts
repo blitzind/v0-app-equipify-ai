@@ -252,6 +252,34 @@ function main(): void {
     }),
     "begin_research",
   )
+  assert.equal(
+    resolveAutonomousLeadDiscoveryAction({
+      lifecycleState: "monitoring",
+      recordsImported: 40,
+      newCompaniesFound: 10,
+      leadPoolVisible: 20,
+      leadPoolHasMore: false,
+      pipelineLow: true,
+      hasBoundSearch: true,
+      researchingCount: 0,
+      pendingApprovals: 3,
+    }),
+    "refresh_audience",
+  )
+  assert.equal(
+    resolveAutonomousLeadDiscoveryAction({
+      lifecycleState: "monitoring",
+      recordsImported: 0,
+      newCompaniesFound: 0,
+      leadPoolVisible: 12,
+      leadPoolHasMore: false,
+      pipelineLow: false,
+      hasBoundSearch: true,
+      researchingCount: 0,
+      pendingApprovals: 0,
+    }),
+    "begin_research",
+  )
   console.log("  ✓ decision rules for discovery chain")
 
   const snapshot = buildGrowthHomeMissionDiscoverySnapshot({

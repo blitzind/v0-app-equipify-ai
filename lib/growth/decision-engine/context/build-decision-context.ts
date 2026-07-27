@@ -377,15 +377,16 @@ function buildLeadDiscoveryCandidates(
       ]
     }
     case "monitoring":
+      // Observational only — refresh not due. Must not masquerade as executable ASL work.
       return [
         {
           id: "discovery:monitor_audience",
-          kind: "continue_mission",
+          kind: "wait",
           title: `${discoveryActionLabel("monitoring")}${targetSuffix}`,
-          detail: "Continuous audience monitoring for new matching companies.",
+          detail: "Audience refresh not due — monitoring only.",
           href: null,
           source: "mission",
-          queuePriority: "medium",
+          queuePriority: "low",
         },
       ]
     default:
