@@ -213,9 +213,6 @@ export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Pr
   let body = generation.generatedContent?.trim() ?? ""
   if (signatureResponse.ok && signaturePayload.ok && signaturePayload.unsignedBody) {
     body = signaturePayload.unsignedBody
-    if (signaturePayload.signatureText?.trim()) {
-      body = `${body}\n\n${signaturePayload.signatureText.trim()}`
-    }
   }
 
   const approvalStateLabel =
@@ -235,7 +232,7 @@ export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Pr
     recipient: contactFromGeneration(generation),
     subject: generation.generatedSubject?.trim() || row.subject || "Prepared outreach",
     body,
-    mailboxLabel: signaturePayload.senderAccountId ? "Assigned sending mailbox" : "Mailbox assigned at send",
+    mailboxLabel: "Mailbox assigned at approval",
     confidenceLabel: confidenceLabelFromGeneration(generation) ?? (row.fitPercent != null ? `${row.fitPercent}%` : null),
     rationale: row.rationale,
     warnings: warningsFromGeneration(generation),

@@ -14,6 +14,7 @@ import {
   AVA_DIRECT_PRODUCTION_CUTOVER_1A_QA_MARKER,
   AVA_DIRECT_PRODUCTION_PROMPT_VERSION,
 } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-direct-reasoning"
+import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
 import { AVA_SUPERVISED_CUTOVER_1A_QA_MARKER } from "@/lib/growth/ava-reasoning/equipify-external-company-preflight"
 
 const AVA_SUPERVISED_DRAFT_PROMPT_VARIANT = "ava_direct_production_cutover_1a" as const
@@ -48,14 +49,17 @@ export function isSendableAvaSupervisedDraft(input: {
 export async function findExistingAvaSupervisedSendableDraft(
   admin: SupabaseClient,
   leadId: string,
+  options?: { includeApproved?: boolean },
 ): Promise<GrowthAiCopilotGeneration | null> {
+  const includeApproved = options?.includeApproved !== false
   const generations = await listGrowthAiCopilotGenerationsForLead(admin, leadId, 50)
   return (
     generations.find(
       (g) =>
         g.generationType === "cold_email" &&
         g.promptVariant === AVA_SUPERVISED_DRAFT_PROMPT_VARIANT &&
-        (g.status === "draft" || g.status === "approved") &&
+        (g.status === "draft" || (includeApproved && g.status === "approved")) &&
+        (g.status === "draft" || !g.sentAt) &&
         Boolean(g.generatedSubject?.trim()) &&
         Boolean(g.generatedContent?.trim()),
     ) ?? null
@@ -77,12 +81,16 @@ export async function persistSendableAvaSupervisedDraft(input: {
   organizationKnowledge: unknown
   approvedSender: unknown
   classification: Record<string, unknown>
+  /** When false, legacy approved-but-unsent rows do not block fresh draft persistence. */
+  includeApprovedExisting?: boolean
 }): Promise<{ id: string | null; status: SupervisedDraftPersistenceStatus }> {
   if (!isSendableAvaSupervisedDraft(input)) {
     return { id: null, status: "skipped" }
   }
 
-  const existing = await findExistingAvaSupervisedSendableDraft(input.admin, input.leadId)
+  const existing = await findExistingAvaSupervisedSendableDraft(input.admin, input.leadId, {
+    includeApproved: input.includeApprovedExisting ?? true,
+  })
   if (existing) {
     return { id: existing.id, status: "duplicate_reused" }
   }
@@ -104,7 +112,7 @@ export async function persistSendableAvaSupervisedDraft(input: {
       approvedSender: input.approvedSender,
       contactsSupplied: input.contactsSupplied,
     },
-    generatedContent: input.email!.body.trim(),
+    generatedContent: stripAccidentalAvaSignatureFromBody(input.email!.body.trim()),
     generatedSubject: input.email!.subject.trim(),
     classification: input.classification,
     createdBy: input.actingUserId,
