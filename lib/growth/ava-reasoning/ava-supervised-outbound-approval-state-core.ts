@@ -93,7 +93,9 @@ export function resolveAvaSupervisedOutboundApprovalPresentation(
   }
 
   const recommendationApproved = isRecommendationApprovedForGeneration(generation)
-  const messageApproved = hasValidMessageApprovalBindingForGeneration(generation)
+
+  const bindingValid = hasValidMessageApprovalBindingForGeneration(generation)
+  const messageApproved = bindingValid && generation.status === "approved"
   const unboundApprovedStatus = isUnboundApprovedSupervisedGeneration(generation)
   const recommendationOperatorApproved = messageApproved || generation.status === "approved"
   const sendReceipt = readAvaSupervisedOutboundSendReceipt(
@@ -118,11 +120,7 @@ export function resolveAvaSupervisedOutboundApprovalPresentation(
             ? "Awaiting approval"
             : "Awaiting message approval"
 
-  const sendEligible =
-    messageApproved &&
-    generation.status === "approved" &&
-    !isSent &&
-    !isDeliveryUnknown
+  const sendEligible = messageApproved && !isSent && !isDeliveryUnknown
 
   return {
     qaMarker: AVA_SUPERVISED_OUTBOUND_APPROVAL_STATE_CORE_QA_MARKER,

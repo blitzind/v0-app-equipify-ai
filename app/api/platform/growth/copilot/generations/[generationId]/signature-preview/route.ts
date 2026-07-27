@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
-import { loadEquipifyApprovedSenderBundle } from "@/lib/growth/ava-reasoning/equipify-approved-sender"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import {
+  isAvaSupervisedOutboundGeneration,
+  readAvaSupervisedOutboundApprovalBinding,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
 import { resolveOutboundSignatureForSender } from "@/lib/growth/signatures/signature-resolver"
 
@@ -11,6 +13,9 @@ export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const PRE_APPROVAL_SIGNATURE_MESSAGE =
+  "Signature will be applied from the assigned sending mailbox at send time."
 
 export async function GET(
   _request: Request,
@@ -29,30 +34,43 @@ export async function GET(
     return NextResponse.json({ error: "not_found", message: "Generation not found." }, { status: 404 })
   }
 
+  const unsignedBody = stripAccidentalAvaSignatureFromBody(generation.generatedContent)
+  const supervisedOutbound = isAvaSupervisedOutboundGeneration(generation)
+  const binding = readAvaSupervisedOutboundApprovalBinding(
+    generation.classification as Record<string, unknown>,
+  )
+  const senderAccountId = binding?.senderAccountId?.trim() || null
+
+  if (supervisedOutbound && !senderAccountId) {
+    return NextResponse.json({
+      ok: true,
+      previewMode: "message_only",
+      message: PRE_APPROVAL_SIGNATURE_MESSAGE,
+      unsignedBody,
+      signatureText: null,
+      signatureHtml: null,
+      senderAccountId: null,
+      supervisedOutbound: true,
+    })
+  }
+
   const lead = await fetchGrowthLeadById(access.admin, generation.leadId)
   const organizationId = lead?.promotedOrganizationId?.trim() || getGrowthEngineAiOrgId() || null
-  const snapshot = generation.inputSnapshot ?? {}
-  const snapshotSender =
-    snapshot.approvedSender && typeof snapshot.approvedSender === "object"
-      ? (snapshot.approvedSender as { senderAccountId?: string | null }).senderAccountId?.trim() || null
-      : null
-
-  const senderBundle = organizationId
-    ? await loadEquipifyApprovedSenderBundle(access.admin, organizationId)
-    : { senderAccountId: null, identity: null }
-
-  const senderAccountId = snapshotSender ?? senderBundle.senderAccountId
-  if (!senderAccountId) {
+  if (!senderAccountId || !organizationId) {
     return NextResponse.json({
       ok: true,
       previewMode: "unavailable",
-      message: "Signature added when sent",
-      unsignedBody: stripAccidentalAvaSignatureFromBody(generation.generatedContent),
+      message: PRE_APPROVAL_SIGNATURE_MESSAGE,
+      unsignedBody,
+      signatureText: null,
+      signatureHtml: null,
+      senderAccountId: null,
+      supervisedOutbound,
     })
   }
 
   const resolved = await resolveOutboundSignatureForSender(access.admin, { senderAccountId })
-  const unsignedBody = stripAccidentalAvaSignatureFromBody(
+  const strippedBody = stripAccidentalAvaSignatureFromBody(
     generation.generatedContent,
     resolved.signature?.text ?? null,
   )
@@ -60,11 +78,12 @@ export async function GET(
   return NextResponse.json({
     ok: true,
     previewMode: resolved.signature?.text ? "signature" : "message_only",
-    message: resolved.signature?.text ? null : "Signature added when sent",
-    unsignedBody,
+    message: resolved.signature?.text ? null : PRE_APPROVAL_SIGNATURE_MESSAGE,
+    unsignedBody: strippedBody,
     signatureText: resolved.signature?.text ?? null,
     signatureHtml: resolved.signature?.html ?? null,
     senderAccountId,
-    supervisedOutbound: isAvaSupervisedOutboundGeneration(generation),
+    senderEmail: binding?.senderEmail ?? null,
+    supervisedOutbound,
   })
 }

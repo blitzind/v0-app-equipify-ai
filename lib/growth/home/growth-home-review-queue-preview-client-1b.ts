@@ -9,6 +9,8 @@ import {
 } from "@/lib/growth/home/growth-home-review-queue-1b"
 import { parseOutreachPrepPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-id"
 import { resolveAvaSupervisedOutboundApprovalPresentation } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import { mapAvaSupervisedOutboundApproveError } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approve-errors-core"
+import { readAvaSupervisedOutboundApprovalBinding } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 
 export const GROWTH_HOME_REVIEW_QUEUE_PREVIEW_CLIENT_1B_QA_MARKER =
   "ava-home-review-queue-preview-client-1b-v1" as const
@@ -217,6 +219,7 @@ export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Pr
   }
 
   const approvalPresentation = resolveAvaSupervisedOutboundApprovalPresentation(generation)
+  const binding = readAvaSupervisedOutboundApprovalBinding(generation.classification as Record<string, unknown>)
   const approvalStateLabel = approvalPresentation.supervisedOutbound
     ? approvalPresentation.messageStatusLabel
     : generation.status === "approved"
@@ -235,7 +238,7 @@ export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Pr
     recipient: contactFromGeneration(generation),
     subject: generation.generatedSubject?.trim() || row.subject || "Prepared outreach",
     body,
-    mailboxLabel: "Mailbox assigned at approval",
+    mailboxLabel: binding?.senderEmail?.trim() || "Sender assigned when approved",
     confidenceLabel: confidenceLabelFromGeneration(generation) ?? (row.fitPercent != null ? `${row.fitPercent}%` : null),
     rationale: row.rationale,
     warnings: warningsFromGeneration(generation),
@@ -263,7 +266,7 @@ async function approveReviewQueueRow(row: GrowthHomeReviewQueueRow): Promise<Gro
         packageId: row.packageId,
         companyName: row.companyName,
         ok: false,
-        message: mapReviewQueueClientError({
+        message: mapAvaSupervisedOutboundApproveError({
           error: payload.error,
           message: payload.message,
           status: response.status,

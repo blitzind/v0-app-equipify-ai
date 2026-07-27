@@ -318,6 +318,14 @@ export async function touchSenderPoolMemberSelection(admin: SupabaseClient, memb
     .eq("id", memberId)
 }
 
+function normalizeSenderRotationDecisionReasonForPersistence(
+  reason: GrowthSenderRotationDecisionReason,
+): GrowthSenderRotationDecisionReason {
+  // DB check constraint predates mailbox_health — map to health_score at persistence boundary.
+  if (reason === "mailbox_health") return "health_score"
+  return reason
+}
+
 export async function createSenderRotationDecision(
   admin: SupabaseClient,
   input: {
@@ -333,6 +341,7 @@ export async function createSenderRotationDecision(
     fallbackCandidates: GrowthSenderRotationFallbackCandidate[]
   },
 ): Promise<GrowthSenderRotationDecision> {
+  const decisionReason = normalizeSenderRotationDecisionReasonForPersistence(input.decisionReason)
   const { data, error } = await decisionsTable(admin)
     .insert({
       sender_pool_id: input.senderPoolId,
@@ -341,7 +350,7 @@ export async function createSenderRotationDecision(
       selected_sender_account_id: input.selectedSenderAccountId,
       selected_provider_id: input.selectedProviderId ?? null,
       selected_route_id: input.selectedRouteId ?? null,
-      decision_reason: input.decisionReason,
+      decision_reason: decisionReason,
       risk_level: input.riskLevel,
       allow_auto_rotation: input.allowAutoRotation,
       fallback_candidates: input.fallbackCandidates,

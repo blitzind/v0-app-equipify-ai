@@ -32,6 +32,7 @@ import { GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER } from "@/lib/growth/aios/op
 import {
   resolveAvaSupervisedOutboundApprovalPresentation,
 } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import { mapAvaSupervisedOutboundApproveError } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approve-errors-core"
 import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 
 type GrowthAiCopilotProps = {
@@ -60,6 +61,7 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [queueItems, setQueueItems] = useState<GrowthOutreachQueueItem[]>([])
   const [senderProfiles, setSenderProfiles] = useState<GrowthSenderProfilesDashboardPayload["profiles"]>([])
@@ -176,12 +178,32 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
 
   async function approve(generationId: string) {
     setActingId(generationId)
+    setApprovalError(null)
+    setError(null)
     try {
       const res = await fetch(`/api/platform/growth/copilot/generations/${generationId}`, { method: "POST" })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; generation?: GrowthAiCopilotGeneration }
-      if (data.generation) {
-        setGenerations((prev) => prev.map((entry) => (entry.id === generationId ? data.generation! : entry)))
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        generation?: GrowthAiCopilotGeneration
+        approvalPresentation?: ReturnType<typeof resolveAvaSupervisedOutboundApprovalPresentation>
+        error?: string
+        message?: string
       }
+      if (!res.ok || !data.ok || !data.generation) {
+        throw new Error(
+          mapAvaSupervisedOutboundApproveError({
+            error: data.error,
+            message: data.message,
+            status: res.status,
+          }),
+        )
+      }
+      setGenerations((prev) => prev.map((entry) => (entry.id === generationId ? data.generation! : entry)))
+      await load()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not approve this email. Please try again."
+      setApprovalError(message)
+      setError(message)
     } finally {
       setActingId(null)
     }
@@ -283,6 +305,7 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
           teammate={teammate}
           generation={primaryGeneration}
           acting={actingId === primaryGeneration.id}
+          approvalError={approvalError}
           queueItem={queueItemForGeneration(primaryGeneration.id)}
           onApprove={() => void approve(primaryGeneration.id)}
           onReject={() => void discard(primaryGeneration.id)}

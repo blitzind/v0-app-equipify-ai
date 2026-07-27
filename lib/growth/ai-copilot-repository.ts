@@ -332,9 +332,13 @@ export async function updateGrowthAiCopilotGenerationRecord(
     classification?: Record<string, unknown>
     sentAt?: string | null
     status?: GrowthAiCopilotGenerationStatus
+    skipSupervisedApprovalInvalidation?: boolean
   },
 ): Promise<GrowthAiCopilotGeneration> {
-  if (input.generatedContent !== undefined || input.generatedSubject !== undefined) {
+  if (
+    !input.skipSupervisedApprovalInvalidation &&
+    (input.generatedContent !== undefined || input.generatedSubject !== undefined)
+  ) {
     const existing = await fetchGrowthAiCopilotGenerationById(admin, generationId)
     if (existing) {
       const invalidated = await invalidateAvaSupervisedApprovalOnContentChange(admin, existing, {

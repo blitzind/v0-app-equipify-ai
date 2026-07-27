@@ -18,7 +18,10 @@ import {
   updateGrowthAiCopilotGenerationRecord,
 } from "@/lib/growth/ai-copilot-repository"
 import { bindAvaSupervisedOutboundApproval } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-service"
-import { isUnboundApprovedSupervisedGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import {
+  hasValidMessageApprovalBindingForGeneration,
+  isUnboundApprovedSupervisedGeneration,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import {
   computeGrowthAiCopilotEffectivenessScore,
@@ -548,32 +551,53 @@ export async function approveGrowthAiCopilotGeneration(
   const { fetchGrowthAiCopilotGenerationById, updateGrowthAiCopilotGenerationStatus } = await import(
     "@/lib/growth/ai-copilot-repository"
   )
+  const actingUserId = normalizeGrowthActorUserIdForDb(input.actingUserId)
   const existing = await fetchGrowthAiCopilotGenerationById(admin, input.generationId)
-  const canApproveDraft = existing?.status === "draft"
-  const canRepairUnboundApproved =
-    existing && isUnboundApprovedSupervisedGeneration(existing)
-  if (!existing || (!canApproveDraft && !canRepairUnboundApproved)) return existing
+  if (!existing) return null
+
+  const canApproveDraft = existing.status === "draft"
+  const canRepairUnboundApproved = isUnboundApprovedSupervisedGeneration(existing)
+  if (
+    !canApproveDraft &&
+    !canRepairUnboundApproved &&
+    !(existing.status === "approved" && hasValidMessageApprovalBindingForGeneration(existing))
+  ) {
+    throw new Error("generation_not_approvable")
+  }
+
+  if (existing.status === "approved" && hasValidMessageApprovalBindingForGeneration(existing)) {
+    return existing
+  }
 
   let approvedGeneration = existing
   if (isAvaSupervisedOutboundGeneration(existing)) {
     const bound = await bindAvaSupervisedOutboundApproval(admin, {
       generation: existing,
-      actingUserId: input.actingUserId,
+      actingUserId: actingUserId ?? input.actingUserId,
     })
-    const updated = canApproveDraft
-      ? await updateGrowthAiCopilotGenerationStatus(admin, input.generationId, {
-          status: "approved",
-          approvedBy: input.actingUserId,
-        })
-      : existing
-    approvedGeneration = await updateGrowthAiCopilotGenerationRecord(admin, updated.id, {
+    if (bound.binding.generationId !== existing.id) {
+      throw new Error("approval_binding_generation_mismatch")
+    }
+
+    const boundDraft = await updateGrowthAiCopilotGenerationRecord(admin, existing.id, {
       generatedContent: bound.unsignedBody,
       classification: bound.classification,
+      skipSupervisedApprovalInvalidation: true,
     })
+    if (!hasValidMessageApprovalBindingForGeneration(boundDraft)) {
+      throw new Error("approval_binding_persist_failed")
+    }
+
+    approvedGeneration = canApproveDraft
+      ? await updateGrowthAiCopilotGenerationStatus(admin, existing.id, {
+          status: "approved",
+          approvedBy: actingUserId,
+        })
+      : boundDraft
   } else if (canApproveDraft) {
     approvedGeneration = await updateGrowthAiCopilotGenerationStatus(admin, input.generationId, {
       status: "approved",
-      approvedBy: input.actingUserId,
+      approvedBy: actingUserId,
     })
   }
 

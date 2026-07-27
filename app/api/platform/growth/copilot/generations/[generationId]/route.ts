@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   approveGrowthAiCopilotGeneration,
   discardGrowthAiCopilotGeneration,
 } from "@/lib/growth/run-ai-copilot-generation"
+import { resolveAvaSupervisedOutboundApprovalPresentation } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 
 export const runtime = "nodejs"
 
@@ -31,10 +32,13 @@ export async function POST(
     if (!generation) {
       return NextResponse.json({ error: "not_found", message: "Generation not found." }, { status: 404 })
     }
-    return NextResponse.json({ ok: true, generation })
+    const approvalPresentation = resolveAvaSupervisedOutboundApprovalPresentation(generation)
+    return NextResponse.json({ ok: true, generation, approvalPresentation })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "approve_failed", message }, { status: 500 })
+    logGrowthEngine("ai_copilot_generation_approve_failed", { generationId, message })
+    const code = message.includes("_") ? message.split("\n")[0] : "approve_failed"
+    return NextResponse.json({ error: code, message }, { status: 500 })
   }
 }
 

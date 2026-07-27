@@ -57,6 +57,7 @@ type Props = {
   teammate: AiTeammatePresentation
   generation: GrowthAiCopilotGeneration
   acting: boolean
+  approvalError?: string | null
   queueItem: GrowthOutreachQueueItem | null
   onApprove: () => void
   onReject: () => void
@@ -70,6 +71,7 @@ export function GrowthAvaOperatorWorkspaceReview({
   teammate,
   generation,
   acting,
+  approvalError = null,
   queueItem,
   onApprove,
   onReject,
@@ -124,6 +126,15 @@ export function GrowthAvaOperatorWorkspaceReview({
       return
     }
 
+    if (!approvalBinding?.senderAccountId) {
+      setSignaturePreview({
+        mode: "message_only",
+        text: null,
+        message: "Signature will be applied from the assigned sending mailbox at send time.",
+      })
+      return
+    }
+
     let cancelled = false
     void fetch(`/api/platform/growth/copilot/generations/${generation.id}/signature-preview`, {
       cache: "no-store",
@@ -162,7 +173,7 @@ export function GrowthAvaOperatorWorkspaceReview({
     return () => {
       cancelled = true
     }
-  }, [generation.id, supervisedOutbound])
+  }, [approvalBinding?.senderAccountId, generation.id, supervisedOutbound])
 
   const subject = editing ? editedSubject : generation.generatedSubject ?? ""
   const body = editing ? editedBody : generation.generatedContent
@@ -324,7 +335,7 @@ export function GrowthAvaOperatorWorkspaceReview({
             <>
               <Button type="button" disabled={acting} onClick={onApprove}>
                 {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Check className="mr-2 size-4" />}
-                Approve Email
+                {acting ? "Approving..." : "Approve Email"}
               </Button>
               <Button
                 type="button"
@@ -346,6 +357,12 @@ export function GrowthAvaOperatorWorkspaceReview({
             Copy
           </Button>
         </div>
+
+        {approvalError ? (
+          <p className="text-sm text-rose-600" role="alert">
+            {approvalError}
+          </p>
+        ) : null}
 
         {approvalPresentation.unboundApprovedStatus ? (
           <div className="space-y-2 rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
