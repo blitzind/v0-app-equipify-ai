@@ -54,6 +54,12 @@ export type GrowthHomeReviewQueueRow = {
   selectable: boolean
   selectableForSend: boolean
   generationStatus: "draft" | "approved" | "unknown"
+  /** Canonical approval presentation — matches review drawer. */
+  showApproveEmailAction: boolean
+  showSendEmailAction: boolean
+  messageStatusLabel: string
+  preparedEmailLabel: string
+  senderEmail: string | null
 }
 
 export type GrowthHomeReviewQueuePresentation = {
@@ -137,18 +143,80 @@ export function isActionableHomeReviewPackagePreview(input: {
 function mapPackageStatus(input: {
   pkg: GrowthCanonicalOperatorApprovalPackagePreview
   supervisedReady?: GrowthSupervisedAvaHomeReadyItem | null
-}): { status: GrowthHomeReviewQueueRowStatus; statusLabel: string; generationStatus: "draft" | "approved" | "unknown" } {
+}): {
+  status: GrowthHomeReviewQueueRowStatus
+  statusLabel: string
+  generationStatus: "draft" | "approved" | "unknown"
+  showApproveEmailAction: boolean
+  showSendEmailAction: boolean
+  messageStatusLabel: string
+  preparedEmailLabel: string
+  senderEmail: string | null
+} {
+  const supervised = input.supervisedReady
+  if (supervised?.showSendEmailAction || supervised?.outboundSendAuthorized) {
+    const messageStatusLabel = supervised.messageStatusLabel ?? "Approved"
+    return {
+      status: "approved",
+      statusLabel: messageStatusLabel,
+      generationStatus: "approved",
+      showApproveEmailAction: false,
+      showSendEmailAction: supervised.showSendEmailAction ?? true,
+      messageStatusLabel,
+      preparedEmailLabel: "Approved",
+      senderEmail: supervised.senderEmail ?? null,
+    }
+  }
+
+  if (supervised) {
+    const messageStatusLabel = supervised.messageStatusLabel ?? "Awaiting approval"
+    return {
+      status: "recommended",
+      statusLabel: supervised.showApproveEmailAction === false ? messageStatusLabel : "Recommended",
+      generationStatus: "draft",
+      showApproveEmailAction: supervised.showApproveEmailAction ?? true,
+      showSendEmailAction: false,
+      messageStatusLabel,
+      preparedEmailLabel: "Awaiting approval",
+      senderEmail: null,
+    }
+  }
+
   const label = input.pkg.statusLabel.trim().toLowerCase()
   if (/approved|authorized/.test(label)) {
-    return { status: "approved", statusLabel: "Approved", generationStatus: "approved" }
+    return {
+      status: "approved",
+      statusLabel: "Approved",
+      generationStatus: "approved",
+      showApproveEmailAction: false,
+      showSendEmailAction: true,
+      messageStatusLabel: "Approved",
+      preparedEmailLabel: "Approved",
+      senderEmail: null,
+    }
   }
   if (/needs|hold|blocked|information|attention/.test(label)) {
-    return { status: "needs_review", statusLabel: "Needs Review", generationStatus: "unknown" }
+    return {
+      status: "needs_review",
+      statusLabel: "Needs Review",
+      generationStatus: "unknown",
+      showApproveEmailAction: false,
+      showSendEmailAction: false,
+      messageStatusLabel: "Needs Review",
+      preparedEmailLabel: "Needs Review",
+      senderEmail: null,
+    }
   }
-  if (input.supervisedReady) {
-    return { status: "recommended", statusLabel: "Recommended", generationStatus: "draft" }
+  return {
+    status: "recommended",
+    statusLabel: input.pkg.statusLabel || "Recommended",
+    generationStatus: "draft",
+    showApproveEmailAction: true,
+    showSendEmailAction: false,
+    messageStatusLabel: "Awaiting approval",
+    preparedEmailLabel: "Awaiting approval",
+    senderEmail: null,
   }
-  return { status: "recommended", statusLabel: input.pkg.statusLabel || "Recommended", generationStatus: "draft" }
 }
 
 function buildRowFromPackage(input: {
@@ -175,9 +243,14 @@ function buildRowFromPackage(input: {
     reviewHref: input.pkg.reviewHref,
     editHref: input.pkg.reviewHref,
     packageSource: input.pkg.packageSource,
-    selectable: statusMeta.status === "recommended" || statusMeta.status === "approved",
-    selectableForSend: statusMeta.status === "approved",
+    selectable: statusMeta.showApproveEmailAction || statusMeta.showSendEmailAction,
+    selectableForSend: statusMeta.showSendEmailAction,
     generationStatus: statusMeta.generationStatus,
+    showApproveEmailAction: statusMeta.showApproveEmailAction,
+    showSendEmailAction: statusMeta.showSendEmailAction,
+    messageStatusLabel: statusMeta.messageStatusLabel,
+    preparedEmailLabel: statusMeta.preparedEmailLabel,
+    senderEmail: statusMeta.senderEmail,
   }
 }
 
@@ -202,6 +275,11 @@ function buildRowFromNeedsInformation(input: {
     selectable: false,
     selectableForSend: false,
     generationStatus: "unknown",
+    showApproveEmailAction: false,
+    showSendEmailAction: false,
+    messageStatusLabel: "Needs Review",
+    preparedEmailLabel: "Needs Review",
+    senderEmail: null,
   }
 }
 
@@ -355,7 +433,7 @@ export function buildGrowthHomeReviewQueueProgressCards(input: {
 }
 
 export function filterSelectableRecommendedRows(rows: GrowthHomeReviewQueueRow[]): GrowthHomeReviewQueueRow[] {
-  return rows.filter((row) => row.selectable && row.status === "recommended")
+  return rows.filter((row) => row.selectable && row.showApproveEmailAction)
 }
 
 export function shouldUseReviewQueuePrimarySurface(input: {
@@ -421,9 +499,13 @@ export function buildLeadsByIdMap(leads: GrowthLead[] | null | undefined): Map<s
 
 export function buildSupervisedReadyByLeadIdMap(
   items: GrowthSupervisedAvaHomeReadyItem[] | null | undefined,
+  approvedItems: GrowthSupervisedAvaHomeReadyItem[] | null | undefined = [],
 ): Map<string, GrowthSupervisedAvaHomeReadyItem> {
   const map = new Map<string, GrowthSupervisedAvaHomeReadyItem>()
   for (const item of items ?? []) {
+    map.set(item.leadId, item)
+  }
+  for (const item of approvedItems ?? []) {
     map.set(item.leadId, item)
   }
   return map

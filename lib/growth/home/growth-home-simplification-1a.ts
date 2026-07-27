@@ -111,8 +111,13 @@ function resolvePrimaryActionHref(input: {
 function resolveStatusLabel(input: {
   pendingApprovals: number
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
+  recommendation: GrowthHomeAvaRecommendationItem | null
 }): string {
   if (input.pendingApprovals > 0) return "Waiting for your approval"
+  const outcomeType = input.recommendation?.outcomeProjection?.outcomeType
+  if (outcomeType === "prepare_opportunity_package" && input.recommendation?.kind !== "approval_package") {
+    return "Researching"
+  }
   if (input.runtimeTrust?.operatorState === "working") return "Working in the background"
   if (input.runtimeTrust?.operatorState === "waiting") return "Waiting for your decision"
   if (input.runtimeTrust?.operatorState === "blocked") return "Blocked"
@@ -127,6 +132,12 @@ function resolveNextActionLabel(input: {
   if (input.pendingApprovals > 0) return "Review prepared outreach"
   if (input.recommendation?.outcomeProjection?.nextStepLabel) {
     return input.recommendation.outcomeProjection.nextStepLabel.replace(/\.$/, "")
+  }
+  if (
+    input.recommendation?.outcomeProjection?.outcomeType === "prepare_opportunity_package" &&
+    input.recommendation.companyName
+  ) {
+    return `Evaluate whether ${input.recommendation.companyName} is a strong opportunity`
   }
   if (input.runtimeTrust?.nextMilestoneLabel) {
     return input.runtimeTrust.nextMilestoneLabel.replace(/\.$/, "")
@@ -230,6 +241,7 @@ export function buildGrowthHomeCurrentFocusPresentation(input: {
     statusLabel: resolveStatusLabel({
       pendingApprovals: input.pendingApprovals,
       runtimeTrust: input.runtimeTrust,
+      recommendation: input.recommendation,
     }),
     nextActionLabel: resolveNextActionLabel({
       pendingApprovals: input.pendingApprovals,

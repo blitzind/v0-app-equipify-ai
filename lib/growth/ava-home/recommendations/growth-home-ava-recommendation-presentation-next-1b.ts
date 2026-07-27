@@ -57,8 +57,8 @@ function expectedOutcomeForItem(item: GrowthHomeAvaRecommendationItem): string |
   }
   if (item.kind === "lead_decision" || item.kind === "operator_focus") {
     return item.companyName
-      ? `A review-ready outreach package for ${item.companyName}.`
-      : "A review-ready outreach package."
+      ? `Ava will evaluate whether ${item.companyName} is a strong opportunity after research completes.`
+      : "Ava will evaluate whether this account is a strong opportunity after research completes."
   }
   if (item.kind === "mission_discovery") {
     return "A qualified discovery audience ready for research."
@@ -182,7 +182,7 @@ export function enrichGrowthHomeAvaRecommendationItemNext1b(input: {
         employeeLeadParagraph:
           input.item.supportingLine ??
           projection.why[0] ??
-          "I've already verified the company and collected most of the buying signals.",
+          "Research is in progress before Ava decides whether outreach makes sense.",
       }
     }
   }

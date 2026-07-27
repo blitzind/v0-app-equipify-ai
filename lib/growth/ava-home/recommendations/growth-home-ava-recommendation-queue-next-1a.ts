@@ -49,11 +49,7 @@ function buildResearchProgressLine(input: {
   confidencePercent?: number | null
   detail?: string | null
 }): string | null {
-  const percent = input.confidencePercent
-  if (typeof percent === "number" && percent > 0 && percent < 100) {
-    return `Research is already ${Math.round(percent)}% complete.`
-  }
-  if (input.detail && /research|qualif|progress|complete/i.test(input.detail)) {
+  if (input.detail && /research|qualif|progress|complete/i.test(input.detail) && !/\d{1,3}\s*%/.test(input.detail)) {
     return input.detail
   }
   return null

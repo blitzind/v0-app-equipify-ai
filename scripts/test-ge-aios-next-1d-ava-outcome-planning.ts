@@ -99,8 +99,11 @@ async function main(): Promise<void> {
   })
 
   assert.match(researchItem.outcomeProjection?.outcomeHeadline ?? "", /review-ready opportunity package/i)
-  assert.match(researchItem.outcomeProjection?.currentProgressNarrative ?? "", /nearly complete|buying signal/i)
-  assert.ok(researchItem.outcomeProjection?.progressMilestones.some((row) => row.complete))
+  assert.match(
+    researchItem.outcomeProjection?.currentProgressNarrative ?? "",
+    /gathering evidence|deciding whether outreach makes sense/i,
+  )
+  assert.equal(researchItem.outcomeProjection?.progressMilestones.length, 0)
   assert.ok(researchItem.outcomeProjection?.remainingWork.length)
   assert.match(researchItem.employeeLeadParagraph ?? "", /next step is/i)
   console.log("  ✓ research recommendations explain progress narratively instead of leading with tasks")

@@ -64,23 +64,22 @@ function buildProgressNarrative(input: {
   if (input.prerequisites[0]) {
     return input.prerequisites.length === 1
       ? input.prerequisites[0]
-      : `${input.prerequisites[0]} and ${input.prerequisites.length - 1} more step${input.prerequisites.length - 1 === 1 ? "" : "s"} remain before I can prepare outreach.`
+      : `${input.prerequisites[0]} and ${input.prerequisites.length - 1} more step${input.prerequisites.length - 1 === 1 ? "" : "s"} remain before Ava can decide whether outreach makes sense.`
   }
 
-  const percent = input.percent
-  if (percent != null && percent > 0 && percent < 100) {
-    const company = input.companyName ? ` for ${input.companyName}` : ""
-    if (percent >= 75) {
-      return `Research is nearly complete${company}. One buying signal remains before I can prepare outreach.`
-    }
-    if (percent >= 50) {
-      return `Research is well underway${company}. A few buying signals still need verification.`
-    }
-    return `Research has started${company}. Most qualification work is still ahead.`
-  }
+  const company = input.companyName?.trim()
+  const companySuffix = company ? ` for ${company}` : ""
 
   if (input.supportingLine && !/\d{1,3}\s*%/.test(input.supportingLine)) {
     return input.supportingLine
+  }
+
+  if (input.percent != null && input.percent > 0 && input.percent < 100) {
+    return `Research is in progress${companySuffix}. Ava is gathering evidence before deciding whether outreach makes sense.`
+  }
+
+  if (company) {
+    return `Researching ${company} before deciding whether outreach makes sense.`
   }
 
   return null
@@ -193,7 +192,7 @@ function nextStepLabelForItem(input: {
       : "The next step is reviewing the prepared opportunity package."
   }
   if (input.item.companyName && /research|finish|continue/i.test(input.item.headline)) {
-    return `The next step is finishing the remaining research for ${input.item.companyName}.`
+    return `The next step is researching ${input.item.companyName} so Ava can decide whether outreach makes sense.`
   }
   if (/find more|discover/i.test(input.item.headline)) {
     return `The next step is ${input.item.headline.charAt(0).toLowerCase()}${input.item.headline.slice(1)}.`
@@ -242,15 +241,12 @@ function remainingWorkForItem(input: {
   if (input.item.kind === "approval_package" || input.item.kind === "waiting_on_you") {
     return ["Review the prepared package.", "Authorize outreach when ready."]
   }
-  if (input.percent != null && input.percent > 0 && input.percent < 100) {
-    const incomplete = buildResearchMilestones(input.percent)
-      .filter((row) => !row.complete)
-      .map((row) => row.label)
-    if (incomplete[0]) {
-      return [`Verify ${incomplete[0].toLowerCase()}.`]
-    }
+  if (input.item.companyName && /research|finish|continue/i.test(input.item.headline)) {
+    return [`Finish research and let Ava evaluate whether ${input.item.companyName} is a strong opportunity.`]
   }
-  if (input.item.supportingLine) return [input.item.supportingLine]
+  if (input.item.supportingLine && !/\d{1,3}\s*%/.test(input.item.supportingLine)) {
+    return [input.item.supportingLine]
+  }
   return []
 }
 
@@ -294,9 +290,11 @@ export function buildGrowthHomeAvaRecommendationOutcomeProjection(input: {
     (input.item.outcomeLine ? [input.item.outcomeLine] : [])
 
   const progressMilestones =
-    outcomeType === "prepare_opportunity_package" && input.item.kind !== "approval_package"
-      ? buildResearchMilestones(percent)
-      : []
+    input.item.explanation?.whyChosen && input.item.explanation.whyChosen.length > 0
+      ? []
+      : outcomeType === "prepare_opportunity_package" && input.item.kind !== "approval_package"
+        ? buildResearchMilestones(null)
+        : []
 
   return {
     qaMarker: GROWTH_AIOS_NEXT_1D_AVA_OUTCOME_PLANNING_QA_MARKER,

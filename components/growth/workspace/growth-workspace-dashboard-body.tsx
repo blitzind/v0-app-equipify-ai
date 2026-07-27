@@ -204,7 +204,7 @@ export function GrowthWorkspaceDashboardBody() {
         recentViews={recentViews}
         continueItems={continueItems}
         everythingElse={everythingElse}
-        onResearchLoopCompleted={() => void reload()}
+        onResearchLoopCompleted={() => reload()}
       />
       <GrowthHomeDebugFooter />
     </div>

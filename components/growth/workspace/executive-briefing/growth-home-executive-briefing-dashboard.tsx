@@ -201,7 +201,7 @@ type Props = {
   recentViews: GrowthWorkspaceRecentView[]
   continueItems: GrowthWorkspaceContinueItem[]
   everythingElse: React.ReactNode
-  onResearchLoopCompleted?: () => void
+  onResearchLoopCompleted?: () => void | Promise<void>
 }
 
 export function GrowthHomeExecutiveBriefingDashboard({
@@ -564,6 +564,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
     const leadsById = buildLeadsByIdMap(workspaceSummary?.portfolioLeads)
     const supervisedReadyByLeadId = buildSupervisedReadyByLeadIdMap(
       workspaceSummary?.supervisedOperatorAttention?.readyForReview,
+      workspaceSummary?.supervisedOperatorAttention?.approvedReadyToSend,
     )
     const reviewQueue = buildGrowthHomeReviewQueuePresentation({
       packages: workspaceSummary?.canonicalOperatorApproval?.packages ?? aiOsUx.canonicalApprovalSnapshot?.packages ?? [],
@@ -695,9 +696,9 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
             <GrowthHomeAvaOutreachReviewQueueSection
               queue={operatorExperience.reviewQueue}
-              onRefresh={() => {
+              onRefresh={async () => {
                 setHomeRefreshVersion((value) => value + 1)
-                onResearchLoopCompleted?.()
+                await onResearchLoopCompleted?.()
               }}
             />
 

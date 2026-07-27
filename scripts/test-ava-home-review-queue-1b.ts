@@ -50,6 +50,8 @@ assert.match(previewCard, /data-preview-pinned/)
 assert.match(previewClient, /bulkApproveReviewQueueRows/)
 assert.match(previewClient, /bulkSendReviewQueueRows/)
 assert.match(previewClient, /signature-preview/)
+assert.match(previewClient, /unsignedBody/)
+assert.doesNotMatch(previewClient, /signaturePayload\.signatureText\?\.trim\(\)/)
 assert.match(previewClient, /mapReviewQueueClientError/)
 assert.match(reviewQueueLib, /resolveVerifiedWebsiteDisplay/)
 
@@ -69,7 +71,7 @@ const queue = buildGrowthHomeReviewQueuePresentation({
   packages: [
     {
       itemId: "supervised-draft:gen-1",
-      packageId: "gen-1",
+      packageId: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
       leadId: "lead-1",
       companyName: "Block Imaging",
       decisionMaker: "Josh Block",
@@ -83,8 +85,8 @@ const queue = buildGrowthHomeReviewQueuePresentation({
       operatorDetail: "Subject: Quick intro",
     },
     {
-      itemId: "supervised-draft:gen-2",
-      packageId: "gen-2",
+      itemId: "supervised-draft:bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      packageId: "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
       leadId: "lead-2",
       companyName: "ABC Calibration",
       decisionMaker: "Jane Smith",
@@ -141,7 +143,7 @@ const queue = buildGrowthHomeReviewQueuePresentation({
     [
       "lead-1",
       {
-        generationId: "gen-1",
+        generationId: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
         leadId: "lead-1",
         companyName: "Block Imaging",
         contactName: "Josh Block",
@@ -150,6 +152,24 @@ const queue = buildGrowthHomeReviewQueuePresentation({
         reviewHref: "/growth/leads/crm?open=lead-1&focus=ai-copilot",
         preparedAt: new Date().toISOString(),
         outboundSendAuthorized: false,
+        showApproveEmailAction: true,
+        showSendEmailAction: false,
+      },
+    ],
+    [
+      "lead-2",
+      {
+        generationId: "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+        leadId: "lead-2",
+        companyName: "ABC Calibration",
+        contactName: "Jane Smith",
+        subject: "Intro for ABC Calibration",
+        rationale: null,
+        reviewHref: "/growth/leads/crm?open=lead-2&focus=ai-copilot",
+        preparedAt: new Date().toISOString(),
+        outboundSendAuthorized: false,
+        showApproveEmailAction: true,
+        showSendEmailAction: false,
       },
     ],
   ]),

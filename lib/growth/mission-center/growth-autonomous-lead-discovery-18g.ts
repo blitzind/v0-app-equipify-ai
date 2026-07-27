@@ -56,11 +56,19 @@ export function resolveHomeOperatorEmployeeStatusFromMission(input: {
     }
   }
 
-  if (readyForReview > 0 || mission?.lifecycleState === "preparing_recommendations") {
+  if (readyForReview > 0) {
     return {
       kind: "preparing_outreach",
       label: "Preparing outreach",
       activityLabel: mission?.activityLabel ?? "preparing personalized outreach",
+    }
+  }
+
+  if (mission?.lifecycleState === "preparing_recommendations") {
+    return {
+      kind: "researching",
+      label: "Researching companies",
+      activityLabel: mission?.activityLabel ?? "evaluating prospects before outreach",
     }
   }
 

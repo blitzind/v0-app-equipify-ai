@@ -14,7 +14,12 @@ export type GrowthSupervisedAvaHomeReadyItem = {
   rationale: string | null
   reviewHref: string
   preparedAt: string
-  outboundSendAuthorized: false
+  /** True when message approval binding exists and send is authorized. */
+  outboundSendAuthorized: boolean
+  messageStatusLabel?: string
+  showApproveEmailAction?: boolean
+  showSendEmailAction?: boolean
+  senderEmail?: string | null
 }
 
 export type GrowthSupervisedAvaHomeNeedsInformationItem = {
@@ -29,6 +34,8 @@ export type GrowthSupervisedAvaHomeNeedsInformationItem = {
 export type GrowthSupervisedAvaHomeOperatorAttention = {
   qaMarker: typeof AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER
   readyForReview: GrowthSupervisedAvaHomeReadyItem[]
+  /** Approved supervised drafts with valid binding — send-eligible on Home. */
+  approvedReadyToSend: GrowthSupervisedAvaHomeReadyItem[]
   needsInformation: GrowthSupervisedAvaHomeNeedsInformationItem[]
   /** Lead IDs with a completed supervised outbound send — excluded from review queues. */
   sentLeadIds: string[]

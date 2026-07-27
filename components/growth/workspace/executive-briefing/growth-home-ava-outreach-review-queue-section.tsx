@@ -35,7 +35,7 @@ import {
 
 type Props = {
   queue: GrowthHomeReviewQueuePresentation
-  onRefresh?: () => void
+  onRefresh?: () => void | Promise<void>
 }
 
 function statusTone(status: GrowthHomeReviewQueueRow["status"]): string {
@@ -89,8 +89,11 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
     try {
       const result = await bulkApproveReviewQueueRows([row])
       const item = result.results[0]
-      if (!item?.ok) setBulkMessage(item?.message ?? "Approval failed.")
-      else onRefresh?.()
+      if (!item?.ok) {
+        setBulkMessage(item?.message ?? "Approval failed.")
+        return
+      }
+      await onRefresh?.()
     } finally {
       setBusy(null)
     }
@@ -101,7 +104,7 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
     setBulkMessage(null)
     try {
       await discardReviewQueueRow(row)
-      onRefresh?.()
+      await onRefresh?.()
     } catch (error) {
       setBulkMessage(error instanceof Error ? error.message : "Skip failed.")
     } finally {
@@ -110,7 +113,7 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
   }
 
   const handleBulkApprove = async () => {
-    const rows = selectedRows.filter((row) => row.selectable && row.status === "recommended")
+    const rows = selectedRows.filter((row) => row.selectable && row.showApproveEmailAction)
     if (rows.length === 0) return
     setBulkBusy("approve")
     setBulkMessage(null)
@@ -121,14 +124,14 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
           ? `${result.successCount} approved, ${result.failureCount} require attention.`
           : `${result.successCount} approved.`,
       )
-      onRefresh?.()
+      await onRefresh?.()
     } finally {
       setBulkBusy(null)
     }
   }
 
   const handleBulkSend = async () => {
-    const rows = selectedRows.filter((row) => row.selectableForSend || row.status === "approved")
+    const rows = selectedRows.filter((row) => row.selectableForSend || row.showSendEmailAction)
     if (rows.length === 0) return
     setBulkBusy("send")
     setBulkMessage(null)
@@ -140,7 +143,7 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
           : `${result.successCount} sent.`,
       )
       setSendConfirmOpen(false)
-      onRefresh?.()
+      await onRefresh?.()
     } finally {
       setBulkBusy(null)
     }
@@ -256,7 +259,14 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
                   </td>
                   <td className="px-3 py-3 text-muted-foreground">{row.primaryContact ?? "—"}</td>
                   <td className="px-3 py-3 tabular-nums">{row.fitPercent != null ? `${row.fitPercent}%` : "—"}</td>
-                  <td className={cn("px-3 py-3 font-medium", statusTone(row.status))}>{row.statusLabel}</td>
+                  <td className={cn("px-3 py-3 font-medium", statusTone(row.status))}>
+                    <div>{row.statusLabel}</div>
+                    {row.senderEmail ? (
+                      <div className="text-xs font-normal text-muted-foreground">
+                        Sending from: {row.senderEmail}
+                      </div>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-3">
                     <button
                       type="button"
@@ -277,37 +287,44 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-1.5">
-                      {row.status === "recommended" ? (
+                      {row.showApproveEmailAction ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulkBusy != null}
                           onClick={() => void handleApprove(row)}
                         >
-                          Approve
+                          {busy === row.id ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin mr-1" aria-hidden />
+                              Approving…
+                            </>
+                          ) : (
+                            "Approve"
+                          )}
                         </Button>
                       ) : null}
-                      {row.status === "approved" ? (
+                      {row.showSendEmailAction ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="secondary"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulkBusy != null}
                           onClick={() => {
                             setSelectedIds(new Set([row.id]))
                             setSendConfirmOpen(true)
                           }}
                         >
-                          Send
+                          Send Email
                         </Button>
                       ) : null}
-                      {row.status === "recommended" ? (
+                      {row.showApproveEmailAction ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="ghost"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulkBusy != null}
                           onClick={() => void handleReject(row)}
                         >
                           Skip
@@ -352,7 +369,7 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Send {selectedRows.filter((row) => row.selectableForSend || row.status === "approved").length} emails
+              Send {selectedRows.filter((row) => row.selectableForSend || row.showSendEmailAction).length} emails
             </DialogTitle>
             <DialogDescription>
               Each package sends independently with its own approval verification, sender mailbox, signature, and receipt.
@@ -360,7 +377,7 @@ export function GrowthHomeAvaOutreachReviewQueueSection({ queue, onRefresh }: Pr
           </DialogHeader>
           <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
             {selectedRows
-              .filter((row) => row.selectableForSend || row.status === "approved")
+              .filter((row) => row.selectableForSend || row.showSendEmailAction)
               .map((row) => (
                 <li key={row.id}>
                   {row.companyName} · {row.primaryContact ?? "Recipient pending"}

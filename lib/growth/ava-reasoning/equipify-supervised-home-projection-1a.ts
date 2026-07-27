@@ -15,6 +15,10 @@ import { AVA_SUPERVISED_CUTOVER_GENERATION_MODE } from "@/lib/growth/ava-reasoni
 import { readAvaSupervisedOutboundSendReceipt } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import { readAvaSupervisedOutboundSendLifecycle } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1b-types"
 import {
+  resolveAvaSupervisedOutboundApprovalPresentation,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import { readAvaSupervisedOutboundApprovalBinding } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import {
   AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER,
   type GrowthSupervisedAvaHomeNeedsInformationItem,
   type GrowthSupervisedAvaHomeOperatorAttention,
@@ -77,6 +81,15 @@ export function isSupervisedAvaGenerationSent(
   return false
 }
 
+export function isSendEligibleSupervisedAvaGeneration(
+  generation: GrowthAiCopilotGeneration,
+): boolean {
+  if (generation.generationType !== "cold_email") return false
+  if (generation.promptVariant !== SUPERVISED_PROMPT_VARIANT) return false
+  if (isSupervisedAvaGenerationSent(generation)) return false
+  return resolveAvaSupervisedOutboundApprovalPresentation(generation).sendEligible
+}
+
 export function isReviewableSupervisedAvaGeneration(
   generation: GrowthAiCopilotGeneration,
 ): boolean {
@@ -130,8 +143,12 @@ function relativePreparedLabel(preparedAt: string | null): string | null {
 function readyItemFromGeneration(
   generation: GrowthAiCopilotGeneration,
   companyName: string,
+  options?: { approved?: boolean },
 ): GrowthSupervisedAvaHomeReadyItem {
   const classification = classificationRecord(generation)
+  const presentation = resolveAvaSupervisedOutboundApprovalPresentation(generation)
+  const binding = readAvaSupervisedOutboundApprovalBinding(classification)
+  const approved = options?.approved === true
   return {
     generationId: generation.id,
     leadId: generation.leadId,
@@ -141,7 +158,11 @@ function readyItemFromGeneration(
     rationale: typeof classification.rationale === "string" ? classification.rationale.trim() : null,
     reviewHref: buildCustomerPackageReviewHref(generation.leadId),
     preparedAt: generation.createdAt,
-    outboundSendAuthorized: false,
+    outboundSendAuthorized: approved || presentation.sendEligible,
+    messageStatusLabel: presentation.messageStatusLabel,
+    showApproveEmailAction: approved ? false : presentation.showApproveEmailAction,
+    showSendEmailAction: approved ? presentation.sendEligible : false,
+    senderEmail: binding?.senderEmail?.trim() || null,
   }
 }
 
@@ -227,8 +248,10 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
   }
 
   const seenReady = new Set<string>()
+  const seenApproved = new Set<string>()
   const seenNeeds = new Set<string>()
   const readyForReview: GrowthSupervisedAvaHomeReadyItem[] = []
+  const approvedReadyToSend: GrowthSupervisedAvaHomeReadyItem[] = []
   const needsInformation: GrowthSupervisedAvaHomeNeedsInformationItem[] = []
   let rejectedCount = 0
 
@@ -242,13 +265,20 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
       continue
     }
 
+    if (!seenApproved.has(generation.leadId) && isSendEligibleSupervisedAvaGeneration(generation)) {
+      approvedReadyToSend.push(readyItemFromGeneration(generation, companyName, { approved: true }))
+      seenApproved.add(generation.leadId)
+      seenReady.add(generation.leadId)
+      continue
+    }
+
     if (!seenReady.has(generation.leadId) && isReviewableSupervisedAvaGeneration(generation)) {
       readyForReview.push(readyItemFromGeneration(generation, companyName))
       seenReady.add(generation.leadId)
       continue
     }
 
-    if (!seenNeeds.has(generation.leadId) && !seenReady.has(generation.leadId)) {
+    if (!seenNeeds.has(generation.leadId) && !seenReady.has(generation.leadId) && !seenApproved.has(generation.leadId)) {
       const needs = needsInformationFromGeneration(generation, companyName)
       if (needs) {
         needsInformation.push(needs)
@@ -260,16 +290,21 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
   return {
     qaMarker: AVA_HOME_PROJECTION_CUTOVER_1A_QA_MARKER,
     readyForReview,
+    approvedReadyToSend,
     needsInformation,
     sentLeadIds: [...sentLeadIds],
     rejectedCount,
   }
 }
 
-function readyItemToPackagePreview(item: GrowthSupervisedAvaHomeReadyItem): GrowthCanonicalOperatorApprovalPackagePreview {
+function readyItemToPackagePreview(
+  item: GrowthSupervisedAvaHomeReadyItem,
+  approved = false,
+): GrowthCanonicalOperatorApprovalPackagePreview {
   const detailParts = [
     item.contactName ? `Contact: ${item.contactName}` : null,
     item.subject ? `Subject: ${item.subject}` : null,
+    item.senderEmail ? `Sending from: ${item.senderEmail}` : null,
     item.rationale,
   ].filter((row): row is string => Boolean(row?.trim()))
 
@@ -283,7 +318,7 @@ function readyItemToPackagePreview(item: GrowthSupervisedAvaHomeReadyItem): Grow
     preparedAt: item.preparedAt,
     preparedAgoLabel: relativePreparedLabel(item.preparedAt),
     channelLabel: item.subject,
-    statusLabel: "Ready for review",
+    statusLabel: approved ? (item.messageStatusLabel ?? "Approved") : "Ready for review",
     reviewHref: buildCustomerPackageReviewHref(item.leadId),
     packageSource: "supervised_ava_generation",
     operatorDetail: detailParts.join(" · "),
@@ -302,9 +337,12 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
   attention: GrowthSupervisedAvaHomeOperatorAttention
 }): GrowthCanonicalOperatorApprovalSnapshot {
   const supervisedReady = input.attention.readyForReview
+  const approvedReady = input.attention.approvedReadyToSend ?? []
   const sentLeadIds = new Set(input.attention.sentLeadIds ?? [])
   const hasSupervisedAttention =
-    supervisedReady.length > 0 || input.attention.needsInformation.length > 0
+    supervisedReady.length > 0 ||
+    approvedReady.length > 0 ||
+    input.attention.needsInformation.length > 0
 
   if (!hasSupervisedAttention && sentLeadIds.size === 0) {
     return input.base
@@ -312,6 +350,7 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
 
   const excludedLeadIds = new Set([
     ...supervisedReady.map((row) => row.leadId),
+    ...approvedReady.map((row) => row.leadId),
     ...input.attention.needsInformation.map((row) => row.leadId),
     ...sentLeadIds,
   ])
@@ -322,7 +361,10 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
     return isActionableHomeReviewPackagePreview({ pkg })
   })
 
-  const supervisedPackages = supervisedReady.map(readyItemToPackagePreview)
+  const supervisedPackages = [
+    ...approvedReady.map((item) => readyItemToPackagePreview(item, true)),
+    ...supervisedReady.map((item) => readyItemToPackagePreview(item, false)),
+  ]
   const packages = [...supervisedPackages, ...legacyPackages]
   const outreachDraftCount = packages.reduce((sum, row) => sum + Math.max(row.draftCount, 0), 0)
 
