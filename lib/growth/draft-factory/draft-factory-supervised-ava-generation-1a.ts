@@ -18,7 +18,7 @@ import { runEquipifySupervisedAvaOutreach } from "@/lib/growth/ava-reasoning/equ
 import {
   GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_1A_QA_MARKER,
   GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_EMAIL,
-  GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_USER_ID,
+  buildDraftFactorySchedulerGenerationProvenance,
 } from "@/lib/growth/draft-factory/draft-factory-scheduler-actor-1a"
 import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
 import {
@@ -140,8 +140,11 @@ export async function runDraftFactorySupervisedAvaGenerationForScheduler(
     admin,
     leadId: input.leadId,
     organizationId: input.organizationId,
-    actingUserId: GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_USER_ID,
     actingUserEmail: GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_EMAIL,
+    autonomousProvenance: buildDraftFactorySchedulerGenerationProvenance({
+      organizationId: input.organizationId,
+      generatedAt: input.generatedAt,
+    }),
     persist: true,
     ignoreApprovedExistingDraft: false,
   })

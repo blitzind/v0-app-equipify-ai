@@ -17,6 +17,7 @@ import {
 import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
 import { assertAvaOutboundCopyQualityForPersistence } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import { AVA_SUPERVISED_CUTOVER_1A_QA_MARKER } from "@/lib/growth/ava-reasoning/equipify-external-company-preflight"
+import type { DraftFactorySchedulerGenerationProvenance } from "@/lib/growth/draft-factory/draft-factory-scheduler-actor-1a"
 
 const AVA_SUPERVISED_DRAFT_PROMPT_VARIANT = "ava_direct_production_cutover_1a" as const
 import type { AvaContactEvidence, AvaReasoningResult } from "@/lib/fuzor/ava-reasoning/ava-reasoning-types"
@@ -70,7 +71,8 @@ export async function findExistingAvaSupervisedSendableDraft(
 export async function persistSendableAvaSupervisedDraft(input: {
   admin: SupabaseClient
   leadId: string
-  actingUserId: string
+  /** Human operator UUID, or null for autonomous scheduler generations. */
+  actingUserId: string | null
   decision: AvaReasoningResult["decision"]
   email: AvaReasoningResult["email"]
   recommendedContact: AvaReasoningResult["recommendedContact"]
@@ -82,6 +84,8 @@ export async function persistSendableAvaSupervisedDraft(input: {
   organizationKnowledge: unknown
   approvedSender: unknown
   classification: Record<string, unknown>
+  /** Autonomous scheduler audit metadata — stored in snapshot, not created_by FK. */
+  autonomousProvenance?: DraftFactorySchedulerGenerationProvenance | null
   /** When false, legacy approved-but-unsent rows do not block fresh draft persistence. */
   includeApprovedExisting?: boolean
 }): Promise<{ id: string | null; status: SupervisedDraftPersistenceStatus }> {
@@ -121,10 +125,14 @@ export async function persistSendableAvaSupervisedDraft(input: {
       organizationKnowledge: input.organizationKnowledge,
       approvedSender: input.approvedSender,
       contactsSupplied: input.contactsSupplied,
+      ...(input.autonomousProvenance ? { autonomousProvenance: input.autonomousProvenance } : {}),
     },
     generatedContent: copyQuality.body,
     generatedSubject: copyQuality.subject,
-    classification: input.classification,
+    classification: {
+      ...input.classification,
+      ...(input.autonomousProvenance ? { autonomousProvenance: input.autonomousProvenance } : {}),
+    },
     createdBy: input.actingUserId,
   })
 

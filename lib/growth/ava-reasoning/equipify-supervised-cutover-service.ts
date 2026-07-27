@@ -40,6 +40,7 @@ import {
   persistSendableAvaSupervisedDraft,
   type SupervisedDraftPersistenceStatus,
 } from "@/lib/growth/ava-reasoning/equipify-supervised-draft-persistence"
+import type { DraftFactorySchedulerGenerationProvenance } from "@/lib/growth/draft-factory/draft-factory-scheduler-actor-1a"
 import { loadOutreachSellerTruthBundle } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -56,10 +57,12 @@ export const AVA_SUPERVISED_CUTOVER_GENERATION_MODE = "ava_direct_production_cut
 export type RunEquipifySupervisedAvaOutreachInput = {
   admin: SupabaseClient
   leadId: string
-  actingUserId: string
+  actingUserId?: string | null
   actingUserEmail: string
   organizationId?: string | null
   persist?: boolean
+  /** When set, created_by is null and provenance is stored in snapshot/classification. */
+  autonomousProvenance?: DraftFactorySchedulerGenerationProvenance | null
   /** When true, legacy approved-but-unsent drafts do not block fresh persistence. */
   ignoreApprovedExistingDraft?: boolean
   /** Ignored — Company Intelligence is no longer required on the critical path. */
@@ -184,7 +187,8 @@ function mapToOutput(input: {
 async function persistSupervisedDraftIfSendable(input: {
   admin: SupabaseClient
   leadId: string
-  actingUserId: string
+  actingUserId: string | null
+  autonomousProvenance?: DraftFactorySchedulerGenerationProvenance | null
   output: EquipifySupervisedAvaOutreachOutput
   organizationKnowledge: unknown
   includeApprovedExisting?: boolean
@@ -193,6 +197,7 @@ async function persistSupervisedDraftIfSendable(input: {
     admin: input.admin,
     leadId: input.leadId,
     actingUserId: input.actingUserId,
+    autonomousProvenance: input.autonomousProvenance,
     decision: input.output.decision,
     email: input.output.email,
     recommendedContact: input.output.recommendedContact,
@@ -237,8 +242,11 @@ export async function runEquipifySupervisedAvaOutreach(
     }
   }
 
-  const actingUserId = normalizeGrowthActorUserIdForDb(input.actingUserId)
-  if (!actingUserId) {
+  const autonomousProvenance = input.autonomousProvenance ?? null
+  const actingUserId = autonomousProvenance
+    ? null
+    : normalizeGrowthActorUserIdForDb(input.actingUserId)
+  if (!autonomousProvenance && !actingUserId) {
     return {
       ok: false,
       code: "actor_invalid",
@@ -328,6 +336,7 @@ export async function runEquipifySupervisedAvaOutreach(
         admin: input.admin,
         leadId: input.leadId,
         actingUserId,
+        autonomousProvenance,
         output,
         organizationKnowledge,
         includeApprovedExisting: !input.ignoreApprovedExistingDraft,
@@ -470,6 +479,7 @@ export async function runEquipifySupervisedAvaOutreach(
       admin: input.admin,
       leadId: input.leadId,
       actingUserId,
+      autonomousProvenance,
       output,
       organizationKnowledge,
     })

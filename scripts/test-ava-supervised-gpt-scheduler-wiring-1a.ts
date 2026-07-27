@@ -93,10 +93,11 @@ async function main() {
   console.log("  ✓ scheduler path uses supervised Ava generation handoff")
 
   assert.match(generationSrc, /runEquipifySupervisedAvaOutreach/)
-  assert.match(generationSrc, /GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_USER_ID/)
+  assert.match(generationSrc, /buildDraftFactorySchedulerGenerationProvenance/)
+  assert.match(generationSrc, /autonomousProvenance:/)
   assert.match(generationSrc, /isDraftFactoryGenerationWake: true/)
   assert.match(generationSrc, /findExistingAvaSupervisedSendableDraft/)
-  console.log("  ✓ supervised generation service invokes existing cutover path")
+  console.log("  ✓ supervised generation service invokes existing cutover path with autonomous provenance")
 
   assert.equal(GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_USER_ID, "00000000-0000-4000-8000-000000000010")
   assert.equal(GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_EMAIL, "ava-scheduler@growth.equipify.internal")
