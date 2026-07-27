@@ -3,6 +3,10 @@
  * Transforms engineering copilot metadata into advisor-style review copy.
  */
 
+import {
+  summarizeSupervisedOperatorWorkspaceHeader,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import type { GrowthAiCopilotGeneration, GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
@@ -94,7 +98,6 @@ export function resolveOperatorConfidenceLabel(generation: GrowthAiCopilotGenera
   if (typeof classification.confidence === "number" && classification.confidence >= 0.75) {
     return "Recommended"
   }
-  if (generation.status === "approved") return "Approved"
   return "Ready for review"
 }
 
@@ -259,6 +262,9 @@ export function formatOperatorDecisionPrompt(teammate: AiTeammatePresentation): 
 export function summarizeOperatorWorkspaceHeader(generations: GrowthAiCopilotGeneration[]): string {
   const primary = resolvePrimaryOperatorReviewGeneration(generations)
   if (!primary) return "No recommendation yet"
+  if (isAvaSupervisedOutboundGeneration(primary)) {
+    return summarizeSupervisedOperatorWorkspaceHeader(primary)
+  }
   if (primary.status === "draft") {
     const emailCount = generations.filter((entry) => entry.status === "draft").length
     return emailCount === 1 ? "1 email ready for review" : `${emailCount} emails ready for review`

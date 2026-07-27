@@ -18,6 +18,7 @@ import {
   updateGrowthAiCopilotGenerationRecord,
 } from "@/lib/growth/ai-copilot-repository"
 import { bindAvaSupervisedOutboundApproval } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-service"
+import { isUnboundApprovedSupervisedGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 import {
   computeGrowthAiCopilotEffectivenessScore,
@@ -548,22 +549,31 @@ export async function approveGrowthAiCopilotGeneration(
     "@/lib/growth/ai-copilot-repository"
   )
   const existing = await fetchGrowthAiCopilotGenerationById(admin, input.generationId)
-  if (!existing || existing.status !== "draft") return existing
+  const canApproveDraft = existing?.status === "draft"
+  const canRepairUnboundApproved =
+    existing && isUnboundApprovedSupervisedGeneration(existing)
+  if (!existing || (!canApproveDraft && !canRepairUnboundApproved)) return existing
 
-  const updated = await updateGrowthAiCopilotGenerationStatus(admin, input.generationId, {
-    status: "approved",
-    approvedBy: input.actingUserId,
-  })
-
-  let approvedGeneration = updated
-  if (isAvaSupervisedOutboundGeneration(updated)) {
+  let approvedGeneration = existing
+  if (isAvaSupervisedOutboundGeneration(existing)) {
     const bound = await bindAvaSupervisedOutboundApproval(admin, {
-      generation: updated,
+      generation: existing,
       actingUserId: input.actingUserId,
     })
+    const updated = canApproveDraft
+      ? await updateGrowthAiCopilotGenerationStatus(admin, input.generationId, {
+          status: "approved",
+          approvedBy: input.actingUserId,
+        })
+      : existing
     approvedGeneration = await updateGrowthAiCopilotGenerationRecord(admin, updated.id, {
       generatedContent: bound.unsignedBody,
       classification: bound.classification,
+    })
+  } else if (canApproveDraft) {
+    approvedGeneration = await updateGrowthAiCopilotGenerationStatus(admin, input.generationId, {
+      status: "approved",
+      approvedBy: input.actingUserId,
     })
   }
 

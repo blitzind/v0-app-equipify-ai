@@ -15,6 +15,7 @@ import {
   AVA_SUPERVISED_STALE_GENERATION_RECOVERY_1A_QA_MARKER,
   BLOCK_IMAGING_FRESH_GENERATION_LEAD_ID,
   BLOCK_IMAGING_LEGACY_GENERATION_ID,
+  BLOCK_IMAGING_FRESH_GENERATION_ID,
   recoverStaleSupervisedGenerationForLead,
 } from "../lib/growth/ava-reasoning/ava-supervised-stale-generation-recovery-1a"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "../lib/growth/notifications/growth-notification-cert-bootstrap"
@@ -96,14 +97,15 @@ async function main(): Promise<void> {
     actingUserId: actingUser.userId,
     actingUserEmail: actingUser.email,
     dryRun,
-    expectedGenerationId: BLOCK_IMAGING_LEGACY_GENERATION_ID,
+    expectedGenerationId: BLOCK_IMAGING_FRESH_GENERATION_ID,
   })
 
   console.log(JSON.stringify({ phase: dryRun ? "dry_run_plan" : "recovery_result", result }, null, 2))
 
   if (!dryRun && result.auditAfter) {
     const checks = {
-      oldGenerationDiscarded: result.discardedGenerationIds.includes(BLOCK_IMAGING_LEGACY_GENERATION_ID),
+      oldGenerationDiscarded: result.discardedGenerationIds.includes(BLOCK_IMAGING_FRESH_GENERATION_ID),
+      noEmDash: !result.auditAfter?.persistedBodyHasProhibitedStyleMarkers,
       newGenerationIdDiffers:
         Boolean(result.newGenerationId) && result.newGenerationId !== BLOCK_IMAGING_LEGACY_GENERATION_ID,
       exactlyOneActionable: result.auditAfter.actionableGenerationCount === 1,

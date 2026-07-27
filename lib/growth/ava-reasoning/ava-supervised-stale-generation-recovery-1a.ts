@@ -30,10 +30,13 @@ import {
   bodyContainsLegacyAvaSignatureMarkers,
   stripAccidentalAvaSignatureFromBody,
 } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
+import { containsProhibitedAvaOutboundStyleMarkers } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import {
   findExistingAvaSupervisedSendableDraft,
   isSendableAvaSupervisedDraft,
 } from "@/lib/growth/ava-reasoning/equipify-supervised-draft-persistence"
+import { updateGrowthAiCopilotGenerationRecord } from "@/lib/growth/ai-copilot-repository"
+import { isUnboundApprovedSupervisedGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 import { runEquipifySupervisedAvaOutreach } from "@/lib/growth/ava-reasoning/equipify-supervised-cutover-service"
 
 export const AVA_SUPERVISED_STALE_GENERATION_RECOVERY_1A_QA_MARKER =
@@ -42,6 +45,7 @@ export const AVA_SUPERVISED_STALE_GENERATION_RECOVERY_1A_QA_MARKER =
 /** AVA-BLOCK-IMAGING-FRESH-GENERATION-1A — scoped recovery allowlist. */
 export const BLOCK_IMAGING_FRESH_GENERATION_LEAD_ID = "6d9220f0-2960-468c-b4be-5d7595d292c3" as const
 export const BLOCK_IMAGING_LEGACY_GENERATION_ID = "2bbacf99-b884-442f-a5b2-ce78132368cf" as const
+export const BLOCK_IMAGING_FRESH_GENERATION_ID = "82e0d27f-5fe2-4424-b262-d78728741b2a" as const
 
 const RECOVERY_ALLOWLIST = new Set<string>([BLOCK_IMAGING_FRESH_GENERATION_LEAD_ID])
 
@@ -59,6 +63,33 @@ function isDiscardableUnsentUnapprovedSupervisedDraft(
     Boolean(generation.generatedSubject?.trim()) &&
     Boolean(generation.generatedContent?.trim())
   )
+}
+
+async function revertUnboundApprovedSupervisedGenerationsForRecovery(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<string[]> {
+  const generations = await listGrowthAiCopilotGenerationsForLead(admin, leadId, 50)
+  const reverted: string[] = []
+  for (const generation of generations) {
+    if (!isUnboundApprovedSupervisedGeneration(generation)) continue
+    const classification = { ...(generation.classification as Record<string, unknown>) }
+    delete classification.avaSupervisedOutboundApproval
+    delete classification.avaSupervisedOutboundSendReceipt
+    delete classification.avaSupervisedOutboundSendLifecycle
+    await updateGrowthAiCopilotGenerationRecord(admin, generation.id, {
+      status: "draft",
+      classification,
+      sentAt: null,
+    })
+    await admin
+      .schema("growth")
+      .from("ai_copilot_generations")
+      .update({ approved_at: null, approved_by: null })
+      .eq("id", generation.id)
+    reverted.push(generation.id)
+  }
+  return reverted
 }
 
 async function listDiscardableUnsentUnapprovedSupervisedDrafts(
@@ -87,6 +118,7 @@ export type SupervisedGenerationAudit = {
   persistedBodyLength: number
   persistedBodyTail: string | null
   persistedBodyHasLegacySignatureMarkers: boolean
+  persistedBodyHasProhibitedStyleMarkers: boolean
   strippedUnsignedBodyHasLegacySignatureMarkers: boolean
   signatureOrigin: SupervisedGenerationBodySignatureOrigin
   draftFactoryState: string | null
@@ -254,6 +286,9 @@ export async function auditSupervisedLeadGenerationState(
     persistedBodyLength: persistedBody.length,
     persistedBodyTail: persistedBody ? persistedBody.slice(-240) : null,
     persistedBodyHasLegacySignatureMarkers: bodyContainsLegacyAvaSignatureMarkers(persistedBody),
+    persistedBodyHasProhibitedStyleMarkers:
+      containsProhibitedAvaOutboundStyleMarkers(persistedBody) ||
+      containsProhibitedAvaOutboundStyleMarkers(primary?.generatedSubject ?? ""),
     strippedUnsignedBodyHasLegacySignatureMarkers:
       bodyContainsLegacyAvaSignatureMarkers(strippedUnsignedBody),
     signatureOrigin: classifySignatureOrigin({ persistedBody, strippedUnsignedBody }),
@@ -339,16 +374,21 @@ export async function recoverStaleSupervisedGenerationForLead(
   })
   const dryRun = input.dryRun !== false
 
-  const discardableDrafts = await listDiscardableUnsentUnapprovedSupervisedDrafts(
+  const unboundApprovedGenerations = (
+    await listGrowthAiCopilotGenerationsForLead(admin, input.leadId, 50)
+  ).filter((generation) => isUnboundApprovedSupervisedGeneration(generation))
+
+  let discardableDrafts = await listDiscardableUnsentUnapprovedSupervisedDrafts(
     admin,
     input.leadId,
   )
 
-  if (
-    input.expectedGenerationId &&
-    discardableDrafts.length > 0 &&
-    !discardableDrafts.some((row) => row.id === input.expectedGenerationId)
-  ) {
+  const recoveryTargets = new Set([
+    ...discardableDrafts.map((row) => row.id),
+    ...unboundApprovedGenerations.map((row) => row.id),
+  ])
+
+  if (input.expectedGenerationId && !recoveryTargets.has(input.expectedGenerationId)) {
     return {
       qaMarker: AVA_SUPERVISED_STALE_GENERATION_RECOVERY_1A_QA_MARKER,
       leadId: input.leadId,
@@ -359,7 +399,7 @@ export async function recoverStaleSupervisedGenerationForLead(
       regenerationAttempted: false,
       regenerationOk: false,
       regenerationCode: "generation_id_mismatch",
-      regenerationMessage: `Expected ${input.expectedGenerationId} among discardable drafts.`,
+      regenerationMessage: `Expected ${input.expectedGenerationId} is not a recoverable supervised generation.`,
       newGenerationId: null,
       persistenceStatus: null,
       decision: null,
@@ -367,7 +407,35 @@ export async function recoverStaleSupervisedGenerationForLead(
     }
   }
 
-  const targetGeneration = discardableDrafts[0] ?? null
+  if (
+    discardableDrafts.length === 0 &&
+    unboundApprovedGenerations.length === 0 &&
+    !auditBefore.persistedBodyHasProhibitedStyleMarkers
+  ) {
+    return {
+      qaMarker: AVA_SUPERVISED_STALE_GENERATION_RECOVERY_1A_QA_MARKER,
+      leadId: input.leadId,
+      dryRun,
+      auditBefore,
+      discardedGenerationId: null,
+      discardedGenerationIds: [],
+      regenerationAttempted: false,
+      regenerationOk: false,
+      regenerationCode: "no_recoverable_generation",
+      regenerationMessage: "No recoverable supervised generation found.",
+      newGenerationId: null,
+      persistenceStatus: null,
+      decision: null,
+      auditAfter: null,
+    }
+  }
+
+  const targetGeneration =
+    discardableDrafts.find((row) => row.id === input.expectedGenerationId) ??
+    unboundApprovedGenerations.find((row) => row.id === input.expectedGenerationId) ??
+    discardableDrafts[0] ??
+    unboundApprovedGenerations[0] ??
+    null
 
   if (!readiness.ok) {
     return {
@@ -395,14 +463,19 @@ export async function recoverStaleSupervisedGenerationForLead(
       dryRun: true,
       auditBefore,
       discardedGenerationId: targetGeneration?.id ?? null,
-      discardedGenerationIds: discardableDrafts.map((row) => row.id),
+      discardedGenerationIds: [
+        ...unboundApprovedGenerations.map((row) => row.id),
+        ...discardableDrafts.map((row) => row.id),
+      ],
       regenerationAttempted: true,
       regenerationOk: true,
       regenerationCode: "dry_run",
       regenerationMessage:
-        discardableDrafts.length > 0
-          ? "Would discard stale supervised drafts and run fresh supervised generation."
-          : "Would run fresh supervised generation (stale draft already discarded).",
+        unboundApprovedGenerations.length > 0
+          ? "Would revert unbound approved drafts, discard stale supervised drafts, and run fresh supervised generation."
+          : discardableDrafts.length > 0
+            ? "Would discard stale supervised drafts and run fresh supervised generation."
+            : "Would run fresh supervised generation.",
       newGenerationId: null,
       persistenceStatus: null,
       decision: null,
@@ -411,6 +484,8 @@ export async function recoverStaleSupervisedGenerationForLead(
   }
 
   const discardedGenerationIds: string[] = []
+  await revertUnboundApprovedSupervisedGenerationsForRecovery(admin, input.leadId)
+  discardableDrafts = await listDiscardableUnsentUnapprovedSupervisedDrafts(admin, input.leadId)
   for (const draft of discardableDrafts) {
     const discarded = await discardGrowthAiCopilotGeneration(admin, draft.id)
     if (!discarded || discarded.status !== "discarded") {

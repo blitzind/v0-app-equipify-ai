@@ -220,7 +220,7 @@ function main(): void {
     const copilot = readSource("components/growth/growth-ai-copilot.tsx")
     assert.match(review, /Delivery unknown/)
     assert.match(review, /readAvaSupervisedOutboundSendLifecycle/)
-    assert.match(copilot, /delivery_unknown/)
+    assert.match(copilot, /resolveAvaSupervisedOutboundApprovalPresentation/)
   })
 
   runGate("Production probe uses Vercel Production env workflow (no .env.local requirement)", () => {

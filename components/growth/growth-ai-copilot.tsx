@@ -29,7 +29,10 @@ import { growthAvaPanelTitle } from "@/lib/growth/workspace/growth-workspace-ava
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthSenderProfilesDashboardPayload } from "@/lib/growth/signatures/signature-types"
 import { GROWTH_AVA_OPERATOR_WORKSPACE_3B_QA_MARKER } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3b"
-import { isAvaSupervisedOutboundGeneration, readAvaSupervisedOutboundSendReceipt } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import {
+  resolveAvaSupervisedOutboundApprovalPresentation,
+} from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
+import { isAvaSupervisedOutboundGeneration } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
 
 type GrowthAiCopilotProps = {
   lead: GrowthLead
@@ -67,6 +70,14 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
   const primaryGeneration = useMemo(
     () => resolvePrimaryOperatorReviewGeneration(generations),
     [generations],
+  )
+
+  const primaryApprovalPresentation = useMemo(
+    () =>
+      primaryGeneration
+        ? resolveAvaSupervisedOutboundApprovalPresentation(primaryGeneration)
+        : null,
+    [primaryGeneration],
   )
 
   const previousGenerations = useMemo(
@@ -276,11 +287,7 @@ export function GrowthAiCopilot({ lead, surface = "embedded" }: GrowthAiCopilotP
           onApprove={() => void approve(primaryGeneration.id)}
           onReject={() => void discard(primaryGeneration.id)}
           onSend={
-            isAvaSupervisedOutboundGeneration(primaryGeneration) &&
-            primaryGeneration.status === "approved" &&
-            !primaryGeneration.sentAt &&
-            readAvaSupervisedOutboundSendReceipt(primaryGeneration.classification as Record<string, unknown>)
-              ?.status !== "delivery_unknown"
+            primaryApprovalPresentation?.showSendEmailAction
               ? () => void sendApproved(primaryGeneration.id)
               : undefined
           }

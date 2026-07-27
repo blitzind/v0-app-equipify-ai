@@ -10,7 +10,6 @@ import {
   buildOperatorWorkspaceDiagnostics,
   formatAvaRecommendsContactHeading,
   formatOperatorDecisionPrompt,
-  formatOperatorGenerationStatusLabel,
   GROWTH_AVA_OPERATOR_WORKSPACE_3A_QA_MARKER,
   projectAvaRecommendationFromGeneration,
 } from "@/lib/growth/aios/operator-experience/growth-ava-operator-workspace-3a"
@@ -29,6 +28,7 @@ import {
   readAvaSupervisedOutboundApprovalBinding,
   readAvaSupervisedOutboundSendReceipt,
 } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1a-types"
+import { resolveAvaSupervisedOutboundApprovalPresentation } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 import { readAvaSupervisedOutboundSendLifecycle } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-1b-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
@@ -91,8 +91,12 @@ export function GrowthAvaOperatorWorkspaceReview({
     () => readAvaSupervisedOutboundApprovalBinding(generation.classification as Record<string, unknown>),
     [generation.classification],
   )
+  const approvalPresentation = useMemo(
+    () => resolveAvaSupervisedOutboundApprovalPresentation(generation),
+    [generation],
+  )
   const isDraft = generation.status === "draft"
-  const isApproved = generation.status === "approved"
+  const isApproved = approvalPresentation.messageApproved
   const isSent = Boolean(generation.sentAt || sendReceipt?.status === "sent")
   const isDeliveryUnknown =
     sendReceipt?.status === "delivery_unknown" || sendLifecycle?.status === "delivery_unknown"
@@ -179,7 +183,6 @@ export function GrowthAvaOperatorWorkspaceReview({
   }
 
   const diagnostics = buildOperatorWorkspaceDiagnostics(generation)
-  const reviewStatusLabel = formatOperatorGenerationStatusLabel(generation.status)
   const estimatedReviewTime = estimateOperatorReviewTimeLabel(generation)
 
   return (
@@ -213,10 +216,9 @@ export function GrowthAvaOperatorWorkspaceReview({
               {GROWTH_AVA_OPERATOR_SECTION_RECOMMENDATION_STATUS}
             </p>
             <GrowthBadge label={recommendation.confidenceLabel} tone="healthy" />
-            <GrowthBadge
-              label={reviewStatusLabel}
-              tone={isDraft ? "warning" : isApproved ? "healthy" : "neutral"}
-            />
+            {approvalPresentation.recommendationOperatorApproved ? (
+              <GrowthBadge label="Approved" tone="healthy" />
+            ) : null}
           </div>
         </div>
       </Section>
@@ -240,6 +242,18 @@ export function GrowthAvaOperatorWorkspaceReview({
       ) : null}
 
       <Section title={GROWTH_AVA_OPERATOR_SECTION_PREPARED_EMAIL}>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <GrowthBadge
+            label={approvalPresentation.messageStatusLabel}
+            tone={
+              approvalPresentation.sendEligible
+                ? "healthy"
+                : approvalPresentation.unboundApprovedStatus || isDraft
+                  ? "warning"
+                  : "neutral"
+            }
+          />
+        </div>
         <div className="overflow-hidden rounded-lg border border-border/70 bg-muted/10">
           {editing ? (
             <div className="space-y-3 p-3">
@@ -306,11 +320,11 @@ export function GrowthAvaOperatorWorkspaceReview({
       <Section title={GROWTH_AVA_OPERATOR_SECTION_YOUR_DECISION}>
         <p className="text-sm text-muted-foreground">{formatOperatorDecisionPrompt(teammate)}</p>
         <div className="flex flex-wrap gap-2">
-          {isDraft ? (
+          {approvalPresentation.showApproveEmailAction ? (
             <>
               <Button type="button" disabled={acting} onClick={onApprove}>
                 {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Check className="mr-2 size-4" />}
-                Approve
+                Approve Email
               </Button>
               <Button
                 type="button"
@@ -333,9 +347,19 @@ export function GrowthAvaOperatorWorkspaceReview({
           </Button>
         </div>
 
-        {isApproved && !isSent && !isDeliveryUnknown ? (
+        {approvalPresentation.unboundApprovedStatus ? (
+          <div className="space-y-2 rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+            <p className="text-sm font-medium text-foreground">Prepared email still needs approval</p>
+            <p className="text-sm text-muted-foreground">
+              The recommendation is marked approved, but this exact email has not been bound for send yet.
+              Approve the email to freeze recipient, subject, body, and sender before sending.
+            </p>
+          </div>
+        ) : null}
+
+        {approvalPresentation.showSendEmailAction ? (
           <div className="space-y-2 rounded-lg border border-emerald-200/70 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-            <p className="text-sm font-medium text-foreground">Approved — ready to send</p>
+            <p className="text-sm font-medium text-foreground">Email approved — ready to send</p>
             {supervisedOutbound && onSend ? (
               <Button type="button" size="sm" disabled={acting} onClick={onSend}>
                 {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Mail className="mr-2 size-4" />}

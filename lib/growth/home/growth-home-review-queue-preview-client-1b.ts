@@ -8,6 +8,7 @@ import {
   type GrowthHomeReviewQueueRow,
 } from "@/lib/growth/home/growth-home-review-queue-1b"
 import { parseOutreachPrepPackageId } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-id"
+import { resolveAvaSupervisedOutboundApprovalPresentation } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-approval-state-core"
 
 export const GROWTH_HOME_REVIEW_QUEUE_PREVIEW_CLIENT_1B_QA_MARKER =
   "ava-home-review-queue-preview-client-1b-v1" as const
@@ -215,8 +216,10 @@ export async function fetchReviewQueuePreview(row: GrowthHomeReviewQueueRow): Pr
     body = signaturePayload.unsignedBody
   }
 
-  const approvalStateLabel =
-    generation.status === "approved"
+  const approvalPresentation = resolveAvaSupervisedOutboundApprovalPresentation(generation)
+  const approvalStateLabel = approvalPresentation.supervisedOutbound
+    ? approvalPresentation.messageStatusLabel
+    : generation.status === "approved"
       ? "Approved"
       : generation.sentAt
         ? "Sent"

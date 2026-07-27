@@ -18,6 +18,7 @@ import {
   runEquipifyAvaDirectReasoning,
 } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-direct-reasoning"
 import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
+import { normalizeProhibitedAvaOutboundCopy } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import { persistAvaUnderstandingMemory } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-understanding-memory"
 import {
   retrieveWebsiteTextForAvaDirect,
@@ -59,6 +60,8 @@ export type RunEquipifySupervisedAvaOutreachInput = {
   actingUserEmail: string
   organizationId?: string | null
   persist?: boolean
+  /** When true, legacy approved-but-unsent drafts do not block fresh persistence. */
+  ignoreApprovedExistingDraft?: boolean
   /** Ignored — Company Intelligence is no longer required on the critical path. */
   forceRegenerateCompanyIntelligence?: boolean
 }
@@ -184,6 +187,7 @@ async function persistSupervisedDraftIfSendable(input: {
   actingUserId: string
   output: EquipifySupervisedAvaOutreachOutput
   organizationKnowledge: unknown
+  includeApprovedExisting?: boolean
 }): Promise<{ id: string | null; status: SupervisedDraftPersistenceStatus }> {
   return persistSendableAvaSupervisedDraft({
     admin: input.admin,
@@ -214,6 +218,7 @@ async function persistSupervisedDraftIfSendable(input: {
       provider: input.output.provider,
       promptVersion: AVA_DIRECT_PRODUCTION_PROMPT_VERSION,
     },
+    includeApprovedExisting: input.includeApprovedExisting,
   })
 }
 
@@ -325,6 +330,7 @@ export async function runEquipifySupervisedAvaOutreach(
         actingUserId,
         output,
         organizationKnowledge,
+        includeApprovedExisting: !input.ignoreApprovedExistingDraft,
       })
       output.persistedGenerationId = persisted.id
       output.persistenceStatus = persisted.status
@@ -402,7 +408,10 @@ export async function runEquipifySupervisedAvaOutreach(
   if (email?.body) {
     email = {
       ...email,
-      body: stripAccidentalAvaSignatureFromBody(email.body),
+      subject: email.subject ? normalizeProhibitedAvaOutboundCopy(email.subject) : email.subject,
+      body: normalizeProhibitedAvaOutboundCopy(
+        stripAccidentalAvaSignatureFromBody(email.body),
+      ),
     }
   }
   const signatureApplied = false

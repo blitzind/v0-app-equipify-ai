@@ -10,6 +10,7 @@ export const AVA_SUPERVISED_OUTBOUND_SIGNATURE_PROHIBITION_LINES = [
   "Write the email body only — no subject line inside the body.",
   "Do NOT include a signature block, sender name, title, company, email, website, tagline, scheduling CTA, or separator lines such as --.",
   "The platform appends the approved outbound signature exactly once at send time.",
+  "NEVER use an em dash (—) in the subject or body. Use a comma, period, colon, parentheses, or a rewritten sentence instead.",
 ] as const
 
 export type AvaSupervisedOutboundApprovalBinding = {

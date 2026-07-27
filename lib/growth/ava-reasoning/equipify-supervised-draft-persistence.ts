@@ -15,6 +15,7 @@ import {
   AVA_DIRECT_PRODUCTION_PROMPT_VERSION,
 } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-direct-reasoning"
 import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/ava-supervised-outbound-signature-boundary-core"
+import { assertAvaOutboundCopyQualityForPersistence } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import { AVA_SUPERVISED_CUTOVER_1A_QA_MARKER } from "@/lib/growth/ava-reasoning/equipify-external-company-preflight"
 
 const AVA_SUPERVISED_DRAFT_PROMPT_VARIANT = "ava_direct_production_cutover_1a" as const
@@ -95,6 +96,15 @@ export async function persistSendableAvaSupervisedDraft(input: {
     return { id: existing.id, status: "duplicate_reused" }
   }
 
+  const unsignedBody = stripAccidentalAvaSignatureFromBody(input.email!.body.trim())
+  const copyQuality = assertAvaOutboundCopyQualityForPersistence({
+    subject: input.email!.subject,
+    body: unsignedBody,
+  })
+  if (!copyQuality.ok) {
+    return { id: null, status: "skipped" }
+  }
+
   const generation = await insertGrowthAiCopilotGeneration(input.admin, {
     leadId: input.leadId,
     generationType: "cold_email",
@@ -112,8 +122,8 @@ export async function persistSendableAvaSupervisedDraft(input: {
       approvedSender: input.approvedSender,
       contactsSupplied: input.contactsSupplied,
     },
-    generatedContent: stripAccidentalAvaSignatureFromBody(input.email!.body.trim()),
-    generatedSubject: input.email!.subject.trim(),
+    generatedContent: copyQuality.body,
+    generatedSubject: copyQuality.subject,
     classification: input.classification,
     createdBy: input.actingUserId,
   })

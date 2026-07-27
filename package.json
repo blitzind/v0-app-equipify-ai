@@ -951,6 +951,8 @@
     "recover:ava-block-imaging-fresh-generation-1a:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/recover-ava-block-imaging-fresh-generation-1a-production.ts",
     "test:ava-block-imaging-approval-fetch-hotfix-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-block-imaging-approval-fetch-hotfix-1a.ts",
     "test:ava-block-imaging-fresh-generation-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-block-imaging-fresh-generation-1a.ts",
+    "test:ava-block-imaging-approval-binding-hotfix-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-block-imaging-approval-binding-hotfix-1a.ts",
+    "probe:ava-block-imaging-approval-binding-hotfix-1a:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ava-block-imaging-approval-binding-hotfix-1a-production.ts",
     "probe:ava-signature-boundary-transport-hotfix-1b:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/probe-ava-signature-boundary-transport-hotfix-1b-production.ts",
     "test:ava-mailbox-reliability-and-affinity-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-mailbox-reliability-and-affinity-1a.ts",
     "test:ava-mailbox-credential-resolution-hotfix-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ava-mailbox-credential-resolution-hotfix-1a.ts",
