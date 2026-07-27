@@ -80,6 +80,7 @@ import { GROWTH_AVA_ACTIVATION_1C_QA_MARKER } from "@/lib/growth/ava-activation/
 import { buildGrowthHomeRuntimeTrustViewModel } from "@/lib/growth/home/growth-home-runtime-trust-presenter-1b"
 import { GROWTH_HOME_RUNTIME_EXECUTION_PRESENTATION_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-execution-presentation-1b"
 import { GROWTH_HOME_RUNTIME_TRUST_1B_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-trust-types-1b"
+import { resolveCanonicalApprovedReadyToSendCount } from "@/lib/growth/aios/operator-experience/growth-canonical-operator-workspace-1a"
 import {
   GROWTH_HOME_OPERATOR_CLOSURE_1A_QA_MARKER,
 } from "@/lib/growth/home/growth-home-operator-closure-1a"
@@ -251,6 +252,10 @@ export function GrowthHomeExecutiveBriefingDashboard({
   const [homeRefreshVersion, setHomeRefreshVersion] = useState(0)
 
   const canonicalPendingApprovals = aiOsUx.approveItemsCount ?? 0
+  const canonicalApprovedReadyToSend = Math.max(
+    resolveCanonicalApprovedReadyToSendCount(workspaceSummary?.canonicalOperatorApproval, 0),
+    workspaceSummary?.supervisedOperatorAttention?.approvedReadyToSend?.length ?? 0,
+  )
   const employeeMode = workspaceSummary?.avaActivation?.activated === true
   const operatorClosureMode = employeeMode
   const homeSimplificationMode = employeeMode
@@ -483,11 +488,42 @@ export function GrowthHomeExecutiveBriefingDashboard({
       portfolio: workspaceSummary?.portfolioManager?.operator ?? null,
       leadsNeedingAction: workspaceSummary?.operatorTasks?.leadsNeedingAction ?? 0,
     })
+
+    const primaryRecommendation = avaHero.recommendationExperience?.recommendations?.[0] ?? null
+    const waitingOnYouItems = enrichGrowthHomeWaitingOnYouItems(
+      aiOsUx.waitingOnYou,
+      workspaceSummary?.relationshipSnapshots?.byLeadId,
+      waitingCompanyByLeadId,
+    )
+    const primaryWaitingItem = waitingOnYouItems[0] ?? null
+    const leadsById = buildLeadsByIdMap(workspaceSummary?.portfolioLeads)
+    const supervisedReadyByLeadId = buildSupervisedReadyByLeadIdMap(
+      workspaceSummary?.supervisedOperatorAttention?.readyForReview,
+      workspaceSummary?.supervisedOperatorAttention?.approvedReadyToSend,
+    )
+    const reviewQueue = buildGrowthHomeReviewQueuePresentation({
+      packages: workspaceSummary?.canonicalOperatorApproval?.packages ?? aiOsUx.canonicalApprovalSnapshot?.packages ?? [],
+      needsInformation: workspaceSummary?.supervisedOperatorAttention?.needsInformation,
+      leadsById,
+      supervisedReadyByLeadId,
+      reviewOutreachHref: aiOsUx.approveItemsHref ?? null,
+    })
+    const lifecycleAwaitingApproval = Math.max(
+      canonicalPendingApprovals,
+      reviewQueue.awaitingReviewCount,
+    )
+    const lifecycleApprovedReadyToSend = Math.max(
+      canonicalApprovedReadyToSend,
+      reviewQueue.approvedCount,
+    )
+    const primaryQueueRow = reviewQueue.rows[0] ?? null
+
     const heroBriefing = buildHeroExecutiveBriefing({
       statusLabel: avaHero.statusLabel,
       dailyActivityNarrative: avaHero.dailyActivityNarrative,
       missionDiscovery,
-      pendingApprovals: canonicalPendingApprovals,
+      pendingApprovals: lifecycleAwaitingApproval,
+      approvedReadyToSend: lifecycleApprovedReadyToSend,
       readyForOutreachReview: avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0,
       discoveryTarget: avaHero.discoveryNarrativeTarget ?? missionDiscovery?.audienceName ?? null,
       portfolioOperator: workspaceSummary?.portfolioManager?.operator ?? null,
@@ -517,20 +553,14 @@ export function GrowthHomeExecutiveBriefingDashboard({
         null,
     })
 
-    const primaryRecommendation = avaHero.recommendationExperience?.recommendations?.[0] ?? null
-    const waitingOnYouItems = enrichGrowthHomeWaitingOnYouItems(
-      aiOsUx.waitingOnYou,
-      workspaceSummary?.relationshipSnapshots?.byLeadId,
-      waitingCompanyByLeadId,
-    )
-    const primaryWaitingItem = waitingOnYouItems[0] ?? null
     const recommendationWhyBullets = [
       ...(avaHero.executiveReasoning?.primary?.evidence ?? []),
       ...(primaryRecommendation?.explanation?.whyChosen ?? primaryRecommendation?.whyReasons ?? []),
     ].filter(Boolean)
 
     const dailyBrief = buildGrowthHomeDailyBriefPresentation({
-      pendingApprovals: canonicalPendingApprovals,
+      pendingApprovals: lifecycleAwaitingApproval,
+      approvedReadyToSend: lifecycleApprovedReadyToSend,
       readyForOutreachReview: avaConsole?.researchLoopSummary?.readyForOutreachReview ?? 0,
       dailyActivityNarrative: avaHero.dailyActivityNarrative,
       completedTodayLines: completedToday.map((entry) => entry.summary),
@@ -540,10 +570,13 @@ export function GrowthHomeExecutiveBriefingDashboard({
       fitBullets: [...new Set(recommendationWhyBullets)],
     })
     const currentFocus = buildGrowthHomeCurrentFocusPresentation({
-      pendingApprovals: canonicalPendingApprovals,
+      pendingApprovals: lifecycleAwaitingApproval,
+      approvedReadyToSend: lifecycleApprovedReadyToSend,
       recommendation: primaryRecommendation,
       waitingItem: primaryWaitingItem,
       runtimeTrust,
+      actionableCompanyName: primaryQueueRow?.companyName ?? null,
+      actionableCompanyHref: primaryQueueRow?.reviewHref ?? null,
     })
     const missionOpportunity = buildGrowthHomeMissionOpportunityPresentation({
       missions: aiOsUx.canonicalActiveMissions?.missions ?? [],
@@ -561,18 +594,6 @@ export function GrowthHomeExecutiveBriefingDashboard({
       activityFeedSummaries: runtimeTrust.activityFeed.map((entry) => entry.summary),
     })
 
-    const leadsById = buildLeadsByIdMap(workspaceSummary?.portfolioLeads)
-    const supervisedReadyByLeadId = buildSupervisedReadyByLeadIdMap(
-      workspaceSummary?.supervisedOperatorAttention?.readyForReview,
-      workspaceSummary?.supervisedOperatorAttention?.approvedReadyToSend,
-    )
-    const reviewQueue = buildGrowthHomeReviewQueuePresentation({
-      packages: workspaceSummary?.canonicalOperatorApproval?.packages ?? aiOsUx.canonicalApprovalSnapshot?.packages ?? [],
-      needsInformation: workspaceSummary?.supervisedOperatorAttention?.needsInformation,
-      leadsById,
-      supervisedReadyByLeadId,
-      reviewOutreachHref: aiOsUx.approveItemsHref ?? null,
-    })
     const reviewQueueDailyBrief = buildGrowthHomeReviewQueueDailyBrief({
       companiesReviewedToday: inferDailyBriefReviewCounts({
         pendingDraftCount: canonicalPendingApprovals,
@@ -626,6 +647,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
     avaHero.workManager,
     avaConsole?.researchLoopSummary?.readyForOutreachReview,
     canonicalPendingApprovals,
+    canonicalApprovedReadyToSend,
     dashboard,
     relationshipSnapshotCount,
     setupIncomplete,

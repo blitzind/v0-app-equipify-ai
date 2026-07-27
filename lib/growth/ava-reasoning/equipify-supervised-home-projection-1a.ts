@@ -367,12 +367,19 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
   ]
   const packages = [...supervisedPackages, ...legacyPackages]
   const outreachDraftCount = packages.reduce((sum, row) => sum + Math.max(row.draftCount, 0), 0)
+  const awaitingApprovalCount =
+    supervisedReady.length +
+    legacyPackages.filter((pkg) => !/approved|authorized|ready to send/i.test(pkg.statusLabel)).length
+  const approvedReadyToSendCount =
+    approvedReady.length +
+    legacyPackages.filter((pkg) => /approved|authorized|ready to send/i.test(pkg.statusLabel)).length
 
   return {
     qaMarker: GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER,
     outreachPackageCount: packages.length,
     outreachDraftCount,
-    pendingApprovalCount: supervisedPackages.length > 0 ? supervisedPackages.length : packages.length,
+    pendingApprovalCount: awaitingApprovalCount,
+    approvedReadyToSendCount,
     waitingForOperator: packages.length > 0,
     packages,
     topPackage: packages[0] ?? null,

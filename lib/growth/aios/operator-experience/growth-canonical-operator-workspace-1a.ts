@@ -391,6 +391,41 @@ export function resolveCanonicalApprovalQueueCount(
   return approvalSnapshot.pendingApprovalCount
 }
 
+export function resolveCanonicalApprovedReadyToSendCount(
+  approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined,
+  legacyFallback = 0,
+): number {
+  if (!approvalSnapshot) return legacyFallback
+  return approvalSnapshot.approvedReadyToSendCount ?? legacyFallback
+}
+
+function isApprovedReadyPackagePreview(
+  pkg: GrowthCanonicalOperatorApprovalPackagePreview,
+): boolean {
+  const label = pkg.statusLabel.trim().toLowerCase()
+  return /approved|authorized|ready to send/.test(label)
+}
+
+export function resolveCanonicalOperatorApprovalLifecycleCounts(
+  approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined,
+): { awaitingApprovalCount: number; approvedReadyToSendCount: number; actionableCount: number } {
+  if (!approvalSnapshot) {
+    return { awaitingApprovalCount: 0, approvedReadyToSendCount: 0, actionableCount: 0 }
+  }
+
+  const awaitingApprovalCount = resolveCanonicalApprovalQueueCount(approvalSnapshot, 0)
+  const approvedReadyToSendCount = Math.max(
+    resolveCanonicalApprovedReadyToSendCount(approvalSnapshot, 0),
+    approvalSnapshot.packages.filter(isApprovedReadyPackagePreview).length,
+  )
+
+  return {
+    awaitingApprovalCount,
+    approvedReadyToSendCount,
+    actionableCount: awaitingApprovalCount + approvedReadyToSendCount,
+  }
+}
+
 export function resolveCanonicalOutreachDraftCount(
   approvalSnapshot: GrowthCanonicalOperatorApprovalSnapshot | null | undefined,
   legacyFallback = 0,

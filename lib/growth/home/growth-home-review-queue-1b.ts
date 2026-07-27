@@ -350,22 +350,33 @@ export function buildGrowthHomeReviewQueueDailyBrief(input: {
   const prepared = input.queue.packagesPrepared
   const recommendSend = input.queue.recommendedCount + input.queue.approvedCount
   const needsReview = input.queue.needsReviewCount
+  const awaitingReview = input.queue.awaitingReviewCount
+  const approvedCount = input.queue.approvedCount
+  const approvedOnly = approvedCount > 0 && awaitingReview === 0 && recommendSend === approvedCount
 
   const accomplishmentLine =
     reviewed > 0
       ? `Today I reviewed ${reviewed} ${reviewed === 1 ? "company" : "companies"}.`
-      : prepared > 0
+      : prepared > 0 && awaitingReview > 0
         ? `I've prepared ${prepared} outreach ${prepared === 1 ? "package" : "packages"} for your review.`
-        : null
+        : prepared > 0 && approvedOnly
+          ? `${approvedCount} approved ${approvedCount === 1 ? "email is" : "emails are"} ready to send.`
+          : prepared > 0
+            ? `I've prepared ${prepared} outreach ${prepared === 1 ? "package" : "packages"}.`
+            : null
 
   const packagesPreparedLine =
     prepared > 0
-      ? `I prepared ${prepared} outreach ${prepared === 1 ? "package" : "packages"}.`
+      ? awaitingReview > 0
+        ? `I prepared ${prepared} outreach ${prepared === 1 ? "package" : "packages"} for your review.`
+        : `I prepared ${prepared} outreach ${prepared === 1 ? "package" : "packages"}.`
       : null
 
   const recommendSendLine =
     recommendSend > 0
-      ? `I recommend sending ${recommendSend}.`
+      ? approvedOnly
+        ? `${approvedCount} approved ${approvedCount === 1 ? "email is" : "emails are"} ready to send.`
+        : `I recommend sending ${recommendSend}.`
       : null
 
   const needsAdditionalReviewLine =

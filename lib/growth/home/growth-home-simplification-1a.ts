@@ -110,10 +110,12 @@ function resolvePrimaryActionHref(input: {
 
 function resolveStatusLabel(input: {
   pendingApprovals: number
+  approvedReadyToSend?: number
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
   recommendation: GrowthHomeAvaRecommendationItem | null
 }): string {
   if (input.pendingApprovals > 0) return "Waiting for your approval"
+  if ((input.approvedReadyToSend ?? 0) > 0) return "Ready to send"
   const outcomeType = input.recommendation?.outcomeProjection?.outcomeType
   if (outcomeType === "prepare_opportunity_package" && input.recommendation?.kind !== "approval_package") {
     return "Researching"
@@ -126,10 +128,12 @@ function resolveStatusLabel(input: {
 
 function resolveNextActionLabel(input: {
   pendingApprovals: number
+  approvedReadyToSend?: number
   recommendation: GrowthHomeAvaRecommendationItem | null
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
 }): string {
   if (input.pendingApprovals > 0) return "Review prepared outreach"
+  if ((input.approvedReadyToSend ?? 0) > 0) return "Send approved email"
   if (input.recommendation?.outcomeProjection?.nextStepLabel) {
     return input.recommendation.outcomeProjection.nextStepLabel.replace(/\.$/, "")
   }
@@ -147,6 +151,7 @@ function resolveNextActionLabel(input: {
 
 export function buildGrowthHomeDailyBriefPresentation(input: {
   pendingApprovals: number
+  approvedReadyToSend?: number
   readyForOutreachReview?: number
   dailyActivityNarrative?: AvaDailyActivityNarrative | null
   completedTodayLines?: string[]
@@ -155,18 +160,30 @@ export function buildGrowthHomeDailyBriefPresentation(input: {
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
   fitBullets?: string[]
 }): GrowthHomeDailyBriefPresentation {
+  const approvedReadyToSend = Math.max(input.approvedReadyToSend ?? 0, 0)
   const briefCounts = inferDailyBriefReviewCounts({
     pendingDraftCount: input.pendingApprovals,
     completedTodayLines: input.completedTodayLines ?? input.dailyActivityNarrative?.completed_today,
   })
 
-  const accomplishmentLine = formatOperatorDailyBriefOpening({
-    pendingDraftCount: input.pendingApprovals,
-    companiesReviewedToday: briefCounts.companiesReviewedToday,
-    strongOpportunities: briefCounts.strongOpportunities,
-    notAFit: briefCounts.notAFit,
-    needsInformation: briefCounts.needsInformation,
-  })
+  const accomplishmentLine =
+    input.pendingApprovals > 0
+      ? formatOperatorDailyBriefOpening({
+          pendingDraftCount: input.pendingApprovals,
+          companiesReviewedToday: briefCounts.companiesReviewedToday,
+          strongOpportunities: briefCounts.strongOpportunities,
+          notAFit: briefCounts.notAFit,
+          needsInformation: briefCounts.needsInformation,
+        })
+      : approvedReadyToSend > 0
+        ? `${approvedReadyToSend} approved ${approvedReadyToSend === 1 ? "email is" : "emails are"} ready to send.`
+        : formatOperatorDailyBriefOpening({
+            pendingDraftCount: input.pendingApprovals,
+            companiesReviewedToday: briefCounts.companiesReviewedToday,
+            strongOpportunities: briefCounts.strongOpportunities,
+            notAFit: briefCounts.notAFit,
+            needsInformation: briefCounts.needsInformation,
+          })
 
   const companyName = resolvePrimaryCompanyName({
     runtimeTrust: input.runtimeTrust,
@@ -183,9 +200,11 @@ export function buildGrowthHomeDailyBriefPresentation(input: {
   const recommendationLine =
     input.pendingApprovals > 0
       ? "Review the prepared outreach package."
-      : input.recommendation?.employeeHeadline?.replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "") ??
-        input.recommendation?.headline?.replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "") ??
-        null
+      : approvedReadyToSend > 0
+        ? "Send the approved outreach email when you're ready."
+        : input.recommendation?.employeeHeadline?.replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "") ??
+          input.recommendation?.headline?.replace(/^My recommendation is to /i, "").replace(/^I recommend /i, "") ??
+          null
 
   const whatHappensNextLine = input.runtimeTrust?.whatHappensNextLines[0] ?? null
 
@@ -208,15 +227,20 @@ export function buildGrowthHomeDailyBriefPresentation(input: {
 
 export function buildGrowthHomeCurrentFocusPresentation(input: {
   pendingApprovals: number
+  approvedReadyToSend?: number
   recommendation: GrowthHomeAvaRecommendationItem | null
   waitingItem: GrowthHomeWaitingOnYouItem | null
   runtimeTrust: GrowthHomeRuntimeTrustViewModel | null
+  actionableCompanyName?: string | null
+  actionableCompanyHref?: string | null
 }): GrowthHomeCurrentFocusPresentation | null {
-  const companyName = resolvePrimaryCompanyName({
-    runtimeTrust: input.runtimeTrust,
-    recommendation: input.recommendation,
-    waitingItem: input.waitingItem,
-  })
+  const companyName =
+    input.actionableCompanyName?.trim() ??
+    resolvePrimaryCompanyName({
+      runtimeTrust: input.runtimeTrust,
+      recommendation: input.recommendation,
+      waitingItem: input.waitingItem,
+    })
 
   if (!companyName) return null
 
@@ -234,17 +258,20 @@ export function buildGrowthHomeCurrentFocusPresentation(input: {
     qaMarker: GROWTH_HOME_SIMPLIFICATION_1A_QA_MARKER,
     companyName,
     companyHref:
+      input.actionableCompanyHref ??
       input.runtimeTrust?.operatorFocusHref ??
       (input.recommendation?.leadId
         ? `/growth/leads/crm?open=${input.recommendation.leadId}&focus=ai-copilot`
         : null),
     statusLabel: resolveStatusLabel({
       pendingApprovals: input.pendingApprovals,
+      approvedReadyToSend: input.approvedReadyToSend,
       runtimeTrust: input.runtimeTrust,
       recommendation: input.recommendation,
     }),
     nextActionLabel: resolveNextActionLabel({
       pendingApprovals: input.pendingApprovals,
+      approvedReadyToSend: input.approvedReadyToSend,
       recommendation: input.recommendation,
       runtimeTrust: input.runtimeTrust,
     }),
