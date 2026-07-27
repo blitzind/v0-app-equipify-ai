@@ -18,9 +18,9 @@ import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/busi
 import { EQUIPIFY_PRODUCTION_ORG_ID } from "@/lib/growth/live-operations/ge-aios-live-1b-equipify-company-profile-content"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import { GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_KEY } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+import type { GrowthPortfolioManagerMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 import { loadContinuousLeadReplenishmentObservability } from "@/lib/growth/portfolio-manager/growth-continuous-lead-replenishment-observability-1a"
 import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "@/lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a"
-import { parsePortfolioManagerMemoryFromStore } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
 import { AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { resolveGrowthLeadAdmissionIntakeSourceFromLeadMetadata } from "@/lib/growth/revenue-workflow/growth-lead-admission-lead-input"
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
       .eq("preference_key", GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_KEY)
       .maybeSingle()
     const memory = memoryRow?.statement
-      ? parsePortfolioManagerMemoryFromStore(JSON.parse(memoryRow.statement as string))
+      ? (JSON.parse(memoryRow.statement as string) as GrowthPortfolioManagerMemory)
       : null
     const sliceState = memory
       ? readDiscoverySearchSliceStateFromPortfolioMemory(memory)
