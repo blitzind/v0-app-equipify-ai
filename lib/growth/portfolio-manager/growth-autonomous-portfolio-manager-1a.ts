@@ -14,6 +14,7 @@ import {
 import { buildPortfolioManagerOperatorProjection } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-operator-projection-1a"
 import { evaluatePortfolioReplenishmentDecision } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-replenishment-1a"
 import { resolvePortfolioTargetFromBusinessProfile } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-target-1a"
+import type { DraftFactoryInventoryState } from "@/lib/growth/portfolio-manager/growth-autonomous-candidate-inventory-1a"
 import type { DatamoonAutonomousDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
@@ -35,6 +36,9 @@ export function buildGrowthPortfolioManagerSnapshot(input: {
   salesOutcomes?: SalesOutcome[]
   datamoonDiscovery?: DatamoonAutonomousDiscoveryOperatorState | null
   discoveryAlreadyRunning?: boolean
+  intakePendingPending?: boolean
+  draftFactoryStateByLeadId?: Map<string, DraftFactoryInventoryState>
+  firstTouchCompleteLeadIds?: ReadonlySet<string>
 }): GrowthPortfolioManagerSnapshot {
   const target = resolvePortfolioTargetFromBusinessProfile(input.approvedProfile)
   const memory = input.organizationalMemory
@@ -49,6 +53,8 @@ export function buildGrowthPortfolioManagerSnapshot(input: {
     approvedProfilePresent: Boolean(input.approvedProfile),
     missionDiscovery: input.missionDiscovery,
     researchingCount: input.researchingCount,
+    draftFactoryStateByLeadId: input.draftFactoryStateByLeadId,
+    firstTouchCompleteLeadIds: input.firstTouchCompleteLeadIds,
   })
 
   const replenishment = evaluatePortfolioReplenishmentDecision({
@@ -58,6 +64,7 @@ export function buildGrowthPortfolioManagerSnapshot(input: {
     generatedAt: input.generatedAt,
     discoveryAlreadyRunning:
       input.discoveryAlreadyRunning === true || input.datamoonDiscovery?.jobActive === true,
+    intakePendingPending: input.intakePendingPending === true,
   })
 
   const operator = buildPortfolioManagerOperatorProjection({

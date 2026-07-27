@@ -94,6 +94,8 @@ export type RunProspectSearchInput = {
   generated_at?: string
   /** Pin push revalidation to a completed DataMoon run — no new provider audience. */
   push_revalidation_datamoon_run_id?: string | null
+  /** AVA-DISCOVERY-SEARCH-DIVERSITY-AND-EXHAUSTION-1A */
+  discovery_search_slice_selection?: import("@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types").DatamoonDiscoverySearchSliceSelection | null
 }
 
 
@@ -252,6 +254,7 @@ export async function runProspectSearch(
           readOnlyProof: input.read_only_proof,
           discoveriesToday: input.discoveries_today,
           maximumDailyDiscovery: input.maximum_daily_discovery,
+          discoverySearchSliceSelection: input.discovery_search_slice_selection ?? null,
         })
       }
 

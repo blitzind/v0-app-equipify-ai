@@ -9,6 +9,19 @@ import {
   buildProspectSearchFiltersFromBusinessProfile,
   buildProspectSearchQueryFromBusinessProfile,
 } from "@/lib/growth/business-profile/business-profile-prospect-search-projection-1b"
+import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
+import {
+  recordDatamoonDiscoverySearchSliceOutcome,
+  selectNextDatamoonDiscoverySearchSlice,
+} from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a"
+import {
+  emptyDatamoonDiscoverySearchSliceState,
+  type DatamoonDiscoverySearchSliceSelection,
+} from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
+import {
+  mergeDiscoverySearchSliceIntoPortfolioMemory,
+  readDiscoverySearchSliceStateFromPortfolioMemory,
+} from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-state-1a"
 import {
   portfolioManagerMemoryPreferencePayload,
   recordPortfolioDiscoveryMemory,
@@ -329,6 +342,43 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   const query = buildProspectSearchQueryFromBusinessProfile(input.approvedProfile, input.companyName)
   const filters = buildProspectSearchFiltersFromBusinessProfile(input.approvedProfile)
 
+  let workingMemory = input.memory
+  let discoverySearchSliceSelection: DatamoonDiscoverySearchSliceSelection | null = null
+
+  if (executionAction === "start_new") {
+    const projection = projectApprovedBusinessProfileToLeadDiscovery(
+      input.approvedProfile,
+      input.companyName,
+    )
+    const sliceState =
+      readDiscoverySearchSliceStateFromPortfolioMemory(workingMemory) ??
+      emptyDatamoonDiscoverySearchSliceState()
+    discoverySearchSliceSelection = selectNextDatamoonDiscoverySearchSlice({
+      projection,
+      state: sliceState,
+      generatedAt: input.generatedAt,
+    })
+    workingMemory = mergeDiscoverySearchSliceIntoPortfolioMemory(workingMemory, {
+      ...sliceState,
+      currentSliceKey: discoverySearchSliceSelection.sliceKey,
+      lastSliceSelectionAt: input.generatedAt,
+    })
+    workingMemory = {
+      ...workingMemory,
+      lastDiscoverySearchSliceSelection: discoverySearchSliceSelection,
+    }
+    await upsertOrganizationMemoryPreferences(admin, {
+      organizationId: input.organizationId,
+      preferences: [
+        portfolioManagerMemoryPreferencePayload(
+          input.organizationId,
+          workingMemory,
+          input.generatedAt,
+        ),
+      ],
+    }).catch(() => 0)
+  }
+
   const search = await runProspectSearch(admin, {
     query,
     filters,
@@ -337,13 +387,14 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     organization_id: input.organizationId,
     approved_profile: input.approvedProfile,
     company_name: input.companyName,
-    discoveries_today: input.memory.discoveriesToday,
+    discoveries_today: workingMemory.discoveriesToday,
     maximum_daily_discovery: input.maximumDailyDiscovery,
     generated_at: input.generatedAt,
     limit: batchSize,
     page_size: batchSize,
     result_mode: "queue",
     created_by: input.createdBy ?? null,
+    discovery_search_slice_selection: discoverySearchSliceSelection,
   })
 
   const datamoon = readDatamoonPortfolioSearchSignals(search)
@@ -443,7 +494,7 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   }
 
   const updatedMemory = recordPortfolioDiscoveryMemory({
-    memory: input.memory,
+    memory: workingMemory,
     generatedAt: input.generatedAt,
     discoveredCount: push.pushed,
     qualityScore: push.pushed > 0 ? Math.min(100, 60 + push.pushed) : null,
@@ -453,12 +504,30 @@ export async function runAutonomousPortfolioDiscoveryBatch(
         : null,
   })
 
+  let memoryToPersist = updatedMemory
+  const sliceSelectionForOutcome =
+    discoverySearchSliceSelection ?? workingMemory.lastDiscoverySearchSliceSelection ?? null
+  if (sliceSelectionForOutcome && selected.length > 0) {
+    const priorSliceState =
+      readDiscoverySearchSliceStateFromPortfolioMemory(updatedMemory) ??
+      emptyDatamoonDiscoverySearchSliceState()
+    const nextSliceState = recordDatamoonDiscoverySearchSliceOutcome({
+      state: priorSliceState,
+      selection: sliceSelectionForOutcome,
+      generatedAt: input.generatedAt,
+      selectedCount: selected.length,
+      pushedCount: push.pushed,
+      existingCount: push.already_exists,
+    })
+    memoryToPersist = mergeDiscoverySearchSliceIntoPortfolioMemory(updatedMemory, nextSliceState)
+  }
+
   await upsertOrganizationMemoryPreferences(admin, {
     organizationId: input.organizationId,
     preferences: [
       portfolioManagerMemoryPreferencePayload(
         input.organizationId,
-        updatedMemory,
+        memoryToPersist,
         input.generatedAt,
       ),
     ],

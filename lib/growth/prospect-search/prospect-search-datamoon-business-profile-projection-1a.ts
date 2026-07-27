@@ -16,6 +16,8 @@ import {
   translateDatamoonOperationalModelTargeting,
   type DatamoonOperationalTargetingStrategyMetadata,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
+import type { DatamoonDiscoverySearchSliceSelection } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
+import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import {
   AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
@@ -37,7 +39,37 @@ export type DatamoonAutonomousDiscoveryRequestProjection = {
     supportedServiceVerticalCount?: number
     targetingStrategy?: DatamoonOperationalTargetingStrategyMetadata
     firmographicStrategy?: DatamoonFirmographicFilterStrategyMetadata
+    discoverySearchSlice?: Pick<
+      DatamoonDiscoverySearchSliceSelection,
+      | "sliceKey"
+      | "clusterId"
+      | "geoBucketId"
+      | "geoBucketLabel"
+      | "topicVariantIndex"
+      | "selectionReason"
+    > | null
   }
+}
+
+function applyDiscoveryGeoBucketFilters(
+  filters: DatamoonAudienceFilter[],
+  searchSlice?: DatamoonDiscoverySearchSliceSelection | null,
+): DatamoonAudienceFilter[] {
+  if (!searchSlice?.stateCodes.length) return filters
+
+  const withoutGeo = filters.filter(
+    (row) => row.field !== "state" && row.field !== "country" && row.field !== "city",
+  )
+
+  return [
+    { field: "country", operator: "=", value: "United States" },
+    {
+      field: "state",
+      operator: "in",
+      value: [...searchSlice.stateCodes],
+    },
+    ...withoutGeo,
+  ]
 }
 
 function hashFingerprint(parts: string[]): string {
@@ -69,15 +101,19 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
   batchSize: number
   generatedAt: string
   audienceOrdinal?: number
+  searchSlice?: DatamoonDiscoverySearchSliceSelection | null
 }): DatamoonAutonomousDiscoveryRequestProjection {
   const projection = projectApprovedBusinessProfileToLeadDiscovery(
     input.profile,
     input.companyName,
   )
+  const searchSlice = input.searchSlice ?? null
   const operationalTargeting = translateDatamoonOperationalModelTargeting({
     projection,
     organizationId: input.organizationId,
     audienceOrdinal: input.audienceOrdinal ?? 0,
+    clusterRotationIndex: searchSlice?.clusterRotationIndex,
+    topicVariantIndex: searchSlice?.topicVariantIndex ?? 0,
   })
   const targetingStrategy = buildDatamoonOperationalTargetingStrategyMetadata(operationalTargeting)
   const firmographicStrategy = buildDatamoonFirmographicFilterStrategyMetadata({
@@ -99,9 +135,9 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
   })
 
   const request = buildDatamoonImportRequestFromAudienceDraft(draft)
-  request.filters = mergeDatamoonAudienceFiltersPreservingProviderFields(
-    request.filters,
-    firmographicFilters,
+  request.filters = applyDiscoveryGeoBucketFilters(
+    mergeDatamoonAudienceFiltersPreservingProviderFields(request.filters, firmographicFilters),
+    searchSlice,
   )
   request.run_name = `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:${input.generatedAt.slice(0, 10)}`
   request.limit = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
@@ -117,11 +153,25 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
       supplementalAliases: operationalTargeting.industryAliasesUsed,
       clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
     },
+    ...(searchSlice
+      ? {
+          discoverySearchSlice: {
+            sliceKey: searchSlice.sliceKey,
+            clusterId: searchSlice.clusterId,
+            geoBucketId: searchSlice.geoBucketId,
+            geoBucketLabel: searchSlice.geoBucketLabel,
+            topicVariantIndex: searchSlice.topicVariantIndex,
+            selectionReason: searchSlice.selectionReason,
+          },
+        }
+      : {}),
   }
 
   const fingerprint = hashFingerprint([
     input.organizationId,
     String(input.audienceOrdinal ?? 0),
+    searchSlice?.sliceKey ?? "no-slice",
+    String(searchSlice?.topicVariantIndex ?? 0),
     operationalTargeting.operationalCluster,
     operationalTargeting.selectedVerticalIds.join("|"),
     operationalTargeting.topicPhrases.join("|"),
@@ -155,6 +205,16 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
       equipmentServiceFocus: equipmentServiceFocus(input.profile),
       targetingStrategy,
       firmographicStrategy,
+      discoverySearchSlice: searchSlice
+        ? {
+            sliceKey: searchSlice.sliceKey,
+            clusterId: searchSlice.clusterId,
+            geoBucketId: searchSlice.geoBucketId,
+            geoBucketLabel: searchSlice.geoBucketLabel,
+            topicVariantIndex: searchSlice.topicVariantIndex,
+            selectionReason: searchSlice.selectionReason,
+          }
+        : null,
     },
   }
 }

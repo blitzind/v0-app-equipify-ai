@@ -57,7 +57,7 @@ export function buildPortfolioManagerOperatorProjection(input: {
   return {
     qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     targetActiveCompanies: input.target.targetActiveCompanies,
-    currentActiveCompanies: input.health.counts.activeCompanies,
+    currentActiveCompanies: input.health.counts.activeCandidateInventory,
     minimumHealthyCompanies: input.target.minimumHealthyCompanies,
     needsCount: input.health.needsCount,
     healthState: input.health.healthState,

@@ -276,7 +276,19 @@ function pickWeightedTopicPhrases(input: {
   adjacentPhrases: readonly string[]
   operationalConcepts: readonly string[]
   existingKeys: Set<string>
+  topicVariantIndex?: number
 }): string[] {
+  const rotate = <T>(values: readonly T[], offset: number): T[] => {
+    if (values.length === 0) return []
+    const normalizedOffset = ((offset % values.length) + values.length) % values.length
+    return [...values.slice(normalizedOffset), ...values.slice(0, normalizedOffset)]
+  }
+
+  const variantIndex = Math.max(0, Math.floor(input.topicVariantIndex ?? 0))
+  const primaryPool = rotate(input.primaryPhrases, variantIndex)
+  const adjacentPool = rotate(input.adjacentPhrases, variantIndex)
+  const conceptPool = rotate(input.operationalConcepts, variantIndex)
+
   const selected: string[] = []
   const addFromPool = (pool: readonly string[], limit: number) => {
     for (const phrase of pool) {
@@ -290,18 +302,18 @@ function pickWeightedTopicPhrases(input: {
     }
   }
 
-  addFromPool(input.primaryPhrases, 3)
-  addFromPool(input.adjacentPhrases, 1)
-  addFromPool(input.operationalConcepts, 1)
+  addFromPool(primaryPool, 3)
+  addFromPool(adjacentPool, 1)
+  addFromPool(conceptPool, 1)
 
   if (selected.length < DATAMOON_MAX_TOPIC_IDS) {
-    addFromPool(input.primaryPhrases.slice(3), DATAMOON_MAX_TOPIC_IDS - selected.length)
+    addFromPool(primaryPool.slice(3), DATAMOON_MAX_TOPIC_IDS - selected.length)
   }
   if (selected.length < DATAMOON_MAX_TOPIC_IDS) {
-    addFromPool(input.adjacentPhrases.slice(1), DATAMOON_MAX_TOPIC_IDS - selected.length)
+    addFromPool(adjacentPool.slice(1), DATAMOON_MAX_TOPIC_IDS - selected.length)
   }
   if (selected.length < DATAMOON_MAX_TOPIC_IDS) {
-    addFromPool(input.operationalConcepts, DATAMOON_MAX_TOPIC_IDS - selected.length)
+    addFromPool(conceptPool, DATAMOON_MAX_TOPIC_IDS - selected.length)
   }
 
   return selected.slice(0, DATAMOON_MAX_TOPIC_IDS)
@@ -327,12 +339,20 @@ export function translateDatamoonOperationalModelTargeting(input: {
   projection: BusinessProfileLeadDiscoveryProjection
   organizationId: string
   audienceOrdinal?: number
+  clusterRotationIndex?: number
+  topicVariantIndex?: number
 }): DatamoonOperationalTargetingTranslation {
   const availableClusters = resolveAvailableOperationalVerticalClusters(input.projection)
-  const rotationIndex = resolveOperationalClusterRotationIndex({
-    audienceOrdinal: input.audienceOrdinal ?? 0,
-    clusterCount: availableClusters.length,
-  })
+  const rotationIndex =
+    input.clusterRotationIndex !== undefined
+      ? resolveOperationalClusterRotationIndex({
+          audienceOrdinal: input.clusterRotationIndex,
+          clusterCount: availableClusters.length,
+        })
+      : resolveOperationalClusterRotationIndex({
+          audienceOrdinal: input.audienceOrdinal ?? 0,
+          clusterCount: availableClusters.length,
+        })
   const primaryCluster = availableClusters[rotationIndex]!
   const adjacentCluster = availableClusters[(rotationIndex + 1) % availableClusters.length]!
 
@@ -347,6 +367,7 @@ export function translateDatamoonOperationalModelTargeting(input: {
     adjacentPhrases,
     operationalConcepts,
     existingKeys,
+    topicVariantIndex: input.topicVariantIndex ?? 0,
   })
   for (const phrase of topicPhrases) existingKeys.add(normalizeKey(phrase))
 

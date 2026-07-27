@@ -52,6 +52,18 @@ export function parsePortfolioManagerMemoryFromStore(
         typeof parsed.averageResearchSuccessRate === "number"
           ? parsed.averageResearchSuccessRate
           : null,
+      discoverySearchSliceState:
+        parsed.discoverySearchSliceState &&
+        typeof parsed.discoverySearchSliceState === "object" &&
+        (parsed.discoverySearchSliceState as { qaMarker?: string }).qaMarker ===
+          "ava-discovery-search-diversity-and-exhaustion-1a-v1"
+          ? (parsed.discoverySearchSliceState as GrowthPortfolioManagerMemory["discoverySearchSliceState"])
+          : null,
+      lastDiscoverySearchSliceSelection:
+        parsed.lastDiscoverySearchSliceSelection &&
+        typeof parsed.lastDiscoverySearchSliceSelection === "object"
+          ? (parsed.lastDiscoverySearchSliceSelection as GrowthPortfolioManagerMemory["lastDiscoverySearchSliceSelection"])
+          : null,
     }
   } catch {
     return empty
@@ -85,6 +97,8 @@ export function recordPortfolioDiscoveryMemory(input: {
     averageAdmissionRate: input.admissionRate ?? input.memory.averageAdmissionRate,
     averageQualificationRate: input.memory.averageQualificationRate,
     averageResearchSuccessRate: input.memory.averageResearchSuccessRate,
+    discoverySearchSliceState: input.memory.discoverySearchSliceState ?? null,
+    lastDiscoverySearchSliceSelection: input.memory.lastDiscoverySearchSliceSelection ?? null,
   }
 }
 

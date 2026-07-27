@@ -9,6 +9,8 @@ import { buildGrowthAutonomousPortfolioWorkSnapshot } from "@/lib/growth/special
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 import { buildGrowthPortfolioManagerSnapshot } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a"
 import { loadPortfolioDatamoonDiscoveryOperatorState } from "@/lib/growth/prospect-search/prospect-search-datamoon-discovery-state-loader-1a"
+import { findLatestIntakePendingAutonomousProspectSearchDatamoonRun } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-lifecycle-1a"
+import type { DraftFactoryInventoryState } from "@/lib/growth/portfolio-manager/growth-autonomous-candidate-inventory-1a"
 import { tickAutonomousPortfolioDiscoveryReplenishment } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a"
 import type { AutonomousPortfolioDiscoveryTickResult } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a"
 import { GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
@@ -93,6 +95,29 @@ export async function tickAutonomousPortfolioManagerForScheduler(
   }
 }
 
+async function loadDraftFactoryInventoryStatesForOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<Map<string, DraftFactoryInventoryState>> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("draft_factory_lead_states")
+    .select("lead_id, state, paused_reason")
+    .eq("organization_id", organizationId)
+
+  if (error) return new Map()
+
+  return new Map(
+    (data ?? []).map((row) => [
+      String(row.lead_id),
+      {
+        state: String(row.state),
+        pausedReason: (row.paused_reason as string | null) ?? null,
+      },
+    ]),
+  )
+}
+
 async function runPortfolioOrganizationTick(
   admin: SupabaseClient,
   input: {
@@ -101,10 +126,15 @@ async function runPortfolioOrganizationTick(
   },
 ): Promise<AutonomousPortfolioDiscoveryTickResult> {
   const { organizationId, generatedAt } = input
-  const [snapshot, approvedProfileRow, missionDiscovery] = await Promise.all([
+  const [snapshot, approvedProfileRow, missionDiscovery, draftFactoryStateByLeadId, intakePendingRun] =
+    await Promise.all([
     buildGrowthAutonomousPortfolioWorkSnapshot(admin, { organizationId, generatedAt }),
     getActiveApprovedBusinessProfile(admin, organizationId).catch(() => null),
     loadGrowthHomeMissionDiscoverySnapshot(admin, { organizationId }).catch(() => null),
+    loadDraftFactoryInventoryStatesForOrganization(admin, organizationId),
+    findLatestIntakePendingAutonomousProspectSearchDatamoonRun(admin, organizationId).catch(
+      () => null,
+    ),
   ])
 
   if (!snapshot) {
@@ -129,6 +159,8 @@ async function runPortfolioOrganizationTick(
     approvedProfile: approvedProfileRow?.profile ?? null,
     organizationalMemory: snapshot.organizationalMemory.store,
     missionDiscovery,
+    draftFactoryStateByLeadId,
+    intakePendingPending: Boolean(intakePendingRun),
   })
 
   const datamoonDiscovery = await loadPortfolioDatamoonDiscoveryOperatorState(admin, {
@@ -147,6 +179,8 @@ async function runPortfolioOrganizationTick(
     organizationalMemory: snapshot.organizationalMemory.store,
     missionDiscovery,
     datamoonDiscovery,
+    draftFactoryStateByLeadId,
+    intakePendingPending: Boolean(intakePendingRun),
     discoveryAlreadyRunning: datamoonDiscovery.jobActive,
   })
 

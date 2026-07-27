@@ -3,6 +3,10 @@
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 import { evaluateGrowthPortfolioLeadEligibility } from "@/lib/growth/portfolio-eligibility/growth-portfolio-eligibility-1a"
 import {
+  buildActiveCandidateInventorySnapshot,
+  type DraftFactoryInventoryState,
+} from "@/lib/growth/portfolio-manager/growth-autonomous-candidate-inventory-1a"
+import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
   type GrowthPortfolioHealthCounts,
   type GrowthPortfolioHealthReadModel,
@@ -15,6 +19,7 @@ import type { GrowthLead } from "@/lib/growth/types"
 function emptyCounts(): GrowthPortfolioHealthCounts {
   return {
     activeCompanies: 0,
+    activeCandidateInventory: 0,
     researching: 0,
     awaitingAdmission: 0,
     awaitingReview: 0,
@@ -27,14 +32,14 @@ function emptyCounts(): GrowthPortfolioHealthCounts {
 }
 
 function resolveHealthState(input: {
-  activeCompanies: number
+  activeCandidateInventory: number
   minimumHealthyCompanies: number
   approvedProfilePresent: boolean
 }): GrowthPortfolioHealthState {
   if (!input.approvedProfilePresent) return "operator_intervention_required"
-  if (input.activeCompanies >= input.minimumHealthyCompanies) return "healthy"
+  if (input.activeCandidateInventory >= input.minimumHealthyCompanies) return "healthy"
   const criticalThreshold = Math.max(1, Math.floor(input.minimumHealthyCompanies * 0.25))
-  if (input.activeCompanies <= criticalThreshold) return "critically_low"
+  if (input.activeCandidateInventory <= criticalThreshold) return "critically_low"
   return "needs_replenishment"
 }
 
@@ -44,9 +49,20 @@ export function buildPortfolioHealthCountsFromLeads(input: {
   eligibleLeadCount: number
   researchingCount?: number
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
+  draftFactoryStateByLeadId?: Map<string, DraftFactoryInventoryState>
+  firstTouchCompleteLeadIds?: ReadonlySet<string>
 }): GrowthPortfolioHealthCounts {
   const counts = emptyCounts()
   counts.activeCompanies = input.eligibleLeadCount
+
+  const inventory = buildActiveCandidateInventorySnapshot({
+    organizationId: input.organizationId,
+    leads: input.leads,
+    eligibleLeadCount: input.eligibleLeadCount,
+    draftFactoryStateByLeadId: input.draftFactoryStateByLeadId,
+    firstTouchCompleteLeadIds: input.firstTouchCompleteLeadIds,
+  })
+  counts.activeCandidateInventory = inventory.activeCandidateCount
 
   for (const lead of input.leads) {
     const status = lead.status?.trim().toLowerCase() ?? ""
@@ -93,8 +109,8 @@ export function buildPortfolioHealthCountsFromLeads(input: {
     input.missionDiscovery?.counters.researchingCount ??
     0
 
-  const target = input.missionDiscovery?.leadPoolVisible ?? counts.activeCompanies
-  counts.discoveryRemaining = Math.max(0, target - counts.activeCompanies)
+  const target = input.missionDiscovery?.leadPoolVisible ?? counts.activeCandidateInventory
+  counts.discoveryRemaining = Math.max(0, target - counts.activeCandidateInventory)
 
   return counts
 }
@@ -107,6 +123,8 @@ export function buildPortfolioHealthReadModel(input: {
   approvedProfilePresent: boolean
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   researchingCount?: number
+  draftFactoryStateByLeadId?: Map<string, DraftFactoryInventoryState>
+  firstTouchCompleteLeadIds?: ReadonlySet<string>
 }): GrowthPortfolioHealthReadModel {
   const counts = buildPortfolioHealthCountsFromLeads({
     organizationId: input.organizationId,
@@ -114,10 +132,12 @@ export function buildPortfolioHealthReadModel(input: {
     eligibleLeadCount: input.eligibleLeadCount,
     researchingCount: input.researchingCount,
     missionDiscovery: input.missionDiscovery,
+    draftFactoryStateByLeadId: input.draftFactoryStateByLeadId,
+    firstTouchCompleteLeadIds: input.firstTouchCompleteLeadIds,
   })
 
   const healthState = resolveHealthState({
-    activeCompanies: counts.activeCompanies,
+    activeCandidateInventory: counts.activeCandidateInventory,
     minimumHealthyCompanies: input.target.minimumHealthyCompanies,
     approvedProfilePresent: input.approvedProfilePresent,
   })
@@ -136,7 +156,7 @@ export function buildPortfolioHealthReadModel(input: {
     qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     healthState,
     counts,
-    needsCount: Math.max(0, input.target.targetActiveCompanies - counts.activeCompanies),
+    needsCount: Math.max(0, input.target.targetActiveCompanies - counts.activeCandidateInventory),
     approvedProfilePresent: input.approvedProfilePresent,
     discoveryRunning,
     researchRunning,

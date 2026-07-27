@@ -39,6 +39,8 @@ export type GrowthPortfolioHealthState =
 
 export type GrowthPortfolioHealthCounts = {
   activeCompanies: number
+  /** Early-funnel candidates that should satisfy replenishment inventory — not total pool size. */
+  activeCandidateInventory: number
   researching: number
   awaitingAdmission: number
   awaitingReview: number
@@ -70,6 +72,10 @@ export type GrowthPortfolioManagerMemory = {
   averageAdmissionRate: number | null
   averageQualificationRate: number | null
   averageResearchSuccessRate: number | null
+  /** AVA-DISCOVERY-SEARCH-DIVERSITY-AND-EXHAUSTION-1A — slice exhaustion + novelty tracking. */
+  discoverySearchSliceState?: import("@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types").DatamoonDiscoverySearchSliceState | null
+  /** Last slice selection snapshot for observability. */
+  lastDiscoverySearchSliceSelection?: import("@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types").DatamoonDiscoverySearchSliceSelection | null
 }
 
 export type GrowthPortfolioReplenishmentDecision = {
@@ -77,9 +83,13 @@ export type GrowthPortfolioReplenishmentDecision = {
   shouldReplenish: boolean
   /** When true, an active DataMoon job exists and must be polled via Prospect Search — not restarted. */
   shouldResumeActiveDiscovery: boolean
+  /** When true, a completed provider run awaits portfolio intake promotion. */
+  shouldResumeIntakePending: boolean
   batchSize: number
   /** Batch size used when resuming an active DataMoon job (may differ when portfolio is healthy). */
   resumeBatchSize: number
+  /** Batch size when promoting intake-pending provider survivors. */
+  intakePendingBatchSize: number
   reason: string | null
   blockedByDailyLimit: boolean
   blockedByQueueLimit: boolean

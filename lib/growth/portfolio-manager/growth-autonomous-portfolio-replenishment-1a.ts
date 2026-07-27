@@ -21,6 +21,7 @@ export function evaluatePortfolioReplenishmentDecision(input: {
   memory: GrowthPortfolioManagerMemory
   generatedAt: string
   discoveryAlreadyRunning?: boolean
+  intakePendingPending?: boolean
 }): GrowthPortfolioReplenishmentDecision {
   const today = input.generatedAt.slice(0, 10)
   const discoveriesToday = sameUtcDay(input.memory.discoveriesTodayDate, today)
@@ -34,14 +35,15 @@ export function evaluatePortfolioReplenishmentDecision(input: {
     input.health.counts.researching >= input.target.maximumConcurrentResearch
 
   const duplicateDiscoveryPrevented = input.discoveryAlreadyRunning === true
+  const shouldResumeIntakePending = input.intakePendingPending === true
 
   const gapToHealthy = Math.max(
     0,
-    input.target.minimumHealthyCompanies - input.health.counts.activeCompanies,
+    input.target.minimumHealthyCompanies - input.health.counts.activeCandidateInventory,
   )
   const gapToTarget = Math.max(
     0,
-    input.target.targetActiveCompanies - input.health.counts.activeCompanies,
+    input.target.targetActiveCompanies - input.health.counts.activeCandidateInventory,
   )
   const need = Math.max(gapToHealthy, gapToTarget > 0 ? Math.min(gapToTarget, input.target.replenishBatchSize) : 0)
 
@@ -64,11 +66,17 @@ export function evaluatePortfolioReplenishmentDecision(input: {
       : Math.min(input.target.replenishBatchSize, remainingDaily || input.target.replenishBatchSize)
     : 0
 
+  const intakePendingBatchSize = shouldResumeIntakePending
+    ? Math.min(input.target.replenishBatchSize, remainingDaily || input.target.replenishBatchSize)
+    : 0
+
   let reason: string | null = null
   if (!input.health.approvedProfilePresent) {
     reason = "Approved Business Profile required before autonomous discovery."
+  } else if (shouldResumeIntakePending) {
+    reason = "Resume intake-pending DataMoon survivors into canonical lead intake."
   } else if (input.health.healthState === "healthy") {
-    reason = "Portfolio is healthy."
+    reason = "Active candidate inventory is healthy."
   } else if (duplicateDiscoveryPrevented) {
     reason = "Discovery already running."
   } else if (blockedByDailyLimit) {
@@ -87,8 +95,10 @@ export function evaluatePortfolioReplenishmentDecision(input: {
     qaMarker: GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
     shouldReplenish,
     shouldResumeActiveDiscovery,
+    shouldResumeIntakePending,
     batchSize: shouldReplenish ? plannedBatchSize : 0,
     resumeBatchSize,
+    intakePendingBatchSize,
     reason,
     blockedByDailyLimit,
     blockedByQueueLimit,
@@ -104,6 +114,14 @@ export function resolveAutonomousPortfolioDiscoveryExecutionPlan(
   batchSize: number
   reason: string | null
 } {
+  if (replenishment.shouldResumeIntakePending && replenishment.intakePendingBatchSize > 0) {
+    return {
+      action: "resume_intake_pending",
+      batchSize: replenishment.intakePendingBatchSize,
+      reason: replenishment.reason,
+    }
+  }
+
   if (replenishment.shouldResumeActiveDiscovery && replenishment.resumeBatchSize > 0) {
     return {
       action: "resume_active",

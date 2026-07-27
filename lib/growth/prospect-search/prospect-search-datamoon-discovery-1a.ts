@@ -20,10 +20,10 @@ import {
   evaluateAutonomousProspectDiscoveryProviderPolicy,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
 import { buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile } from "@/lib/growth/prospect-search/prospect-search-datamoon-business-profile-projection-1a"
+import type { DatamoonDiscoverySearchSliceSelection } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
 import {
   attachAutonomousProspectSearchDatamoonMetadata,
   buildAutonomousProspectSearchDatamoonProviderMetadata,
-  countAutonomousProspectSearchDatamoonRunsForOrganization,
   findActiveAutonomousProspectSearchDatamoonRun,
   findLatestIntakePendingAutonomousProspectSearchDatamoonRun,
   isDatamoonAutonomousDiscoveryRunActive,
@@ -66,6 +66,8 @@ export type RunProspectSearchDatamoonAutonomousDiscoveryInput = {
   readOnlyProof?: boolean
   discoveriesToday?: number
   maximumDailyDiscovery?: number
+  /** AVA-DISCOVERY-SEARCH-DIVERSITY-AND-EXHAUSTION-1A — pre-selected slice for new runs. */
+  discoverySearchSliceSelection?: DatamoonDiscoverySearchSliceSelection | null
 }
 
 export type DatamoonProspectSearchNormalizationStats = {
@@ -531,10 +533,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     maximumDailyDiscovery: input.maximumDailyDiscovery,
   })
 
-  const audienceOrdinal = await countAutonomousProspectSearchDatamoonRunsForOrganization(
-    admin,
-    input.organizationId,
-  )
+  const audienceOrdinal = input.discoverySearchSliceSelection?.clusterRotationIndex ?? 0
 
   const projection = buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile({
     profile: input.approvedProfile,
@@ -543,6 +542,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     batchSize: input.limit,
     generatedAt: input.generatedAt,
     audienceOrdinal,
+    searchSlice: input.discoverySearchSliceSelection ?? null,
   })
 
   if (!policy.eligible && policy.stopReason) {
@@ -596,6 +596,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
             targeting_summary: projection.targetingSummary,
             targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
             firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
+            discovery_search_slice: input.discoverySearchSliceSelection ?? null,
           },
         ),
       },
@@ -638,6 +639,7 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     targeting_summary: projection.targetingSummary,
     targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
     firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
+    discovery_search_slice: input.discoverySearchSliceSelection ?? null,
   })
 
   logGrowthEngine("prospect_search_datamoon_autonomous_discovery_started", {
