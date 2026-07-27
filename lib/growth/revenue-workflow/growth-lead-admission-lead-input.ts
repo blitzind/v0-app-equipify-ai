@@ -2,6 +2,52 @@
 
 import { normalizeDomain } from "@/lib/growth/company-identification/company-identification-normalize"
 import type { GrowthLeadAdmissionIntakeInput } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import {
+  LEAD_INTAKE_SOURCES,
+  type LeadIntakeSource,
+} from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
+
+export const AVA_CROSSWALK_E2E_AUTONOMY_1A_ADMISSION_INTAKE_SOURCE_QA_MARKER =
+  "ava-crosswalk-e2e-autonomy-1a-admission-intake-source-v1" as const
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function isLeadIntakeSource(value: string): value is LeadIntakeSource {
+  return (LEAD_INTAKE_SOURCES as readonly string[]).includes(value)
+}
+
+/** Rehydrate intake source from persisted lead metadata when unified_intake_source was not written. */
+export function resolveGrowthLeadAdmissionIntakeSourceFromLeadMetadata(
+  metadata: Record<string, unknown>,
+): LeadIntakeSource {
+  const unified = asString(metadata.unified_intake_source)
+  if (unified && isLeadIntakeSource(unified)) return unified
+
+  const normalized = asString(metadata.normalized_source)
+  if (normalized && isLeadIntakeSource(normalized)) return normalized
+
+  const lineage =
+    metadata.source_lineage && typeof metadata.source_lineage === "object"
+      ? (metadata.source_lineage as Record<string, unknown>)
+      : null
+  const lineageSource = asString(lineage?.intake_source)
+  if (lineageSource && isLeadIntakeSource(lineageSource)) return lineageSource
+
+  const siteKey = asString(metadata.intake_site_key) || asString(metadata.intakeSiteKey)
+  if (siteKey === "prospect_search_external_discovery") return "datamoon"
+
+  if (metadata.datamoon && typeof metadata.datamoon === "object") return "datamoon"
+
+  const prospectSearch =
+    metadata.prospect_search && typeof metadata.prospect_search === "object"
+      ? (metadata.prospect_search as Record<string, unknown>)
+      : null
+  if (asString(prospectSearch?.source_type) === "external_discovered") return "datamoon"
+
+  return "manual"
+}
 
 export type GrowthLeadAdmissionLeadRow = {
   id: string
@@ -32,10 +78,7 @@ export function buildGrowthLeadAdmissionIntakeFromLead(
     email: lead.contact_email ?? null,
     contactName: lead.contact_name ?? null,
     identityUncertain: metadata.identity_uncertain === true,
-    source:
-      typeof metadata.unified_intake_source === "string"
-        ? (metadata.unified_intake_source as GrowthLeadAdmissionIntakeInput["source"])
-        : "manual",
+    source: resolveGrowthLeadAdmissionIntakeSourceFromLeadMetadata(metadata),
     metadata: {
       ...metadata,
       business_email:
