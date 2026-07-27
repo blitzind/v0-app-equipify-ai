@@ -16,6 +16,7 @@ import {
   type DatamoonDiscoverySearchSliceOutcome,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
 import {
+  isTrustworthyCompletedDatamoonSearchForSliceOutcome,
   recordDatamoonDiscoverySearchSliceOutcome,
   selectNextDatamoonDiscoverySearchSlice,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a"
@@ -62,6 +63,7 @@ function lowNoveltyOutcome(input: {
     lastPushedCount: 0,
     lastExistingCount: 21,
     lastNoveltyRate: 0,
+    lastOutcomeKind: "duplicate_exhaustion",
     consecutiveLowNoveltyRuns: input.consecutiveLowNoveltyRuns,
     exhaustedUntil: null,
   }
@@ -341,7 +343,7 @@ async function main(): Promise<void> {
     )
   })
 
-  runGate("13. provider failure does not mark slice exhausted from tiny sample", () => {
+  runGate("13. completed zero-result counts as low novelty but does not immediately exhaust", () => {
     const sliceKey = "biomedical_imaging:us_midwest"
     const state = recordDatamoonDiscoverySearchSliceOutcome({
       state: emptyDatamoonDiscoverySearchSliceState(),
@@ -355,10 +357,20 @@ async function main(): Promise<void> {
       selectedCount: 0,
       pushedCount: 0,
       existingCount: 0,
+      rawCompanyCount: 0,
     })
     const outcome = state.slices[sliceKey]
-    assert.equal(outcome.consecutiveLowNoveltyRuns, 0)
+    assert.equal(outcome.consecutiveLowNoveltyRuns, 1)
+    assert.equal(outcome.lastOutcomeKind, "zero_provider_results")
     assert.equal(outcome.exhaustedUntil, null)
+    assert.equal(
+      isTrustworthyCompletedDatamoonSearchForSliceOutcome({
+        datamoonJobActive: false,
+        datamoonStopReason: "datamoon_disabled",
+        datamoonRunId: null,
+      }),
+      false,
+    )
   })
 
   runGate("14. no approval/send in discovery slice path (source)", () => {

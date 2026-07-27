@@ -11,6 +11,7 @@ import {
 } from "@/lib/growth/business-profile/business-profile-prospect-search-projection-1b"
 import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
 import {
+  isTrustworthyCompletedDatamoonSearchForSliceOutcome,
   recordDatamoonDiscoverySearchSliceOutcome,
   selectNextDatamoonDiscoverySearchSlice,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a"
@@ -264,6 +265,47 @@ async function terminalizeAutonomousRunIntakeIfEligible(
   return true
 }
 
+async function persistPortfolioDiscoverySliceOutcome(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    generatedAt: string
+    memory: GrowthPortfolioManagerMemory
+    sliceSelection: DatamoonDiscoverySearchSliceSelection
+    selectedCount: number
+    pushedCount: number
+    existingCount: number
+    rawCompanyCount?: number
+    normalizedCompanyCount?: number
+  },
+): Promise<GrowthPortfolioManagerMemory> {
+  const priorSliceState =
+    readDiscoverySearchSliceStateFromPortfolioMemory(input.memory) ??
+    emptyDatamoonDiscoverySearchSliceState()
+  const nextSliceState = recordDatamoonDiscoverySearchSliceOutcome({
+    state: priorSliceState,
+    selection: input.sliceSelection,
+    generatedAt: input.generatedAt,
+    selectedCount: input.selectedCount,
+    pushedCount: input.pushedCount,
+    existingCount: input.existingCount,
+    rawCompanyCount: input.rawCompanyCount,
+    normalizedCompanyCount: input.normalizedCompanyCount,
+  })
+  const memoryToPersist = mergeDiscoverySearchSliceIntoPortfolioMemory(input.memory, nextSliceState)
+  await upsertOrganizationMemoryPreferences(admin, {
+    organizationId: input.organizationId,
+    preferences: [
+      portfolioManagerMemoryPreferencePayload(
+        input.organizationId,
+        memoryToPersist,
+        input.generatedAt,
+      ),
+    ],
+  }).catch(() => 0)
+  return memoryToPersist
+}
+
 function buildPortfolioDiscoveryTickResult(input: {
   organizationId: string
   ran: boolean
@@ -438,8 +480,48 @@ export async function runAutonomousPortfolioDiscoveryBatch(
     company_name: company.company_name,
   }))
 
+  const sliceSelectionForOutcome =
+    discoverySearchSliceSelection ?? workingMemory.lastDiscoverySearchSliceSelection ?? null
+
+  async function maybePersistSliceOutcome(outcome: {
+    selectedCount: number
+    pushedCount: number
+    existingCount: number
+    intakeTerminalized?: boolean
+  }): Promise<GrowthPortfolioManagerMemory> {
+    if (
+      !sliceSelectionForOutcome ||
+      !isTrustworthyCompletedDatamoonSearchForSliceOutcome({
+        datamoonJobActive: datamoon.datamoonJobActive,
+        datamoonStopReason: datamoon.datamoonStopReason,
+        datamoonRunId: datamoon.datamoonRunId,
+        intakeTerminalized: outcome.intakeTerminalized,
+      })
+    ) {
+      return workingMemory
+    }
+
+    return persistPortfolioDiscoverySliceOutcome(admin, {
+      organizationId: input.organizationId,
+      generatedAt: input.generatedAt,
+      memory: workingMemory,
+      sliceSelection: sliceSelectionForOutcome,
+      selectedCount: outcome.selectedCount,
+      pushedCount: outcome.pushedCount,
+      existingCount: outcome.existingCount,
+      rawCompanyCount: datamoon.datamoonRawCompanyCount,
+      normalizedCompanyCount,
+    })
+  }
+
   if (selected.length === 0) {
     const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, terminalizationInput)
+    workingMemory = await maybePersistSliceOutcome({
+      selectedCount: 0,
+      pushedCount: 0,
+      existingCount: 0,
+      intakeTerminalized,
+    })
     return buildPortfolioDiscoveryTickResult({
       organizationId: input.organizationId,
       ran: true,
@@ -505,33 +587,37 @@ export async function runAutonomousPortfolioDiscoveryBatch(
   })
 
   let memoryToPersist = updatedMemory
-  const sliceSelectionForOutcome =
-    discoverySearchSliceSelection ?? workingMemory.lastDiscoverySearchSliceSelection ?? null
-  if (sliceSelectionForOutcome && selected.length > 0) {
-    const priorSliceState =
-      readDiscoverySearchSliceStateFromPortfolioMemory(updatedMemory) ??
-      emptyDatamoonDiscoverySearchSliceState()
-    const nextSliceState = recordDatamoonDiscoverySearchSliceOutcome({
-      state: priorSliceState,
-      selection: sliceSelectionForOutcome,
+  if (
+    sliceSelectionForOutcome &&
+    isTrustworthyCompletedDatamoonSearchForSliceOutcome({
+      datamoonJobActive: datamoon.datamoonJobActive,
+      datamoonStopReason: datamoon.datamoonStopReason,
+      datamoonRunId: datamoon.datamoonRunId,
+    })
+  ) {
+    memoryToPersist = await persistPortfolioDiscoverySliceOutcome(admin, {
+      organizationId: input.organizationId,
       generatedAt: input.generatedAt,
+      memory: updatedMemory,
+      sliceSelection: sliceSelectionForOutcome,
       selectedCount: selected.length,
       pushedCount: push.pushed,
       existingCount: push.already_exists,
+      rawCompanyCount: datamoon.datamoonRawCompanyCount,
+      normalizedCompanyCount,
     })
-    memoryToPersist = mergeDiscoverySearchSliceIntoPortfolioMemory(updatedMemory, nextSliceState)
+  } else {
+    await upsertOrganizationMemoryPreferences(admin, {
+      organizationId: input.organizationId,
+      preferences: [
+        portfolioManagerMemoryPreferencePayload(
+          input.organizationId,
+          memoryToPersist,
+          input.generatedAt,
+        ),
+      ],
+    }).catch(() => 0)
   }
-
-  await upsertOrganizationMemoryPreferences(admin, {
-    organizationId: input.organizationId,
-    preferences: [
-      portfolioManagerMemoryPreferencePayload(
-        input.organizationId,
-        memoryToPersist,
-        input.generatedAt,
-      ),
-    ],
-  }).catch(() => 0)
 
   const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {
     ...terminalizationInput,

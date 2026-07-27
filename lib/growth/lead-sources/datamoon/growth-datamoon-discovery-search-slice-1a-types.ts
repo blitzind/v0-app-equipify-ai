@@ -53,6 +53,14 @@ export const DATAMOON_DISCOVERY_US_GEO_BUCKETS: readonly DatamoonDiscoveryGeoBuc
   },
 ] as const
 
+/** Completed search result category for slice rotation diagnostics. */
+export type DatamoonDiscoverySearchSliceOutcomeKind =
+  | "zero_provider_results"
+  | "zero_after_normalization"
+  | "duplicate_exhaustion"
+  | "qualification_rejection"
+  | "novel_intake"
+
 export type DatamoonDiscoverySearchSliceOutcome = {
   sliceKey: string
   clusterId: string
@@ -63,6 +71,7 @@ export type DatamoonDiscoverySearchSliceOutcome = {
   lastPushedCount: number
   lastExistingCount: number
   lastNoveltyRate: number | null
+  lastOutcomeKind: DatamoonDiscoverySearchSliceOutcomeKind | null
   consecutiveLowNoveltyRuns: number
   exhaustedUntil: string | null
 }

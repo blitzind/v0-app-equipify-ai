@@ -16,9 +16,11 @@ import {
   DISCOVERY_SLICE_MIN_SELECTED_FOR_EXHAUSTION,
   GROWTH_DATAMOON_DISCOVERY_SEARCH_SLICE_1A_QA_MARKER,
   type DatamoonDiscoverySearchSliceOutcome,
+  type DatamoonDiscoverySearchSliceOutcomeKind,
   type DatamoonDiscoverySearchSliceSelection,
   type DatamoonDiscoverySearchSliceState,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
+import type { DatamoonAutonomousDiscoveryStopReason } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 
 export {
   DATAMOON_DISCOVERY_US_GEO_BUCKETS,
@@ -42,10 +44,62 @@ function computeNoveltyRate(pushed: number, selected: number): number | null {
   return pushed / selected
 }
 
+/** Stop reasons that reflect provider/system failure — must not affect slice novelty. */
+export const DATAMOON_SLICE_OUTCOME_UNTRUSTWORTHY_STOP_REASONS = [
+  "datamoon_not_configured",
+  "datamoon_disabled",
+  "datamoon_dry_run_only",
+  "datamoon_budget_exhausted",
+  "datamoon_request_active",
+  "datamoon_job_failed",
+  "datamoon_provider_error",
+  "business_profile_missing",
+  "fixture_fallback_forbidden",
+] as const satisfies readonly DatamoonAutonomousDiscoveryStopReason[]
+
 function isLowNoveltyRun(input: { selected: number; pushed: number }): boolean {
+  if (input.selected === 0 && input.pushed === 0) {
+    return true
+  }
   if (input.selected < DISCOVERY_SLICE_MIN_SELECTED_FOR_EXHAUSTION) return false
   const rate = computeNoveltyRate(input.pushed, input.selected)
   return rate !== null && rate < DISCOVERY_SLICE_LOW_NOVELTY_RATE_THRESHOLD
+}
+
+export function resolveDatamoonDiscoverySearchSliceOutcomeKind(input: {
+  selectedCount: number
+  pushedCount: number
+  existingCount: number
+  rawCompanyCount?: number
+  normalizedCompanyCount?: number
+}): DatamoonDiscoverySearchSliceOutcomeKind {
+  if (input.pushedCount > 0) return "novel_intake"
+  if (input.selectedCount === 0) {
+    if ((input.rawCompanyCount ?? 0) === 0) return "zero_provider_results"
+    if ((input.normalizedCompanyCount ?? 0) === 0) return "zero_after_normalization"
+    return "qualification_rejection"
+  }
+  if (input.existingCount > 0 && input.pushedCount === 0) return "duplicate_exhaustion"
+  return "qualification_rejection"
+}
+
+export function isTrustworthyCompletedDatamoonSearchForSliceOutcome(input: {
+  datamoonJobActive: boolean
+  datamoonStopReason: string | null
+  datamoonRunId: string | null
+  intakeTerminalized?: boolean
+}): boolean {
+  if (input.datamoonJobActive) return false
+  if (!input.datamoonRunId && input.intakeTerminalized !== true) return false
+  if (
+    input.datamoonStopReason &&
+    (DATAMOON_SLICE_OUTCOME_UNTRUSTWORTHY_STOP_REASONS as readonly string[]).includes(
+      input.datamoonStopReason,
+    )
+  ) {
+    return false
+  }
+  return true
 }
 
 export function recordDatamoonDiscoverySearchSliceOutcome(input: {
@@ -58,12 +112,21 @@ export function recordDatamoonDiscoverySearchSliceOutcome(input: {
   selectedCount: number
   pushedCount: number
   existingCount: number
+  rawCompanyCount?: number
+  normalizedCompanyCount?: number
 }): DatamoonDiscoverySearchSliceState {
   const lowNovelty = isLowNoveltyRun({
     selected: input.selectedCount,
     pushed: input.pushedCount,
   })
   const noveltyRate = computeNoveltyRate(input.pushedCount, input.selectedCount)
+  const outcomeKind = resolveDatamoonDiscoverySearchSliceOutcomeKind({
+    selectedCount: input.selectedCount,
+    pushedCount: input.pushedCount,
+    existingCount: input.existingCount,
+    rawCompanyCount: input.rawCompanyCount,
+    normalizedCompanyCount: input.normalizedCompanyCount,
+  })
   const prior = input.state.slices[input.selection.sliceKey]
   const consecutiveLowNoveltyRuns = lowNovelty
     ? (prior?.consecutiveLowNoveltyRuns ?? 0) + 1
@@ -92,6 +155,7 @@ export function recordDatamoonDiscoverySearchSliceOutcome(input: {
     lastPushedCount: input.pushedCount,
     lastExistingCount: input.existingCount,
     lastNoveltyRate: noveltyRate,
+    lastOutcomeKind: outcomeKind,
     consecutiveLowNoveltyRuns,
     exhaustedUntil,
   }
