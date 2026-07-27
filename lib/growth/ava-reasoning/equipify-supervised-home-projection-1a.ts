@@ -239,12 +239,17 @@ export async function loadSupervisedAvaGenerationsForHome(
 export function buildSupervisedAvaHomeOperatorAttention(input: {
   generations: GrowthAiCopilotGeneration[]
   leadsById: LeadLookup
+  firstTouchCompleteLeadIds?: ReadonlySet<string>
 }): GrowthSupervisedAvaHomeOperatorAttention {
+  const firstTouchCompleteLeadIds = input.firstTouchCompleteLeadIds ?? new Set<string>()
   const sentLeadIds = new Set<string>()
   for (const generation of input.generations) {
     if (isSupervisedAvaGenerationSent(generation)) {
       sentLeadIds.add(generation.leadId)
     }
+  }
+  for (const leadId of firstTouchCompleteLeadIds) {
+    sentLeadIds.add(leadId)
   }
 
   const seenReady = new Set<string>()
@@ -257,6 +262,7 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
 
   for (const generation of input.generations) {
     if (sentLeadIds.has(generation.leadId)) continue
+    if (firstTouchCompleteLeadIds.has(generation.leadId)) continue
 
     const companyName = input.leadsById.get(generation.leadId) ?? "Account"
     const classification = classificationRecord(generation)
@@ -293,6 +299,7 @@ export function buildSupervisedAvaHomeOperatorAttention(input: {
     approvedReadyToSend,
     needsInformation,
     sentLeadIds: [...sentLeadIds],
+    firstTouchCompleteLeadIds: [...firstTouchCompleteLeadIds],
     rejectedCount,
   }
 }
@@ -353,6 +360,7 @@ export function mergeSupervisedAvaIntoApprovalSnapshot(input: {
     ...approvedReady.map((row) => row.leadId),
     ...input.attention.needsInformation.map((row) => row.leadId),
     ...sentLeadIds,
+    ...(input.attention.firstTouchCompleteLeadIds ?? []),
   ])
 
   const legacyPackages = input.base.packages.filter((pkg) => {

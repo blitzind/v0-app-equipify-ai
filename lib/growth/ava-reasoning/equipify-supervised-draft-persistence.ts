@@ -18,6 +18,7 @@ import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/
 import { assertAvaOutboundCopyQualityForPersistence } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import { AVA_SUPERVISED_CUTOVER_1A_QA_MARKER } from "@/lib/growth/ava-reasoning/equipify-external-company-preflight"
 import type { DraftFactorySchedulerGenerationProvenance } from "@/lib/growth/draft-factory/draft-factory-scheduler-actor-1a"
+import { resolveFirstTouchOutboundCompletionForLead } from "@/lib/growth/ava-reasoning/ava-first-touch-outbound-completion-1a"
 
 const AVA_SUPERVISED_DRAFT_PROMPT_VARIANT = "ava_direct_production_cutover_1a" as const
 import type { AvaContactEvidence, AvaReasoningResult } from "@/lib/fuzor/ava-reasoning/ava-reasoning-types"
@@ -90,6 +91,13 @@ export async function persistSendableAvaSupervisedDraft(input: {
   includeApprovedExisting?: boolean
 }): Promise<{ id: string | null; status: SupervisedDraftPersistenceStatus }> {
   if (!isSendableAvaSupervisedDraft(input)) {
+    return { id: null, status: "skipped" }
+  }
+
+  const firstTouchComplete = await resolveFirstTouchOutboundCompletionForLead(input.admin, {
+    leadId: input.leadId,
+  }).catch(() => null)
+  if (firstTouchComplete?.complete) {
     return { id: null, status: "skipped" }
   }
 

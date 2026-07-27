@@ -39,6 +39,8 @@ export type GrowthSupervisedAvaHomeOperatorAttention = {
   needsInformation: GrowthSupervisedAvaHomeNeedsInformationItem[]
   /** Lead IDs with a completed supervised outbound send — excluded from review queues. */
   sentLeadIds: string[]
+  /** Lead IDs with completed first-touch outbound (transport or reconciled) — excluded from initial outreach. */
+  firstTouchCompleteLeadIds: string[]
   rejectedCount: number
 }
 

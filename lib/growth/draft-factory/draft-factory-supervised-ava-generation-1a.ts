@@ -14,6 +14,7 @@ import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growt
 import { selectLatestAuthoritativeOutreachPackage } from "@/lib/growth/aios/growth/growth-canonical-outreach-package-authority-1a"
 import { listOutreachPreparationRunsForLead } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
 import { findExistingAvaSupervisedSendableDraft } from "@/lib/growth/ava-reasoning/equipify-supervised-draft-persistence"
+import { resolveFirstTouchOutboundCompletionForLead } from "@/lib/growth/ava-reasoning/ava-first-touch-outbound-completion-1a"
 import { runEquipifySupervisedAvaOutreach } from "@/lib/growth/ava-reasoning/equipify-supervised-cutover-service"
 import {
   GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_1A_QA_MARKER,
@@ -71,6 +72,23 @@ export async function runDraftFactorySupervisedAvaGenerationForScheduler(
     }
   } catch {
     // Non-fatal — authority falls back to package body checks.
+  }
+
+  const firstTouchComplete = await resolveFirstTouchOutboundCompletionForLead(admin, {
+    leadId: input.leadId,
+  }).catch(() => null)
+  if (firstTouchComplete?.complete) {
+    logGrowthEngine("draft_factory_supervised_generation_first_touch_complete", {
+      qa_marker: GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_1A_QA_MARKER,
+      organization_id: input.organizationId,
+      lead_id: input.leadId,
+      evidence_kind: firstTouchComplete.evidenceKind,
+      delivery_attempt_id: firstTouchComplete.record?.deliveryAttemptId ?? null,
+    })
+    return {
+      gptOutcome: "reject",
+      reason: "First-touch outbound already completed for this lead.",
+    }
   }
 
   const existingDraft = await findExistingAvaSupervisedSendableDraft(admin, input.leadId, {
