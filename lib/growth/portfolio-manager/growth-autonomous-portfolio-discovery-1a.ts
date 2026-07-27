@@ -23,17 +23,14 @@ import {
   mergeDiscoverySearchSliceIntoPortfolioMemory,
   readDiscoverySearchSliceStateFromPortfolioMemory,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-state-1a"
-import {
-  portfolioManagerMemoryPreferencePayload,
-  recordPortfolioDiscoveryMemory,
-} from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
+import { recordPortfolioDiscoveryMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
   type AutonomousPortfolioDiscoveryDisposition,
   type AutonomousPortfolioDiscoveryExecutionAction,
   type GrowthPortfolioReplenishmentDecision,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
-import { upsertOrganizationMemoryPreferences } from "@/lib/growth/memory/storage/organization-memory-repository"
+import { persistPortfolioManagerMemoryPreferences } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-persistence-1a"
 import { executeBulkPushToLeadInbox } from "@/lib/growth/prospect-search/prospect-search-push-to-inbox"
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
 import type { GrowthPortfolioManagerMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
@@ -293,16 +290,12 @@ async function persistPortfolioDiscoverySliceOutcome(
     normalizedCompanyCount: input.normalizedCompanyCount,
   })
   const memoryToPersist = mergeDiscoverySearchSliceIntoPortfolioMemory(input.memory, nextSliceState)
-  await upsertOrganizationMemoryPreferences(admin, {
+  await persistPortfolioManagerMemoryPreferences(admin, {
     organizationId: input.organizationId,
-    preferences: [
-      portfolioManagerMemoryPreferencePayload(
-        input.organizationId,
-        memoryToPersist,
-        input.generatedAt,
-      ),
-    ],
-  }).catch(() => 0)
+    memory: memoryToPersist,
+    generatedAt: input.generatedAt,
+    reason: "slice_outcome",
+  })
   return memoryToPersist
 }
 
@@ -409,16 +402,12 @@ export async function runAutonomousPortfolioDiscoveryBatch(
       ...workingMemory,
       lastDiscoverySearchSliceSelection: discoverySearchSliceSelection,
     }
-    await upsertOrganizationMemoryPreferences(admin, {
+    await persistPortfolioManagerMemoryPreferences(admin, {
       organizationId: input.organizationId,
-      preferences: [
-        portfolioManagerMemoryPreferencePayload(
-          input.organizationId,
-          workingMemory,
-          input.generatedAt,
-        ),
-      ],
-    }).catch(() => 0)
+      memory: workingMemory,
+      generatedAt: input.generatedAt,
+      reason: "slice_selection",
+    })
   }
 
   const search = await runProspectSearch(admin, {
@@ -607,16 +596,12 @@ export async function runAutonomousPortfolioDiscoveryBatch(
       normalizedCompanyCount,
     })
   } else {
-    await upsertOrganizationMemoryPreferences(admin, {
+    await persistPortfolioManagerMemoryPreferences(admin, {
       organizationId: input.organizationId,
-      preferences: [
-        portfolioManagerMemoryPreferencePayload(
-          input.organizationId,
-          memoryToPersist,
-          input.generatedAt,
-        ),
-      ],
-    }).catch(() => 0)
+      memory: memoryToPersist,
+      generatedAt: input.generatedAt,
+      reason: "discovery_batch",
+    })
   }
 
   const intakeTerminalized = await terminalizeAutonomousRunIntakeIfEligible(admin, {

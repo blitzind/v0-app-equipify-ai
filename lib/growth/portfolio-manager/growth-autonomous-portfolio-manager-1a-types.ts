@@ -11,6 +11,14 @@ export const GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER =
 export const GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_KEY =
   "ge-aios-portfolio-manager-1a" as const
 
+/** Matches growth.organization_memory_preferences.importance check (1–5). */
+export const GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MIN = 1 as const
+export const GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MAX = 5 as const
+
+/** High-salience durable state for autonomous portfolio replenishment. */
+export const GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_IMPORTANCE =
+  GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MAX as const
+
 export const DEFAULT_PORTFOLIO_TARGET_ACTIVE_COMPANIES = 100 as const
 export const DEFAULT_PORTFOLIO_MINIMUM_HEALTHY_COMPANIES = 40 as const
 export const DEFAULT_PORTFOLIO_REPLENISH_BATCH_SIZE = 25 as const

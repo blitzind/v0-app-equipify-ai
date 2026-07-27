@@ -7,13 +7,9 @@ import {
   GROWTH_DATAMOON_DISCOVERY_SEARCH_SLICE_1A_QA_MARKER,
   type DatamoonDiscoverySearchSliceState,
 } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
-import {
-  parsePortfolioManagerMemoryFromStore,
-  portfolioManagerMemoryPreferencePayload,
-  serializePortfolioManagerMemory,
-} from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
+import { parsePortfolioManagerMemoryFromStore } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-1a"
 import type { GrowthPortfolioManagerMemory } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
-import { upsertOrganizationMemoryPreferences } from "@/lib/growth/memory/storage/organization-memory-repository"
+import { persistPortfolioManagerMemoryPreferences } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-memory-persistence-1a"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { AvaOrganizationalMemoryStore } from "@/lib/growth/memory/types"
 
@@ -64,16 +60,12 @@ export async function persistDiscoverySearchSliceState(
     ...input.memory,
     discoverySearchSliceState: input.sliceState,
   }
-  await upsertOrganizationMemoryPreferences(admin, {
+  await persistPortfolioManagerMemoryPreferences(admin, {
     organizationId: input.organizationId,
-    preferences: [
-      portfolioManagerMemoryPreferencePayload(
-        input.organizationId,
-        nextMemory,
-        input.generatedAt,
-      ),
-    ],
-  }).catch(() => 0)
+    memory: nextMemory,
+    generatedAt: input.generatedAt,
+    reason: "slice_outcome",
+  })
 }
 
 export function mergeDiscoverySearchSliceIntoPortfolioMemory(

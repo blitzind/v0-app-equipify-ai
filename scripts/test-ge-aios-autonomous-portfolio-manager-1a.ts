@@ -275,7 +275,7 @@ const queueBlocked = evaluatePortfolioReplenishmentDecision({
 assert.equal(queueBlocked.blockedByQueueLimit, true)
 console.log("  ✓ Phase 11 — respects queued admission limits")
 
-assert.match(discoverySource, /upsertOrganizationMemoryPreferences/)
+assert.match(discoverySource, /persistPortfolioManagerMemoryPreferences/)
 assert.doesNotMatch(discoverySource, /CREATE TABLE/)
 console.log("  ✓ Phase 12 — no duplicate persistence layer")
 

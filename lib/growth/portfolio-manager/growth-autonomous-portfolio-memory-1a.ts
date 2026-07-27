@@ -3,8 +3,17 @@
 import type { AvaOrganizationalMemoryStore } from "@/lib/growth/memory/types"
 import {
   GROWTH_AUTONOMOUS_PORTFOLIO_MANAGER_1A_QA_MARKER,
+  GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MAX,
+  GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MIN,
+  GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_IMPORTANCE,
   GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_KEY,
   type GrowthPortfolioManagerMemory,
+} from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
+
+export {
+  GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MAX,
+  GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MIN,
+  GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_IMPORTANCE,
 } from "@/lib/growth/portfolio-manager/growth-autonomous-portfolio-manager-1a-types"
 
 export function emptyPortfolioManagerMemory(): GrowthPortfolioManagerMemory {
@@ -111,8 +120,16 @@ export function portfolioManagerMemoryPreferencePayload(
     id: `${organizationId}:portfolio-manager`,
     key: GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_KEY,
     statement: serializePortfolioManagerMemory(memory),
-    importance: 90,
+    importance: GROWTH_PORTFOLIO_MANAGER_MEMORY_PREFERENCE_IMPORTANCE,
     source: "sales_specialist" as const,
     capturedAt,
   }
+}
+
+export function isValidOrganizationMemoryPreferenceImportance(importance: number): boolean {
+  return (
+    Number.isInteger(importance) &&
+    importance >= GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MIN &&
+    importance <= GROWTH_ORGANIZATION_MEMORY_PREFERENCE_IMPORTANCE_MAX
+  )
 }
