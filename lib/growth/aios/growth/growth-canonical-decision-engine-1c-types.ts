@@ -64,6 +64,8 @@ export type GrowthCanonicalPackagePreparationContext = {
   isOperatorRebuild?: boolean
   isMaterialRefresh?: boolean
   isPreviewOnly?: boolean
+  /** Draft Factory capacity wake — initial supervised generation, not operator rebuild. */
+  isDraftFactoryGenerationWake?: boolean
   leadLifecycle?: import("@/lib/growth/aios/execution/growth-canonical-execution-authority-1a").GrowthCanonicalLeadLifecycleSnapshot
 }
 

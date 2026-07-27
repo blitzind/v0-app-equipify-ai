@@ -315,6 +315,7 @@ export function createPostgresDraftFactoryRepository(
         .select("*")
         .eq("organization_id", input.organizationId)
         .not("state", "in", '("waiting_for_approval","approved","executed","failed")')
+        .neq("paused_reason", "stop_investment")
         .or(`next_eligible_wake_at.is.null,next_eligible_wake_at.lte.${input.now}`)
         .order("updated_at", { ascending: true })
         .limit(input.limit ?? 100)
@@ -323,6 +324,25 @@ export function createPostgresDraftFactoryRepository(
           throw new Error(`SV1-5A Postgres fail-closed: ${error.message}`)
         }
         throw new Error(`Draft Factory listDueStates failed: ${error.message}`)
+      }
+      return (data ?? []).map((row) => rowToState(row as Record<string, unknown>))
+    },
+
+    async listWaitingForGenerationStates(input) {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("draft_factory_lead_states")
+        .select("*")
+        .eq("organization_id", input.organizationId)
+        .eq("state", "waiting_for_generation")
+        .or(`next_eligible_wake_at.is.null,next_eligible_wake_at.lte.${input.now}`)
+        .order("updated_at", { ascending: true })
+        .limit(input.limit ?? 20)
+      if (error) {
+        if (isMissingRelationError(error)) {
+          throw new Error(`SV1-5A Postgres fail-closed: ${error.message}`)
+        }
+        throw new Error(`Draft Factory listWaitingForGenerationStates failed: ${error.message}`)
       }
       return (data ?? []).map((row) => rowToState(row as Record<string, unknown>))
     },

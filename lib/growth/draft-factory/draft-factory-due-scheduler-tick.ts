@@ -12,7 +12,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
+import { createDraftFactorySupervisedAvaGenerationHandoff } from "@/lib/growth/draft-factory/draft-factory-supervised-ava-generation-1a"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { ensureGrowthAiEventBusInProcessSubscribers } from "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
 import {
@@ -34,6 +34,7 @@ import {
   getDeferredDraftFactoryStates,
   listAdmissionIntegrityReconcileDraftFactoryStates,
   listDueDraftFactoryStates,
+  listWaitingForGenerationDraftFactoryStates,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
 import {
   advanceDraftFactoryForLeadLive,
@@ -48,6 +49,8 @@ import {
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ORGS,
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
   GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT,
+  GROWTH_DRAFT_FACTORY_GENERATION_READY_POOL_LIMIT,
+  GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER,
   REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG,
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import {
@@ -69,6 +72,7 @@ import { evaluateGrowthPortfolioLeadEligibility } from "@/lib/growth/portfolio-e
 import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import { isProspectResearchStale } from "@/lib/growth/research/growth-lead-research-readiness"
+import { assessGrowthResearchSufficiencyFromLead } from "@/lib/growth/research/growth-research-sufficiency-1a"
 import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import type { AiOsInvestmentState } from "@/lib/growth/resource-allocation/resource-allocation-types"
@@ -170,10 +174,15 @@ async function projectInvestmentForDueLead(
       ? isProspectResearchStale(lead.lastProspectResearchedAt)
       : true
     const researchFresh = hasUsableResearch && !researchStale
+    const sufficiency = assessGrowthResearchSufficiencyFromLead(lead)
+    const researchSufficientForPackage = researchFresh && sufficiency.packageReady === true
+    const sendReady = sufficiency.sendReady === true
 
     const signals = buildResourceAllocationSignalsFromLead(lead, {
       budgetAvailable: true,
       killSwitchActive: false,
+      researchSufficientForPackage,
+      sendReady,
     })
     const resource = evaluateResourceAllocationFacade({
       organizationId,
@@ -849,13 +858,19 @@ export async function tickDraftFactoryDueStatesForScheduler(
 
       // AUTONOMY-1F — capacity wake discovers waiting_for_generation + deferred.
       const deferred = await getDeferredDraftFactoryStates(organizationId, repository)
+      const generationReadyStates = await listWaitingForGenerationDraftFactoryStates({
+        organizationId,
+        now,
+        limit: GROWTH_DRAFT_FACTORY_GENERATION_READY_POOL_LIMIT,
+        repository,
+      })
       const generationPool = collectGenerationCapacityCandidates({
         deferredStates: deferred.map((row) => ({
           leadId: row.leadId,
           state: row.state,
           updatedAt: row.updatedAt,
         })),
-        dueStates: dueStates.map((row) => ({
+        generationReadyStates: generationReadyStates.map((row) => ({
           leadId: row.leadId,
           state: row.state,
           updatedAt: row.updatedAt,
@@ -868,11 +883,37 @@ export async function tickDraftFactoryDueStatesForScheduler(
         perRunCap: GROWTH_DRAFT_FACTORY_CAPACITY_SLOTS_PER_ORG,
       })
 
+      const capacityTelemetry = {
+        qa_marker: GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER,
+        organization_id: organizationId,
+        due_states_found: dueStates.length,
+        waiting_for_generation_in_due_pool: dueStates.filter((row) => row.state === "waiting_for_generation")
+          .length,
+        waiting_for_generation_dedicated_pool: generationReadyStates.length,
+        generative_candidates: generationPool.waitingForGenerationCount,
+        non_generative_candidates: generationPool.deferredCount,
+        excluded_paused: 0,
+        excluded_stop_investment: 0,
+        excluded_not_due: 0,
+        excluded_attempt_limit: 0,
+        excluded_lock: 0,
+        excluded_duplicate: 0,
+        excluded_ineligible: 0,
+        capacity_available: capacityBatch.effectiveLimit,
+        capacity_selected: 0,
+        selected_lead_ids: [] as string[],
+        generation_outcomes: [] as Array<{ lead_id: string; outcome: string | null; package_id: string | null }>,
+      }
+
       logGrowthEngine("draft_factory_generation_capacity_pool", {
         qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+        recovery_1a_qa_marker: GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER,
         organization_id: organizationId,
         deferred_count: generationPool.deferredCount,
         waiting_for_generation_count: generationPool.waitingForGenerationCount,
+        waiting_for_generation_dedicated_pool: generationReadyStates.length,
+        waiting_for_generation_in_due_pool: dueStates.filter((row) => row.state === "waiting_for_generation")
+          .length,
         capacity_candidate_count: capacityCandidates.length,
         capacity_slots: capacityBatch.effectiveLimit,
         wake_execution_enabled: capacityBatch.wakeExecutionEnabled,
@@ -899,8 +940,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
             "llm_drafting",
           )
           if (investment.investmentState === "stop_investment" || investment.enrichmentFailed) {
+            capacityTelemetry.excluded_stop_investment += 1
             logGrowthEngine("draft_factory_generation_capacity_skipped", {
               qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+              recovery_1a_qa_marker: GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER,
               organization_id: organizationId,
               lead_id: row.leadId,
               source: row.source,
@@ -916,8 +959,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
               organizationId,
             })
             if (!portfolioEligibility.eligible) {
+              capacityTelemetry.excluded_ineligible += 1
               logGrowthEngine("draft_factory_generation_capacity_admission_excluded", {
                 qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+                recovery_1a_qa_marker: GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER,
                 organization_id: organizationId,
                 lead_id: row.leadId,
                 reason: portfolioEligibility.reasonCode,
@@ -930,6 +975,14 @@ export async function tickDraftFactoryDueStatesForScheduler(
             leadId: row.leadId,
             portfolioSelected: true,
           })
+          if (evidence.stopInvestment) {
+            capacityTelemetry.excluded_stop_investment += 1
+            continue
+          }
+          if (!evidence.admitted || !evidence.contactVerifiedForEmail || !evidence.researchCurrent) {
+            capacityTelemetry.excluded_ineligible += 1
+            continue
+          }
           capacityEnriched.push({
             leadId: row.leadId,
             investmentState: (investment.investmentState ?? "maintain_investment") as AiOsInvestmentState,
@@ -951,28 +1004,20 @@ export async function tickDraftFactoryDueStatesForScheduler(
             workerId: `df-capacity-scheduler:${organizationId}`,
             repository,
             candidates: capacityEnriched,
-            generateViaGrowth5F: async ({ organizationId: orgId, leadId, now: generatedAt }) => {
-              const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
-                admin,
-                {
-                  organizationId: orgId,
-                  leadId,
-                  generatedAt,
-                },
-              )
-              if (!persisted) return null
-              return {
-                packageId: persisted.packageId,
-                pendingHumanApproval: true as const,
-                transportBlocked: true as const,
-              }
-            },
+            generateViaGrowth5F: createDraftFactorySupervisedAvaGenerationHandoff(admin),
           })
           capacitySelected += capacity.selectedLeadIds.length
           capacityDeferred += capacity.deferredLeadIds.length
+          capacityTelemetry.capacity_selected = capacity.selectedLeadIds.length
+          capacityTelemetry.selected_lead_ids = capacity.selectedLeadIds
 
           for (const leadId of capacity.selectedLeadIds) {
             const result = capacity.results.find((row) => row.leadId === leadId)
+            capacityTelemetry.generation_outcomes.push({
+              lead_id: leadId,
+              outcome: result?.outcome ?? null,
+              package_id: result?.packageId ?? null,
+            })
             logGrowthEngine("draft_factory_generation_capacity_selected", {
               qa_marker: GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
               organization_id: organizationId,
@@ -988,6 +1033,8 @@ export async function tickDraftFactoryDueStatesForScheduler(
           }
         }
       }
+
+      logGrowthEngine("draft_factory_generation_capacity_selection", capacityTelemetry)
     } catch (error) {
       failures += 1
       logGrowthEngine("draft_factory_due_scheduler_org_failed", {

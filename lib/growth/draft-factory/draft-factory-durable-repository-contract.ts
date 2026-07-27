@@ -49,6 +49,12 @@ export type DraftFactoryDurableRepository = {
     now: string
     limit?: number
   }): Promise<AiOsDraftFactoryDurableLeadState[]>
+  /** Generation-ready pool — not subject to generic due-pool FIFO starvation. */
+  listWaitingForGenerationStates(input: {
+    organizationId: string
+    now: string
+    limit?: number
+  }): Promise<AiOsDraftFactoryDurableLeadState[]>
   /** Wake-independent scan of downstream nonterminal states for admission integrity reconcile. */
   listAdmissionIntegrityReconcileStates(input: {
     organizationId: string

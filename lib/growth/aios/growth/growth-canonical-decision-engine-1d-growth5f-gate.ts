@@ -39,6 +39,7 @@ export async function assertGrowth5fPackagePreparationAllowed(
     previousPackage?: GrowthAutonomousOutreachApprovalPackage | null
     isOperatorRebuild?: boolean
     isMaterialRefresh?: boolean
+    isDraftFactoryGenerationWake?: boolean
     cacheScope?: string
     runtimeContext?: GrowthAiOsRuntimeContext
   },
@@ -62,6 +63,7 @@ export async function assertGrowth5fPackagePreparationAllowed(
     wakeCondition: input.wakeCondition,
     isOperatorRebuild: input.isOperatorRebuild,
     isMaterialRefresh: input.isMaterialRefresh,
+    isDraftFactoryGenerationWake: input.isDraftFactoryGenerationWake,
     leadLifecycle,
   })
 

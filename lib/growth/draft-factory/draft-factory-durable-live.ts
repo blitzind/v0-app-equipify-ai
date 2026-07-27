@@ -6,7 +6,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
+import { createDraftFactorySupervisedAvaGenerationHandoff } from "@/lib/growth/draft-factory/draft-factory-supervised-ava-generation-1a"
 import { evaluateDraftFactoryDecisionGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
 import { buildLeadLifecycleSnapshotForAuthority } from "@/lib/growth/aios/execution/growth-canonical-execution-authority-server-1a"
 import { recordDegradedEnforcementTelemetry } from "@/lib/growth/aios/execution/growth-degraded-enforcement-telemetry-1a"
@@ -463,23 +463,7 @@ export async function advanceDraftFactoryForLeadLive(
     completionHints,
     observability: input.observability,
     generateViaGrowth5F: allowGeneration
-      ? async ({ organizationId, leadId, now: generatedAt }) => {
-          const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
-            admin,
-            {
-              organizationId,
-              leadId,
-              generatedAt,
-              runtimeContext,
-            },
-          )
-          if (!persisted) return null
-          return {
-            packageId: persisted.packageId,
-            pendingHumanApproval: true as const,
-            transportBlocked: true as const,
-          }
-        }
+      ? createDraftFactorySupervisedAvaGenerationHandoff(admin)
       : undefined,
   })
 }

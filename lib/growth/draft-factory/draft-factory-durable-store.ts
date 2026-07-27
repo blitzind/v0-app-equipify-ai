@@ -181,19 +181,37 @@ export function listDueDurableDraftFactoryStates(input: {
   const due = [...durableDisk.states.values()]
     .filter((s) => s.organizationId === input.organizationId)
     .filter((s) => {
+      if (s.pausedReason === "stop_investment") return false
       if (!s.nextEligibleWakeAt) {
         return (
           s.state !== "waiting_for_approval" &&
           s.state !== "approved" &&
           s.state !== "executed" &&
-          s.state !== "failed" &&
-          s.pausedReason !== "stop_investment"
+          s.state !== "failed"
         )
       }
       return Date.parse(s.nextEligibleWakeAt) <= nowMs
     })
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
   return due.slice(0, input.limit ?? 100)
+}
+
+export function listWaitingForGenerationDurableDraftFactoryStates(input: {
+  organizationId: string
+  now: string
+  limit?: number
+}): AiOsDraftFactoryDurableLeadState[] {
+  const nowMs = Date.parse(input.now)
+  return [...durableDisk.states.values()]
+    .filter((s) => s.organizationId === input.organizationId)
+    .filter((s) => s.state === "waiting_for_generation")
+    .filter((s) => !s.nextEligibleWakeAt || Date.parse(s.nextEligibleWakeAt) <= nowMs)
+    .sort((a, b) => {
+      const byUpdated = a.updatedAt.localeCompare(b.updatedAt)
+      if (byUpdated !== 0) return byUpdated
+      return a.leadId.localeCompare(b.leadId)
+    })
+    .slice(0, input.limit ?? 20)
 }
 
 export function listAdmissionIntegrityReconcileDurableDraftFactoryStates(input: {

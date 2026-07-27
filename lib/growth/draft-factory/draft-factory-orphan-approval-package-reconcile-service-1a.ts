@@ -7,6 +7,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { buildCanonicalEvidenceForLead } from "@/lib/growth/draft-factory/draft-factory-durable-live"
 import type { DraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-contract"
 import type { AiOsDraftFactoryDurableLeadState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
@@ -294,6 +295,7 @@ export async function reconcileOrphanApprovalPackagesForOrganization(
           failed += 1
           continue
         }
+        invalidateCanonicalDecisionCacheForLead(candidate.leadId, "orphan_approval_package_reconciled")
       }
 
       if (

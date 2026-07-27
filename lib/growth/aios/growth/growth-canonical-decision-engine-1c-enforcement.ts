@@ -159,7 +159,21 @@ export function evaluateGrowth5fPackagePreparation(
     })
   }
 
-  if (isWaitActive(decision, nowMs) && !materialRefresh && !operatorRebuild && !requiredByDecision) {
+  const strategicWaitWithoutHardPrerequisite =
+    context.isDraftFactoryGenerationWake === true &&
+    isWaitActive(decision, nowMs) &&
+    !decision.waitUntil &&
+    !decision.prerequisites.some((row) => row.blocksPrimary && row.status !== "complete") &&
+    !isRelationshipProtectionPause(decision) &&
+    decision.sourceSummary.revenueRecommendation === "delay"
+
+  if (
+    isWaitActive(decision, nowMs) &&
+    !materialRefresh &&
+    !operatorRebuild &&
+    !requiredByDecision &&
+    !strategicWaitWithoutHardPrerequisite
+  ) {
     return packagePreparationResult({
       allowed: false,
       outcome: "decision_blocked_waiting_on_prospect",
@@ -181,10 +195,12 @@ export function evaluateGrowth5fPackagePreparation(
   }
 
   if (
-    suppressionHints.suppressDuplicatePackage &&
     !requiredByDecision &&
     !materialRefresh &&
-    !operatorRebuild
+    !operatorRebuild &&
+    !strategicWaitWithoutHardPrerequisite &&
+    !context.isDraftFactoryGenerationWake &&
+    suppressionHints.suppressDuplicatePackage
   ) {
     return packagePreparationResult({
       allowed: false,
@@ -198,6 +214,8 @@ export function evaluateGrowth5fPackagePreparation(
     !requiredByDecision &&
     !materialRefresh &&
     !operatorRebuild &&
+    !strategicWaitWithoutHardPrerequisite &&
+    !context.isDraftFactoryGenerationWake &&
     suppressionHints.suppressColdOutreach &&
     (isColdOutreachPurpose(context) || decision.primaryAction !== "contact")
   ) {

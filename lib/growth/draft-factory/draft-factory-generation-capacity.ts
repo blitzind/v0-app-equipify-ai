@@ -24,9 +24,12 @@ export type GenerationCapacityCandidate = {
 }
 
 /**
- * Union portfolio-deferred rows with due waiting_for_generation leads.
- * Deterministic: deferred first (updated_at ASC), then generation-ready (updated_at ASC).
+ * Union portfolio-deferred rows with generation-ready waiting_for_generation leads.
+ * Deterministic: generation-ready first (updated_at ASC), then deferred (updated_at ASC).
  * Dedupes by leadId (generation-ready wins when both present).
+ *
+ * Prefer `generationReadyStates` — the dedicated pool not subject to generic due-pool
+ * FIFO starvation when stop_investment / paused rows fill the due limit.
  */
 export function collectGenerationCapacityCandidates(input: {
   deferredStates: Array<{
@@ -34,7 +37,13 @@ export function collectGenerationCapacityCandidates(input: {
     state: string
     updatedAt: string
   }>
-  dueStates: Array<{
+  /** @deprecated Prefer generationReadyStates — due pool may omit generation-ready rows. */
+  dueStates?: Array<{
+    leadId: string
+    state: string
+    updatedAt: string
+  }>
+  generationReadyStates?: Array<{
     leadId: string
     state: string
     updatedAt: string
@@ -52,13 +61,14 @@ export function collectGenerationCapacityCandidates(input: {
     if (byUpdated !== 0) return byUpdated
     return a.leadId.localeCompare(b.leadId)
   })
-  const generationReady = input.dueStates
-    .filter((row) => row.state === "waiting_for_generation")
-    .sort((a, b) => {
-      const byUpdated = a.updatedAt.localeCompare(b.updatedAt)
-      if (byUpdated !== 0) return byUpdated
-      return a.leadId.localeCompare(b.leadId)
-    })
+  const generationSource =
+    input.generationReadyStates ??
+    (input.dueStates ?? []).filter((row) => row.state === "waiting_for_generation")
+  const generationReady = [...generationSource].sort((a, b) => {
+    const byUpdated = a.updatedAt.localeCompare(b.updatedAt)
+    if (byUpdated !== 0) return byUpdated
+    return a.leadId.localeCompare(b.leadId)
+  })
 
   const byLead = new Map<string, GenerationCapacityCandidate>()
   for (const row of deferredSorted) {

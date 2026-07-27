@@ -64,6 +64,7 @@ export async function buildAutonomousOutreachApprovalPackage(
     adaptiveEvents?: AdaptiveProspectEvent[]
     buildMode?: Growth5fPackageBuildMode
     runtimeContext?: GrowthAiOsRuntimeContext
+    isDraftFactoryGenerationWake?: boolean
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage> {
   if (input.buildMode !== "preview_only") {
@@ -76,6 +77,7 @@ export async function buildAutonomousOutreachApprovalPackage(
       previousPackage: input.previousPackage ?? null,
       isOperatorRebuild: Boolean(input.refreshReasons?.length),
       isMaterialRefresh: input.wakeCondition === "relationship_material_change",
+      isDraftFactoryGenerationWake: input.isDraftFactoryGenerationWake,
       cacheScope: "growth5f:build-package",
       runtimeContext: input.runtimeContext,
     })

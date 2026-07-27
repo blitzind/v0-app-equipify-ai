@@ -52,3 +52,9 @@ export const GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP = 20
 export const REVENUE_PROMOTION_RECONCILE_LIMIT_PER_ORG = 50
 /** Max downstream rows scanned per org for wake-independent admission integrity reconcile. */
 export const GROWTH_DRAFT_FACTORY_ADMISSION_RECONCILE_POOL_LIMIT = 100
+
+/** AVA-DRAFT-FACTORY-GENERATION-RECOVERY-1A — generation-ready pool cap (independent of due FIFO). */
+export const GROWTH_DRAFT_FACTORY_GENERATION_READY_POOL_LIMIT = 20
+
+export const GROWTH_AIOS_DRAFT_FACTORY_GENERATION_RECOVERY_1A_QA_MARKER =
+  "ava-draft-factory-generation-recovery-1a-v1" as const

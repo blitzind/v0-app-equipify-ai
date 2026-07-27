@@ -32,12 +32,14 @@ import type {
   GrowthAutonomousOutreachPreparationWakeCondition,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { selectLatestAuthoritativeOutreachPackage } from "@/lib/growth/aios/growth/growth-canonical-outreach-package-authority-1a"
 import { resolveGrowthCanonicalDecisionForLeadCached, invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { evaluateGrowth5fPackagePreparation } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
 import {
   createGrowthAiOsRuntimeContext,
   type GrowthAiOsRuntimeContext,
 } from "@/lib/growth/aios/runtime/growth-aios-runtime-context-1a"
+import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export {
@@ -103,6 +105,19 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) return null
 
+  let draftFactoryPackageId: string | null = null
+  let draftFactoryState: string | null = null
+  try {
+    const resolved = await resolveDraftFactoryDurableRepository({ runtime: "production", admin })
+    if (resolved.kind === "postgres") {
+      const dfState = await resolved.repository.getLeadState(input.organizationId, input.leadId)
+      draftFactoryPackageId = dfState?.packageId ?? null
+      draftFactoryState = dfState?.state ?? null
+    }
+  } catch {
+    // Non-fatal — package authority falls back to body checks only.
+  }
+
   const { listOutreachPreparationRunsForLead } = await import(
     "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
   )
@@ -111,11 +126,16 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
     input.organizationId,
     input.leadId,
   ).catch(() => [])
-  const previousPackage =
-    priorRuns
-      .filter((run) => run.outcome === "completed" && run.approvalPackage)
-      .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))[0]?.approvalPackage ??
-    null
+
+  const previousPackage = selectLatestAuthoritativeOutreachPackage({
+    runs: priorRuns,
+    draftFactoryPackageId,
+    draftFactoryState,
+  })
+
+  if (!previousPackage && priorRuns.some((run) => run.approvalPackage?.pendingHumanApproval)) {
+    invalidateCanonicalDecisionCacheForLead(input.leadId, "orphan_package_not_authoritative")
+  }
 
   const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
     organizationId: input.organizationId,
@@ -133,13 +153,15 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
       generatedAt: input.generatedAt,
       packageSnapshot: previousPackage,
       companyName: input.companyName ?? lead.companyName,
+      bypassDecisionCache: !previousPackage && draftFactoryState === "waiting_for_generation",
     })
 
   const canonicalDecision = await runtimeContext.getDecision().catch(() => null)
   const packageEnforcement = evaluateGrowth5fPackagePreparation(canonicalDecision, {
-    proposedPurpose: previousPackage?.expectedOutcome ?? null,
+    proposedPurpose: previousPackage?.expectedOutcome ?? "supervised_ava_outreach_generation",
     wakeCondition,
     isMaterialRefresh: wakeCondition === "relationship_material_change",
+    isDraftFactoryGenerationWake: true,
   })
   if (!packageEnforcement.allowed) {
     logGrowthEngine("growth_5f_package_preparation_blocked_by_canonical_decision", {
@@ -167,6 +189,7 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
         ? ["relationship_material_change"]
         : undefined,
     runtimeContext,
+    isDraftFactoryGenerationWake: true,
   })
 
   if (approvalPackage.pendingHumanApproval !== true || approvalPackage.transportBlocked !== true) {

@@ -8,6 +8,7 @@ import type {
   GrowthAutonomousOutreachPreparationRunRecord,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { listOutreachPreparationRunsForLead } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import { selectLatestAuthoritativeOutreachPackage } from "@/lib/growth/aios/growth/growth-canonical-outreach-package-authority-1a"
 import { hasCanonicalSalesStrategyBriefPackage } from "@/lib/growth/aios/growth/growth-send-plane-1a-materialization"
 
 function isEligibleCompletedRun(
@@ -46,6 +47,9 @@ export async function resolveCanonicalOutreachPackageForLead(
   input: {
     organizationId: string
     leadId: string
+    draftFactoryPackageId?: string | null
+    draftFactoryState?: string | null
+    hasSupervisedGenerationForLead?: boolean
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage | null> {
   const runs = await listOutreachPreparationRunsForLead(
@@ -54,6 +58,11 @@ export async function resolveCanonicalOutreachPackageForLead(
     input.leadId,
   )
 
-  const eligible = runs.filter(isEligibleCompletedRun).sort(compareCanonicalPreparationRuns)
-  return eligible[0]?.approvalPackage ?? null
+  const authoritative = selectLatestAuthoritativeOutreachPackage({
+    runs,
+    draftFactoryPackageId: input.draftFactoryPackageId,
+    hasSupervisedGenerationForLead: input.hasSupervisedGenerationForLead,
+    draftFactoryState: input.draftFactoryState,
+  })
+  return authoritative
 }

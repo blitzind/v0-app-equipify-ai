@@ -9,6 +9,7 @@ import {
   applyWakeInvalidationToEvidence,
   buildAdvanceResultV5,
   buildDraftFactoryWakeFingerprint,
+  computeRetryEligibleAt,
   isBillableDraftingAuthorized,
   normalizeDraftFactoryWake,
   planDurableStageAdvance,
@@ -37,6 +38,10 @@ export {
   buildDraftFactoryWakeFingerprint,
 } from "@/lib/growth/draft-factory/draft-factory-durable-engine"
 
+import type { DraftFactorySupervisedAvaGenerationHandoffResult } from "@/lib/growth/draft-factory/draft-factory-supervised-ava-generation-1a"
+
+export type DraftFactoryGenerationHandoffResult = DraftFactorySupervisedAvaGenerationHandoffResult
+
 export type AdvanceDraftFactoryForLeadInput = {
   organizationId: string
   leadId: string
@@ -46,12 +51,12 @@ export type AdvanceDraftFactoryForLeadInput = {
   workerId?: string
   /** Injected repository — production must pass Postgres via live facade. */
   repository?: DraftFactoryDurableRepository
-  /** Injected Growth 5F generation — only path that may create packages. */
+  /** Injected supervised Ava generation — scheduler canonical path. */
   generateViaGrowth5F?: (ctx: {
     organizationId: string
     leadId: string
     now: string
-  }) => Promise<{ packageId: string; pendingHumanApproval: true; transportBlocked: true } | null>
+  }) => Promise<DraftFactoryGenerationHandoffResult>
   /** Optional auto-complete facts for deterministic certs / wake completions. */
   completionHints?: {
     completeCurrentStage?: boolean
@@ -412,8 +417,45 @@ export async function advanceDraftFactoryForLead(
           leadId: input.leadId,
           now,
         })
-        if (
+        if (pkg && "gptOutcome" in pkg && pkg.gptOutcome === "reject") {
+          nextEvidence = {
+            ...nextEvidence,
+            rejected: true,
+            draftValid: false,
+            packageId: null,
+          }
+          await repo.incrementPackagesProduced(input.organizationId, now)
+          plan = {
+            stageEvaluated: "generation",
+            outcome: "completed",
+            reason: `Supervised Ava rejected prospect — ${pkg.reason}`,
+            nextEvidence,
+            nextEligibleWakeAt: null,
+            incrementAttempt: "generation",
+          }
+        } else if (pkg && "gptOutcome" in pkg && pkg.gptOutcome === "hold") {
+          nextEvidence = {
+            ...nextEvidence,
+            draftValid: false,
+            packageId: null,
+          }
+          await repo.incrementPackagesProduced(input.organizationId, now)
+          const generationAttempt = (previous.attemptCounts.generation ?? 0) + 1
+          plan = {
+            stageEvaluated: "generation",
+            outcome: "deferred",
+            reason: `Supervised Ava hold — ${pkg.reason}`,
+            nextEvidence,
+            nextEligibleWakeAt: computeRetryEligibleAt({
+              stage: "generation",
+              attempt: generationAttempt,
+              nowMs: Date.parse(now),
+            }),
+            incrementAttempt: "generation",
+          }
+        } else if (
           pkg &&
+          "pendingHumanApproval" in pkg &&
           pkg.pendingHumanApproval === true &&
           pkg.transportBlocked === true
         ) {
@@ -421,14 +463,19 @@ export async function advanceDraftFactoryForLead(
           nextEvidence = applyStageCompletionFact(nextEvidence, "generation", {
             packageId: pkg.packageId,
           })
-          await repo.incrementPackagesProduced(input.organizationId, now)
+          if (pkg.gptOutcome === "pursue") {
+            await repo.incrementPackagesProduced(input.organizationId, now)
+          }
           plan = {
             stageEvaluated: "generation",
             outcome: "completed",
-            reason: "Growth 5F generated approval package — stop at waiting_for_approval.",
+            reason:
+              pkg.gptOutcome === "duplicate_reused"
+                ? "Existing supervised Ava draft linked — stop at waiting_for_approval."
+                : "Supervised Ava GPT generation completed — stop at waiting_for_approval.",
             nextEvidence,
             nextEligibleWakeAt: null,
-            incrementAttempt: "generation",
+            incrementAttempt: pkg.gptOutcome === "pursue" ? "generation" : undefined,
           }
         } else if (pkg) {
           plan = {
@@ -650,6 +697,16 @@ export async function listDueDraftFactoryStates(input: {
 }): Promise<AiOsDraftFactoryDurableLeadState[]> {
   const repo = input.repository ?? createMemoryDraftFactoryRepository("memory")
   return repo.listDueStates(input)
+}
+
+export async function listWaitingForGenerationDraftFactoryStates(input: {
+  organizationId: string
+  now: string
+  limit?: number
+  repository?: DraftFactoryDurableRepository
+}): Promise<AiOsDraftFactoryDurableLeadState[]> {
+  const repo = input.repository ?? createMemoryDraftFactoryRepository("memory")
+  return repo.listWaitingForGenerationStates(input)
 }
 
 export async function listAdmissionIntegrityReconcileDraftFactoryStates(input: {

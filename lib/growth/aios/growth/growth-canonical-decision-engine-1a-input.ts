@@ -120,5 +120,7 @@ export type GrowthCanonicalDecisionInput = {
     meetingVersion?: string | null
     approvalVersion?: string | null
     materialEventId?: string | null
+    draftFactoryState?: string | null
+    draftFactoryPackageId?: string | null
   }
 }

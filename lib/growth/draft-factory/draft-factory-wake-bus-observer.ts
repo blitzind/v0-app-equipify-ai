@@ -12,6 +12,7 @@ import {
   advanceDraftFactoryCapacityWake,
   getDeferredDraftFactoryStates,
   listDueDraftFactoryStates,
+  listWaitingForGenerationDraftFactoryStates,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
 import {
   buildCanonicalEvidenceForLead,
@@ -26,12 +27,13 @@ import {
 import {
   GROWTH_DRAFT_FACTORY_CAPACITY_SLOTS_PER_ORG,
   GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
+  GROWTH_DRAFT_FACTORY_GENERATION_READY_POOL_LIMIT,
   GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER,
   GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
-import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
+import { createDraftFactorySupervisedAvaGenerationHandoff } from "@/lib/growth/draft-factory/draft-factory-supervised-ava-generation-1a"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import {
   createDraftFactoryWakeObservabilityHandle,
@@ -68,21 +70,21 @@ async function applyOrgCapacityWake(
 ): Promise<number> {
   const repository = await resolveLiveRepository(admin)
   const deferred = await getDeferredDraftFactoryStates(input.organizationId, repository)
-  const due = await listDueDraftFactoryStates({
+  const generationReady = await listWaitingForGenerationDraftFactoryStates({
     organizationId: input.organizationId,
     now: input.now,
-    limit: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
+    limit: GROWTH_DRAFT_FACTORY_GENERATION_READY_POOL_LIMIT,
     repository,
   })
 
-  // AUTONOMY-1F — include waiting_for_generation, not only portfolio_deferred.
+  // AUTONOMY-1F — include waiting_for_generation via dedicated pool (not due FIFO).
   const pool = collectGenerationCapacityCandidates({
     deferredStates: deferred.map((row) => ({
       leadId: row.leadId,
       state: row.state,
       updatedAt: row.updatedAt,
     })),
-    dueStates: due.map((row) => ({
+    generationReadyStates: generationReady.map((row) => ({
       leadId: row.leadId,
       state: row.state,
       updatedAt: row.updatedAt,
@@ -123,22 +125,7 @@ async function applyOrgCapacityWake(
     workerId: `df-wake-bus:${input.sourceId}`,
     repository,
     candidates: capacityCandidates,
-    generateViaGrowth5F: async ({ organizationId, leadId, now: generatedAt }) => {
-      const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
-        admin,
-        {
-          organizationId,
-          leadId,
-          generatedAt,
-        },
-      )
-      if (!persisted) return null
-      return {
-        packageId: persisted.packageId,
-        pendingHumanApproval: true as const,
-        transportBlocked: true as const,
-      }
-    },
+    generateViaGrowth5F: createDraftFactorySupervisedAvaGenerationHandoff(admin),
   })
 
   return result.results.filter((row) => row.outcome !== "duplicate_noop").length

@@ -24,6 +24,7 @@ import { buildRelationshipAssessment } from "@/lib/growth/aios/growth/growth-rel
 import type { RevenueStrategyRecommendation } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
 import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
+import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import { listGrowthMeetingsForLead } from "@/lib/growth/meeting-intelligence/meeting-repository"
@@ -132,12 +133,27 @@ export async function resolveGrowthCanonicalDecisionForLead(
       materialEventAt: input.materialEvent?.at ?? null,
     })
 
+  let draftFactoryPackageId: string | null = null
+  let draftFactoryState: string | null = null
+  try {
+    const resolved = await resolveDraftFactoryDurableRepository({ runtime: "production", admin })
+    if (resolved.kind === "postgres") {
+      const dfState = await resolved.repository.getLeadState(organizationId, input.leadId)
+      draftFactoryPackageId = dfState?.packageId ?? null
+      draftFactoryState = dfState?.state ?? null
+    }
+  } catch {
+    // Non-fatal for decision resolution.
+  }
+
   const packagePromise: Promise<GrowthAutonomousOutreachApprovalPackage | null> =
     input.packageSnapshot != null
       ? Promise.resolve(input.packageSnapshot)
       : resolveCanonicalOutreachPackageForLead(admin, {
           organizationId,
           leadId: input.leadId,
+          draftFactoryPackageId,
+          draftFactoryState,
         }).catch(() => {
           inputDegraded.push("outreach_package")
           return null
@@ -436,6 +452,8 @@ export async function resolveGrowthCanonicalDecisionForLead(
         input.materialEvent?.id ??
         latestReply?.id ??
         null,
+      draftFactoryState: draftFactoryState,
+      draftFactoryPackageId: draftFactoryPackageId,
     },
   }
 

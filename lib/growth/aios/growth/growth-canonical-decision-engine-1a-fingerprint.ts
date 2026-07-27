@@ -41,6 +41,8 @@ export function buildGrowthCanonicalDecisionFingerprint(input: GrowthCanonicalDe
     reply?.isMaterial ? stablePart(reply.classification) : "",
     input.approvalState?.pendingPackageApproval ? "approval_pending" : "",
     input.transportState?.blocked ? "transport_blocked" : "",
+    stablePart(versions.draftFactoryState),
+    stablePart(versions.draftFactoryPackageId),
   ]
 
   return parts.filter(Boolean).join(":")
