@@ -92,10 +92,10 @@ async function main() {
   assert.match(externalSource, /autonomous_portfolio_discovery_deferred/)
   assert.match(enrichmentSource, /discovery_authority/)
   assert.match(enrichmentSource, /autonomous_portfolio_discovery/)
-  assert.match(projectionSource, /provider query stays US-wide/)
+  assert.match(projectionSource, /autonomousBroadProviderDiscovery/)
+  assert.match(projectionSource, /discoveryQualificationContext/)
   assert.doesNotMatch(projectionSource, /field: "state"/)
-  assert.match(targetingSource, /preferClusterBroadeningAnchors/)
-  console.log("  ✓ Architecture guard — discovery deferral + US-wide provider geo")
+  console.log("  ✓ Architecture guard — broad provider discovery + deferred qualification")
 
   const profile = buildLive1bEquipifyCompanyProfileContent()
   const canonicalFilters = buildProspectSearchFiltersFromBusinessProfile(profile)
@@ -121,7 +121,6 @@ async function main() {
   assert.equal(autonomous.diagnostics.industry_deferred_count, 1)
   console.log("  ✓ Industry deferral keeps provider candidates for GPT admission")
 
-  const projection = projectApprovedBusinessProfileToLeadDiscovery(profile, "Equipify")
   const slicedRequest = buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile({
     profile,
     organizationId: EQUIPIFY_PRODUCTION_ORG_ID,
@@ -142,15 +141,21 @@ async function main() {
       rotatedFromSliceKey: null,
     },
   })
-  const stateFilters = slicedRequest.request.filters.filter((row) => row.field === "state")
-  assert.equal(stateFilters.length, 0, "slice rotation must not send state IN filters to DataMoon")
+  assert.equal(slicedRequest.request.audience_type, "advanced_search")
+  const stateFilters = slicedRequest.request.filters.filter(
+    (row) => row.field === "state" || row.field === "personal_state",
+  )
+  assert.equal(stateFilters.length, 0, "slice rotation must not send state filters to DataMoon")
   assert.ok(
     slicedRequest.request.filters.some(
       (row) => row.field === "country" && row.value === "United States",
     ),
   )
-  assert.ok((slicedRequest.targetingSummary.targetingStrategy?.topicPhrases?.length ?? 0) >= 3)
-  console.log("  ✓ Sliced provider request is US-wide with broadened topic pool")
+  assert.ok(
+    (slicedRequest.request.workbench_context?.discoveryQualificationContext?.topicPhrases?.length ??
+      0) >= 3,
+  )
+  console.log("  ✓ Sliced provider request is US-wide advanced_search with qualification metadata")
 
   if (PRODUCTION_REPLAY) {
     process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN = "1"

@@ -7,8 +7,6 @@ import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
   buildDatamoonFirmographicFilterStrategyMetadata,
-  buildDatamoonFirmographicFiltersFromCanonicalProjection,
-  mergeDatamoonAudienceFiltersPreservingProviderFields,
   type DatamoonFirmographicFilterStrategyMetadata,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-firmographic-filter-mapping-1a"
 import {
@@ -18,6 +16,9 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 import type { DatamoonDiscoverySearchSliceSelection } from "@/lib/growth/lead-sources/datamoon/growth-datamoon-discovery-search-slice-1a-types"
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
+import {
+  GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-provider-discovery-1a"
 import {
   AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
@@ -58,7 +59,13 @@ function applyDiscoveryGeoBucketFilters(
   if (!searchSlice?.stateCodes.length) return filters
 
   const withoutGeo = filters.filter(
-    (row) => row.field !== "state" && row.field !== "country" && row.field !== "city",
+    (row) =>
+      row.field !== "state" &&
+      row.field !== "personal_state" &&
+      row.field !== "country" &&
+      row.field !== "contact_country" &&
+      row.field !== "city" &&
+      row.field !== "personal_city",
   )
 
   // Slice geo buckets drive rotation/exhaustion only — provider query stays US-wide so
@@ -116,31 +123,46 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     operationalTargeting,
     companySizeRanges: input.profile.idealCustomers.companySizeRanges,
   })
-  const firmographicFilters = buildDatamoonFirmographicFiltersFromCanonicalProjection({
-    projection,
-    operationalTargeting,
-    companySizeRanges: input.profile.idealCustomers.companySizeRanges,
-  })
 
   const draft = buildAudienceDraftFromLeadDiscoveryProjection(projection, {
     audienceName: projection.audienceNameSuggestion,
     recordLimit: Math.max(1, Math.min(100, Math.floor(input.batchSize))),
     excludeDuplicates: true,
-    topics: operationalTargeting.topicPhrases,
+    // Qualification topics/personas stay in workbench metadata — not provider B2B filters.
+    topics: [],
+    jobTitles: [],
+    intentLevels: [],
+    lookbackDays: 0,
   })
 
   const request = buildDatamoonImportRequestFromAudienceDraft(draft)
-  request.filters = applyDiscoveryGeoBucketFilters(
-    mergeDatamoonAudienceFiltersPreservingProviderFields(request.filters, firmographicFilters),
-    searchSlice,
-  )
+  request.audience_type = "advanced_search"
+  request.filters = applyDiscoveryGeoBucketFilters([], searchSlice)
   request.run_name = `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:${input.generatedAt.slice(0, 10)}`
   request.limit = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
   request.workbench_context = {
     ...(request.workbench_context ?? {}),
-    topics: operationalTargeting.topicPhrases,
-    supplementalTopicSearchQueries: operationalTargeting.industryAliasesUsed,
-    clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
+    topics: [],
+    intentLevels: [],
+    lookbackDays: 0,
+    autonomousBroadProviderDiscovery: true,
+    qaMarker: GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER,
+    discoveryQualificationContext: {
+      topicPhrases: operationalTargeting.topicPhrases,
+      supplementalTopicSearchQueries: operationalTargeting.industryAliasesUsed,
+      clusterBroadeningAnchors: operationalTargeting.clusterBroadeningAnchors,
+      operationalConceptPhrases: operationalTargeting.operationalConcepts,
+      discoverySearchSlice: searchSlice
+        ? {
+            sliceKey: searchSlice.sliceKey,
+            clusterId: searchSlice.clusterId,
+            geoBucketId: searchSlice.geoBucketId,
+            geoBucketLabel: searchSlice.geoBucketLabel,
+            topicVariantIndex: searchSlice.topicVariantIndex,
+            selectionReason: searchSlice.selectionReason,
+          }
+        : null,
+    },
     topicRankingSignals: {
       topicPhrases: operationalTargeting.topicPhrases,
       operationalConceptPhrases: operationalTargeting.operationalConcepts,

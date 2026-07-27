@@ -185,10 +185,30 @@ async function main(): Promise<void> {
     )
   })
 
-  runGate("7. repeated low-novelty attempts advance rotation/exhaustion", () => {
+  runGate("7. zero provider results rotate immediately to a different slice", () => {
+    let state = recordZeroSelected({ rawCompanyCount: 0, normalizedCompanyCount: 0, topicVariantIndex: 2 })
+    assert.equal(state.slices[SLICE_KEY]?.lastOutcomeKind, "zero_provider_results")
+    assert.ok(state.slices[SLICE_KEY]?.exhaustedUntil)
+
+    const next = selectNextDatamoonDiscoverySearchSlice({
+      projection: equipifyProjection(),
+      state,
+      generatedAt: GENERATED_AT,
+    })
+    assert.notEqual(next.sliceKey, SLICE_KEY)
+    assert.equal(next.topicVariantIndex, 0)
+  })
+
+  runGate("8. repeated low-novelty attempts still advance rotation/exhaustion", () => {
     let state = emptyDatamoonDiscoverySearchSliceState()
     state.currentSliceKey = SLICE_KEY
-    state = recordZeroSelected({ state, topicVariantIndex: 0 })
+    state = recordZeroSelected({
+      state,
+      topicVariantIndex: 0,
+      rawCompanyCount: 12,
+      normalizedCompanyCount: 0,
+    })
+    assert.equal(state.slices[SLICE_KEY]?.lastOutcomeKind, "zero_after_normalization")
     assert.equal(state.slices[SLICE_KEY]?.consecutiveLowNoveltyRuns, 1)
     assert.equal(state.slices[SLICE_KEY]?.exhaustedUntil, null)
 
@@ -200,11 +220,21 @@ async function main(): Promise<void> {
     assert.equal(afterFirst.sliceKey, SLICE_KEY)
     assert.equal(afterFirst.topicVariantIndex, 1)
 
-    state = recordZeroSelected({ state, topicVariantIndex: 1 })
+    state = recordZeroSelected({
+      state,
+      topicVariantIndex: 1,
+      rawCompanyCount: 12,
+      normalizedCompanyCount: 0,
+    })
     assert.equal(state.slices[SLICE_KEY]?.consecutiveLowNoveltyRuns, 2)
 
     for (let variant = 2; variant < DISCOVERY_SLICE_MAX_TOPIC_VARIANTS; variant += 1) {
-      state = recordZeroSelected({ state, topicVariantIndex: variant })
+      state = recordZeroSelected({
+        state,
+        topicVariantIndex: variant,
+        rawCompanyCount: 12,
+        normalizedCompanyCount: 0,
+      })
     }
     assert.ok(state.slices[SLICE_KEY]?.exhaustedUntil)
     assert.ok(
@@ -213,8 +243,8 @@ async function main(): Promise<void> {
     )
   })
 
-  runGate("8. nextSearchSlice advances after completed zero-result attempts", () => {
-    let state = recordZeroSelected({ rawCompanyCount: 0 })
+  runGate("9. nextSearchSlice advances topic variants for post-normalization zero-result attempts", () => {
+    let state = recordZeroSelected({ rawCompanyCount: 12, normalizedCompanyCount: 0 })
     const firstNext = selectNextDatamoonDiscoverySearchSlice({
       projection: equipifyProjection(),
       state,
@@ -223,7 +253,12 @@ async function main(): Promise<void> {
     assert.equal(firstNext.sliceKey, SLICE_KEY)
     assert.equal(firstNext.topicVariantIndex, 1)
 
-    state = recordZeroSelected({ state, topicVariantIndex: 1 })
+    state = recordZeroSelected({
+      state,
+      topicVariantIndex: 1,
+      rawCompanyCount: 12,
+      normalizedCompanyCount: 0,
+    })
     const secondNext = selectNextDatamoonDiscoverySearchSlice({
       projection: equipifyProjection(),
       state,
@@ -237,7 +272,7 @@ async function main(): Promise<void> {
     )
   })
 
-  runGate("9. existing successful discovery behavior remains intact", () => {
+  runGate("10. existing successful discovery behavior remains intact", () => {
     const state = recordDatamoonDiscoverySearchSliceOutcome({
       state: { ...emptyDatamoonDiscoverySearchSliceState(), currentSliceKey: SLICE_KEY },
       selection: {
@@ -261,14 +296,14 @@ async function main(): Promise<void> {
     assert.equal(next.resumedSlice, true)
   })
 
-  runGate("10. no approval/send behavior changes (source)", () => {
+  runGate("11. no approval/send behavior changes (source)", () => {
     const portfolioSource = readSource("lib/growth/portfolio-manager/growth-autonomous-portfolio-discovery-1a.ts")
     assert.doesNotMatch(portfolioSource, /approveFirstTouch|sendOutbound|delivery_attempts/i)
     assert.match(portfolioSource, /selected\.length === 0/)
     assert.doesNotMatch(portfolioSource, /selected\.length > 0[\s\S]{0,120}recordDatamoonDiscoverySearchSliceOutcome/)
   })
 
-  console.log(`\n[${CERT_ID}] PASS 10/10`)
+  console.log(`\n[${CERT_ID}] PASS 11/11`)
 }
 
 void main().catch((error) => {

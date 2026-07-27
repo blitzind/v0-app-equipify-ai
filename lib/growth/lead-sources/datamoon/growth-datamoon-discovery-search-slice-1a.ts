@@ -133,7 +133,11 @@ export function recordDatamoonDiscoverySearchSliceOutcome(input: {
     : 0
 
   let exhaustedUntil: string | null = null
-  if (
+  if (outcomeKind === "zero_provider_results") {
+    exhaustedUntil = new Date(
+      Date.parse(input.generatedAt) + DISCOVERY_SLICE_EXHAUSTION_COOLDOWN_MS,
+    ).toISOString()
+  } else if (
     lowNovelty &&
     consecutiveLowNoveltyRuns >= DISCOVERY_SLICE_CONSECUTIVE_LOW_NOVELTY_FOR_EXHAUSTION &&
     input.selection.topicVariantIndex >= DISCOVERY_SLICE_MAX_TOPIC_VARIANTS - 1
@@ -216,6 +220,7 @@ export function selectNextDatamoonDiscoverySearchSlice(input: {
     const clusterRotationIndex = Math.max(0, clusters.findIndex((row) => row.id === clusterId))
 
     if (
+      current.lastOutcomeKind !== "zero_provider_results" &&
       current.consecutiveLowNoveltyRuns > 0 &&
       current.topicVariantIndex < DISCOVERY_SLICE_MAX_TOPIC_VARIANTS - 1
     ) {
@@ -236,7 +241,10 @@ export function selectNextDatamoonDiscoverySearchSlice(input: {
       }
     }
 
-    if (current.consecutiveLowNoveltyRuns === 0) {
+    if (
+      current.lastOutcomeKind !== "zero_provider_results" &&
+      current.consecutiveLowNoveltyRuns === 0
+    ) {
       return {
         qaMarker: GROWTH_DATAMOON_DISCOVERY_SEARCH_SLICE_1A_QA_MARKER,
         sliceKey: currentKey,
