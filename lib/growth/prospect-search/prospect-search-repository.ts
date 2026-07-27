@@ -265,6 +265,7 @@ export async function runProspectSearch(
           query: input.query,
           filters: mergedFilters,
           parsed,
+          discovery_authority: input.discovery_authority ?? "autonomous_portfolio",
         },
       )
 

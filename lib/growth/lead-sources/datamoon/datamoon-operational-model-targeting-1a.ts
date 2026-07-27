@@ -341,6 +341,8 @@ export function translateDatamoonOperationalModelTargeting(input: {
   audienceOrdinal?: number
   clusterRotationIndex?: number
   topicVariantIndex?: number
+  /** When true, blend cluster broadening anchors into provider topic pool (slice rotation searches). */
+  preferClusterBroadeningAnchors?: boolean
 }): DatamoonOperationalTargetingTranslation {
   const availableClusters = resolveAvailableOperationalVerticalClusters(input.projection)
   const rotationIndex =
@@ -356,7 +358,10 @@ export function translateDatamoonOperationalModelTargeting(input: {
   const primaryCluster = availableClusters[rotationIndex]!
   const adjacentCluster = availableClusters[(rotationIndex + 1) % availableClusters.length]!
 
-  const primaryPhrases = verticalTopicPhrasesForCluster(input.projection, primaryCluster)
+  const primaryPhrases = uniqueStrings([
+    ...(input.preferClusterBroadeningAnchors ? primaryCluster.broadeningAnchors : []),
+    ...verticalTopicPhrasesForCluster(input.projection, primaryCluster),
+  ])
   const adjacentPhrases = verticalTopicPhrasesForCluster(input.projection, adjacentCluster)
   const operationalConcepts = buildOperationalConceptPhrases(input.projection)
   const qualificationTopics = translateQualificationCriteriaToTopicPhrases(input.projection.qualificationCriteria)

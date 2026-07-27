@@ -4,6 +4,24 @@ import {
   explainProspectSearchFilterDrop,
 } from "@/lib/growth/prospect-search/prospect-search-filters"
 
+export const GROWTH_AUTONOMOUS_PORTFOLIO_EXTERNAL_DISCOVERY_DEFERRAL_1A_QA_MARKER =
+  "ava-discovery-novel-lead-yield-recovery-1a-v1" as const
+
+/** Discovery-stage filters deferred to GPT-5.5 admission for autonomous portfolio replenishment. */
+export function buildAutonomousPortfolioExternalDiscoveryFilters(
+  filters: GrowthProspectSearchFilters,
+): GrowthProspectSearchFilters {
+  return {
+    ...filters,
+    keywords: undefined,
+    industry: null,
+    industry_aliases: undefined,
+    location: null,
+    territory_filter: undefined,
+    territory_id: null,
+  }
+}
+
 function isGeographyDropReason(reason: string | null): boolean {
   return reason === "location" || reason === "territory" || reason === "service_area"
 }
@@ -32,22 +50,29 @@ export type GrowthProspectSearchExternalFilterDiagnostics = {
   company_identity_missing_count?: number
   /** Operational keywords deferred to post-research validation (GE-AIOS-EXTERNAL-DISCOVERY-POST-RESEARCH-KEYWORD-VALIDATION-1A). */
   operational_keywords_deferred?: boolean
+  /** Industry/SSV aliases deferred to GPT admission for autonomous portfolio discovery. */
+  industry_deferred_count?: number
+  autonomous_portfolio_discovery_deferred?: boolean
 }
 
 export function explainExternalDiscoveryProspectSearchFilterDrop(
   row: GrowthProspectSearchCompanyResult,
   filters: GrowthProspectSearchFilters,
+  options?: { autonomous_portfolio_discovery?: boolean },
 ): string | null {
-  const filtersWithoutKeywords: GrowthProspectSearchFilters = {
-    ...filters,
-    keywords: undefined,
-  }
-  return explainProspectSearchFilterDrop(row, filtersWithoutKeywords, { external_discovery: true })
+  const effectiveFilters = options?.autonomous_portfolio_discovery
+    ? buildAutonomousPortfolioExternalDiscoveryFilters(filters)
+    : {
+        ...filters,
+        keywords: undefined,
+      }
+  return explainProspectSearchFilterDrop(row, effectiveFilters, { external_discovery: true })
 }
 
 export function applyProspectSearchExternalCompanyFilters(
   companies: GrowthProspectSearchCompanyResult[],
   filters: GrowthProspectSearchFilters,
+  options?: { autonomous_portfolio_discovery?: boolean },
 ): {
   companies: GrowthProspectSearchCompanyResult[]
   diagnostics: GrowthProspectSearchExternalFilterDiagnostics
@@ -59,11 +84,14 @@ export function applyProspectSearchExternalCompanyFilters(
   let keyword_accepted_count = 0
   let keyword_rejected_count = 0
   let keywords_deferred_count = 0
+  let industry_deferred_count = 0
   let company_identity_missing_count = 0
-  const operationalKeywordsDeferred = Boolean(filters.keywords?.length)
+  const autonomousPortfolioDiscoveryDeferred = options?.autonomous_portfolio_discovery === true
+  const operationalKeywordsDeferred =
+    autonomousPortfolioDiscoveryDeferred || Boolean(filters.keywords?.length)
 
   for (const row of companies) {
-    const reason = explainExternalDiscoveryProspectSearchFilterDrop(row, filters)
+    const reason = explainExternalDiscoveryProspectSearchFilterDrop(row, filters, options)
     if (companyIdentityMissing(row)) {
       company_identity_missing_count += 1
     }
@@ -78,6 +106,9 @@ export function applyProspectSearchExternalCompanyFilters(
     }
     kept.push(row)
     geography_accepted_count += 1
+    if (autonomousPortfolioDiscoveryDeferred) {
+      industry_deferred_count += 1
+    }
     if (operationalKeywordsDeferred) {
       keywords_deferred_count += 1
     } else {
@@ -99,6 +130,8 @@ export function applyProspectSearchExternalCompanyFilters(
       keywords_deferred_count: operationalKeywordsDeferred ? keywords_deferred_count : 0,
       company_identity_missing_count,
       operational_keywords_deferred: operationalKeywordsDeferred,
+      industry_deferred_count: autonomousPortfolioDiscoveryDeferred ? industry_deferred_count : 0,
+      autonomous_portfolio_discovery_deferred: autonomousPortfolioDiscoveryDeferred,
     },
   }
 }

@@ -61,15 +61,9 @@ function applyDiscoveryGeoBucketFilters(
     (row) => row.field !== "state" && row.field !== "country" && row.field !== "city",
   )
 
-  return [
-    { field: "country", operator: "=", value: "United States" },
-    {
-      field: "state",
-      operator: "in",
-      value: [...searchSlice.stateCodes],
-    },
-    ...withoutGeo,
-  ]
+  // Slice geo buckets drive rotation/exhaustion only — provider query stays US-wide so
+  // DataMoon can return candidates; GPT-5.5 admission evaluates ICP fit downstream.
+  return [{ field: "country", operator: "=", value: "United States" }, ...withoutGeo]
 }
 
 function hashFingerprint(parts: string[]): string {
@@ -114,6 +108,7 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     audienceOrdinal: input.audienceOrdinal ?? 0,
     clusterRotationIndex: searchSlice?.clusterRotationIndex,
     topicVariantIndex: searchSlice?.topicVariantIndex ?? 0,
+    preferClusterBroadeningAnchors: Boolean(searchSlice),
   })
   const targetingStrategy = buildDatamoonOperationalTargetingStrategyMetadata(operationalTargeting)
   const firmographicStrategy = buildDatamoonFirmographicFilterStrategyMetadata({

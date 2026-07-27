@@ -6,6 +6,8 @@ import {
   applyProspectSearchExternalCompanyFilters,
   type GrowthProspectSearchExternalFilterDiagnostics,
 } from "@/lib/growth/prospect-search/prospect-search-external-filters"
+import { isAutonomousProspectDiscoveryAuthority } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-policy-1a"
+import type { ProspectSearchDiscoveryAuthority } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
 import {
@@ -43,9 +45,13 @@ export async function enrichProspectSearchExternalCompanies(
     query: string
     filters: GrowthProspectSearchFilters
     parsed: GrowthProspectSearchParsedQuery
+    discovery_authority?: ProspectSearchDiscoveryAuthority | null
   },
 ): Promise<EnrichProspectSearchExternalCompaniesResult> {
   const suppressionLookup = await loadProspectSearchSuppressionLookup(admin)
+  const autonomousPortfolioDiscovery = isAutonomousProspectDiscoveryAuthority(
+    context.discovery_authority ?? null,
+  )
 
   const enriched = companies.map((company) => {
     const status = deriveProspectSearchCompanyStatus(company)
@@ -60,7 +66,9 @@ export async function enrichProspectSearchExternalCompanies(
     return finalizeProspectSearchCompanyResult(withSafety, context)
   })
 
-  const filtered = applyProspectSearchExternalCompanyFilters(enriched, context.filters)
+  const filtered = applyProspectSearchExternalCompanyFilters(enriched, context.filters, {
+    autonomous_portfolio_discovery: autonomousPortfolioDiscovery,
+  })
   if (filtered.companies.length > 0 || enriched.length === 0) {
     return {
       companies: filtered.companies,
@@ -83,7 +91,9 @@ export async function enrichProspectSearchExternalCompanies(
     search_intent_categories: undefined,
   }
 
-  const relaxedFiltered = applyProspectSearchExternalCompanyFilters(enriched, relaxedFilters)
+  const relaxedFiltered = applyProspectSearchExternalCompanyFilters(enriched, relaxedFilters, {
+    autonomous_portfolio_discovery: autonomousPortfolioDiscovery,
+  })
 
   return {
     companies: relaxedFiltered.companies,
