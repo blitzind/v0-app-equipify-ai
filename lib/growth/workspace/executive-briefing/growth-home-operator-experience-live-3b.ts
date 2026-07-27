@@ -223,12 +223,14 @@ function buildExecutiveOpeningParagraph(input: {
   currentActivityLabel?: string | null
   repliesToday?: number
   pendingPackages: number
+  approvedReadyToSend?: number
   preparingOutreach: number
 }): string {
   const monitoringReplies = (input.repliesToday ?? 0) > 0
   const replySuffix = monitoringReplies ? " I'm also monitoring replies from earlier outreach." : ""
   const batchSize = input.portfolioOperator?.nextBatchSize
   const belowTargetReason = portfolioBelowTargetReason(input)
+  const approvedReadyToSend = Math.max(input.approvedReadyToSend ?? 0, 0)
 
   if (input.pendingPackages > 0) {
     const briefCounts = inferDailyBriefReviewCounts({
@@ -249,6 +251,12 @@ function buildExecutiveOpeningParagraph(input: {
         ? "1 email draft is ready for your review"
         : `${input.pendingPackages} email drafts are ready for your review`
     return `I've finished reviewing companies, and ${draftPhrase}.`
+  }
+
+  if (approvedReadyToSend > 0) {
+    return approvedReadyToSend === 1
+      ? "1 approved email is ready to send."
+      : `${approvedReadyToSend} approved emails are ready to send.`
   }
 
   if (
@@ -317,12 +325,19 @@ function buildExecutiveOpeningParagraph(input: {
   )
 }
 
-function operatorNeedLine(pendingPackages: number): string {
+function operatorNeedLine(pendingPackages: number, approvedReadyToSend = 0): string {
+  if (pendingPackages > 0) return formatOperatorDailyBriefNeedLine(pendingPackages)
+  if (approvedReadyToSend > 0) {
+    return approvedReadyToSend === 1
+      ? "Send the approved email when you're ready."
+      : "Send the approved emails when you're ready."
+  }
   return formatOperatorDailyBriefNeedLine(pendingPackages)
 }
 
 function executiveNextMilestoneLine(input: {
   pendingPackages: number
+  approvedReadyToSend?: number
   preparingOutreach: number
   canonicalOperatorFocus?: GrowthCanonicalOperatorFocus | null
   primaryMissionLabel?: string | null
@@ -334,6 +349,13 @@ function executiveNextMilestoneLine(input: {
     return input.pendingPackages === 1
       ? "After your approval, I'll continue reviewing the next company."
       : "After your approval, I'll continue reviewing the next companies."
+  }
+
+  const approvedReadyToSend = Math.max(input.approvedReadyToSend ?? 0, 0)
+  if (approvedReadyToSend > 0) {
+    return approvedReadyToSend === 1
+      ? "After you send it, I'll continue reviewing the next company."
+      : "After you send them, I'll continue reviewing the next companies."
   }
 
   if (input.preparingOutreach > 0) {
@@ -394,6 +416,7 @@ export function buildHeroExecutiveBriefing(input: {
   dailyActivityNarrative?: AvaDailyActivityNarrative | null
   missionDiscovery?: GrowthHomeMissionDiscoverySnapshot | null
   pendingApprovals?: number
+  approvedReadyToSend?: number
   readyForOutreachReview?: number
   discoveryTarget?: string | null
   portfolioOperator?: GrowthPortfolioManagerOperatorProjection | null
@@ -405,6 +428,7 @@ export function buildHeroExecutiveBriefing(input: {
 }): GrowthHomeHeroExecutiveBriefing {
   /** Canonical approval queue — sole authority for "ready for your review" language. */
   const pendingPackages = Math.max(0, input.pendingApprovals ?? 0)
+  const approvedReadyToSend = Math.max(0, input.approvedReadyToSend ?? 0)
   /** Research loop in-progress count — not the same as operator review queue. */
   const preparingOutreach = Math.max(0, input.readyForOutreachReview ?? 0)
   const setupIncomplete = input.dailyActivityNarrative?.focus === "setup"
@@ -432,15 +456,17 @@ export function buildHeroExecutiveBriefing(input: {
       currentActivityLabel: input.currentActivityLabel,
       repliesToday: input.repliesToday,
       pendingPackages,
+      approvedReadyToSend,
       preparingOutreach,
     }),
   )
 
-  paragraphs.push(operatorNeedLine(pendingPackages))
+  paragraphs.push(operatorNeedLine(pendingPackages, approvedReadyToSend))
 
   paragraphs.push(
     executiveNextMilestoneLine({
       pendingPackages,
+      approvedReadyToSend,
       preparingOutreach,
       canonicalOperatorFocus: input.canonicalOperatorFocus,
       primaryMissionLabel: input.primaryMissionLabel,

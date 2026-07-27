@@ -65,13 +65,21 @@ export function filterProductionOperatorApprovalSnapshot(
   const topPackage =
     packages.find((row) => row.packageId === snapshot.topPackage?.packageId) ?? packages[0] ?? null
 
+  const awaitingApprovalCount = packages.filter(
+    (row) => !/approved|authorized|ready to send/i.test(row.statusLabel),
+  ).length
+  const approvedReadyToSendCount = packages.filter((row) =>
+    /approved|authorized|ready to send/i.test(row.statusLabel),
+  ).length
+
   return {
     ...snapshot,
     packages,
     topPackage,
     outreachPackageCount: packages.length,
     outreachDraftCount: packages.reduce((sum, row) => sum + Math.max(0, row.draftCount), 0),
-    pendingApprovalCount: packages.length,
+    pendingApprovalCount: awaitingApprovalCount,
+    approvedReadyToSendCount,
     waitingForOperator: packages.length > 0,
   }
 }

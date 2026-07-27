@@ -31,7 +31,10 @@ export type GrowthCanonicalOperatorApprovalSnapshot = {
   qaMarker: typeof GROWTH_AIOS_OPERATOR_EXPERIENCE_1A_QA_MARKER
   outreachPackageCount: number
   outreachDraftCount: number
+  /** Draft packages awaiting operator message approval — excludes approved-unsent send queue. */
   pendingApprovalCount: number
+  /** Supervised drafts with valid binding awaiting transport send. */
+  approvedReadyToSendCount?: number
   waitingForOperator: boolean
   packages: GrowthCanonicalOperatorApprovalPackagePreview[]
   topPackage: GrowthCanonicalOperatorApprovalPackagePreview | null
