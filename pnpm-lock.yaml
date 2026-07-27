@@ -50,11 +50,11 @@ importers:
         specifier: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz
       '@fuzor/research':
-        specifier: file:../../fuzor/packages/research
-        version: file:../../fuzor/packages/research
+        specifier: file:vendor/fuzor-packages/fuzor-research-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-research-0.1.0.tgz
       '@fuzor/sales':
-        specifier: file:../../fuzor/packages/sales
-        version: file:../../fuzor/packages/sales
+        specifier: file:vendor/fuzor-packages/fuzor-sales-0.1.0.tgz
+        version: file:vendor/fuzor-packages/fuzor-sales-0.1.0.tgz
       '@fuzor/sdk':
         specifier: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz
         version: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz
@@ -652,11 +652,13 @@ packages:
     resolution: {integrity: sha512-Gd25gSiJnAWYdQZrA8ybq15gVPquEGwnt2H3DoiOTdEESgreRb4e5FONyQHzgtQdhz4C5ta7aMeHvYFTPy4jog==, tarball: file:vendor/fuzor-packages/fuzor-observability-0.1.0.tgz}
     version: 0.1.0
 
-  '@fuzor/research@file:../../fuzor/packages/research':
-    resolution: {directory: ../../fuzor/packages/research, type: directory}
+  '@fuzor/research@file:vendor/fuzor-packages/fuzor-research-0.1.0.tgz':
+    resolution: {integrity: sha512-0lld9yiDAT5reIDSss7U47RoFsOeDRo/VGqcaYtth8xb8ijAFOd8sptTaTrgaG+mQpXdUC1ADGeS8IPAvn8vqw==, tarball: file:vendor/fuzor-packages/fuzor-research-0.1.0.tgz}
+    version: 0.1.0
 
-  '@fuzor/sales@file:../../fuzor/packages/sales':
-    resolution: {directory: ../../fuzor/packages/sales, type: directory}
+  '@fuzor/sales@file:vendor/fuzor-packages/fuzor-sales-0.1.0.tgz':
+    resolution: {integrity: sha512-Vm+mGpJ030rq6sT3kp/xcjTIjjVjvT5RBdFcClKQSGNmCI2xDIUzf9xnSfz44mMnPQGDb2LRzIxr1CxnVgHVcw==, tarball: file:vendor/fuzor-packages/fuzor-sales-0.1.0.tgz}
+    version: 0.1.0
 
   '@fuzor/sdk@file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz':
     resolution: {integrity: sha512-Vs3ovQMkBFr2HSDj3eFmHA6QcAc1hfMGNO5cef2q76O6s5mkOAgRSqhF4Cxi745P1oAs3QlrhaOG88AUkz+Nmg==, tarball: file:vendor/fuzor-packages/fuzor-sdk-0.1.0.tgz}
@@ -4477,9 +4479,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@fuzor/research@file:../../fuzor/packages/research': {}
+  '@fuzor/research@file:vendor/fuzor-packages/fuzor-research-0.1.0.tgz': {}
 
-  '@fuzor/sales@file:../../fuzor/packages/sales':
+  '@fuzor/sales@file:vendor/fuzor-packages/fuzor-sales-0.1.0.tgz':
     dependencies:
       zod: 3.25.76
 
