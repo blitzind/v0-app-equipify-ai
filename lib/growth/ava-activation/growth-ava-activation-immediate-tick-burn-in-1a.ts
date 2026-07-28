@@ -58,7 +58,7 @@ function buildOperatorLines(input: {
 
   if (lines.length === 1) {
     lines.push(
-      "Nothing was queued for immediate execution. I'll continue on my regular schedule (about every 20 minutes) and update Home as real work completes.",
+      "Nothing was queued for immediate execution. I'll continue on my regular schedule (about every 5 minutes) and update Home as real work completes.",
     )
   }
 
@@ -148,7 +148,7 @@ export async function runGrowthAvaActivationImmediateProductionTick(input: {
       missionBootstrapsCompleted: 0,
       stopReason: null,
       operatorLines: [
-        "Activation complete — I'm enabled and will begin on my next scheduled cycle (about every 20 minutes).",
+        "Activation complete — I'm enabled and will begin on my next scheduled cycle (about every 5 minutes).",
         `Immediate cycle note: ${message}`,
       ],
       error: message,

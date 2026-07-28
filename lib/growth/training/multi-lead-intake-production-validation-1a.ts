@@ -693,7 +693,7 @@ export async function assembleMultiLeadIntakeValidationReport(
     measuredBatchSize: input.preflight.portfolio.batchSize,
     measuredProviderPreviewCount: reconciliation.providerPreviewCount,
     datamoonRunDurationMinutes: reconciliation.runDurationMinutes,
-    schedulerCadenceMinutes: 20,
+    schedulerCadenceMinutes: 5,
   })
 
   let recommendedNextAction = "Continue bounded production intake; batch path is healthy."

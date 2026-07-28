@@ -98,11 +98,11 @@ async function verifyProductionReadinessAudit(admin: SupabaseClient): Promise<vo
   )
   record(
     "scheduler-cron-cadence",
-    vercelCron.includes('"schedule": "*/20 * * * *"') &&
+    vercelCron.includes('"schedule": "*/5 * * * *"') &&
       vercelCron.includes('"/api/cron/growth-objective-runtime-scheduler"')
       ? "pass"
       : "warn",
-    "Objective runtime scheduler runs every 20 minutes",
+    "Objective runtime scheduler runs every 5 minutes",
   )
 
   record(

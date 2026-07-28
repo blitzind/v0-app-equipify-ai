@@ -36,7 +36,7 @@ const viewModel = buildGrowthHomeRuntimeTrustViewModel({
     autonomyTickHealth: null,
     lastSchedulerRunAt: generatedAt,
     lastSchedulerOk: true,
-    nextSchedulerEstimateAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+    nextSchedulerEstimateAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
   },
   salesOutcomes: {
     qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,

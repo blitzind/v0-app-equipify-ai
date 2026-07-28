@@ -14,7 +14,7 @@ import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { loadGrowthHomeCanonicalRuntimeActivity } from "@/lib/growth/home/growth-home-canonical-runtime-activity-loader-1a"
 
-const SCHEDULER_INTERVAL_MS = 20 * 60 * 1000
+const SCHEDULER_INTERVAL_MS = 5 * 60 * 1000
 const STEP_BUDGET_MS = 3_000
 
 export async function loadGrowthHomeRuntimeTrustPayload(input: {

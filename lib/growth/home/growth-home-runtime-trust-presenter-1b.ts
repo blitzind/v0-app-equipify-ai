@@ -410,7 +410,7 @@ function buildStartStatus(input: {
     headline: "Autonomous mode active",
     detail: beganLabel
       ? `My last autonomous action was ${beganLabel}.`
-      : "I'm scheduled to check for work every 20 minutes.",
+      : "I'm scheduled to check for work every 5 minutes.",
     primaryActionLabel: input.pendingApprovals > 0 ? "Review what I prepared" : null,
     primaryActionHref: input.pendingApprovals > 0 ? GROWTH_HOME_STARTUP_STEP_PATHS.approvals : null,
     primaryActionKind: input.pendingApprovals > 0 ? "link" : null,

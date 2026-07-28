@@ -199,7 +199,7 @@ function testScaleAssessmentVerdicts() {
     measuredBatchSize: 25,
     measuredProviderPreviewCount: 25,
     datamoonRunDurationMinutes: 20,
-    schedulerCadenceMinutes: 20,
+    schedulerCadenceMinutes: 5,
   })
   const byTarget = new Map(verdicts.map((entry) => [entry.target, entry.verdict]))
   assert.equal(byTarget.get(100), "ready_with_limits")

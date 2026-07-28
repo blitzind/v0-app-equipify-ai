@@ -74,7 +74,7 @@ function auditRuntimeSystems(): void {
 
   const vercel = readSource("vercel.json")
   assert.match(vercel, /growth-objective-runtime-scheduler/)
-  record("runtime", "cron-schedule", "Objective scheduler cron registered", "pass", "*/20 * * * * in vercel.json")
+  record("runtime", "cron-schedule", "Objective scheduler cron registered", "pass", "*/5 * * * * in vercel.json")
 
   const cronRoute = readSource("app/api/cron/growth-objective-runtime-scheduler/route.ts")
   assert.match(cronRoute, /runGrowthObjectiveRuntimeScheduler/)

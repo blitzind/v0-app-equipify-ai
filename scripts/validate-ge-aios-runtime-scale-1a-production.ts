@@ -104,7 +104,7 @@ async function main(): Promise<void> {
   console.log(`  avg research duration: ${avgMs != null ? Math.round(avgMs / 1000) : "—"}s`)
   console.log(`  p50: ${p50 != null ? Math.round(p50 / 1000) : "—"}s | p90: ${p90 != null ? Math.round(p90 / 1000) : "—"}s | p95: ${p95 != null ? Math.round(p95 / 1000) : "—"}s`)
   console.log(`  provider calls/company (observed crawl budget): ~${GROWTH_SCALE_OBSERVED_CRAWL_PAGES_PER_COMPANY} page fetches (no paid LLM per page)`)
-  console.log(`  scheduler cycles/day: 72 (20-minute cadence)`)
+  console.log(`  scheduler cycles/day: 288 (5-minute cadence)`)
 
   const avgDurationMs = avgMs ?? 45_000
   const required = computeRequiredResearchConcurrency({
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   console.log(`  500/day → ${required.completionsPerCycle} completions/cycle, concurrency ≥ ${required.requiredConcurrency}`)
   console.log(`  750/day → ${headroom.completionsPerCycle} completions/cycle, concurrency ≥ ${headroom.requiredConcurrency}`)
   console.log(
-    `  configured: ${GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS} parallel workers × 12 iterations/tick × 72 cycles = up to ${GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS * 12 * 72} attempts/day (theoretical)`,
+    `  configured: ${GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS} parallel workers × 12 iterations/tick × 288 cycles = up to ${GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS * 12 * 288} attempts/day (theoretical)`,
   )
 
   const autonomySettings = await fetchGrowthAutonomySettings(admin, organizationId)
