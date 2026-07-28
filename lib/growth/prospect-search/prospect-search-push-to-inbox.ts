@@ -189,26 +189,30 @@ export async function pushProspectSearchCompanyToLeadInbox(
   }
 
   const growthLeadId = result.growth_lead_id
-  const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
-    admin,
-    actor,
-    source: "saved_search",
-    leadId: growthLeadId,
-    company: {
-      name: company.company_name,
-      website: company.website,
-      companyId: company.id,
-    },
-    metadata: {
-      searchQuery: query,
-      identityUncertain: false,
-    },
-  })
+  const usesAutonomousGptPath = company.source_type === "external_discovered"
+
+  const workflowRun = usesAutonomousGptPath
+    ? { workflow: null, skipped: true, skipReason: "autonomous_sal_gpt_path" }
+    : await runUnifiedRevenueWorkflowAfterIntake({
+        admin,
+        actor,
+        source: "saved_search",
+        leadId: growthLeadId,
+        company: {
+          name: company.company_name,
+          website: company.website,
+          companyId: company.id,
+        },
+        metadata: {
+          searchQuery: query,
+          identityUncertain: false,
+        },
+      })
 
   return {
     outcome: "pushed",
     message: "Added to Revenue Queue for human review.",
-    growth_lead_id: workflowRun.workflow?.leadId ?? growthLeadId,
+    growth_lead_id: usesAutonomousGptPath ? growthLeadId : workflowRun.workflow?.leadId ?? growthLeadId,
     lead_status: result.lead_status ?? null,
     lead_created: result.lead_created ?? null,
     workflow: workflowRun.workflow,

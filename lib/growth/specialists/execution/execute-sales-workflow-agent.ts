@@ -32,6 +32,7 @@ import {
 } from "@/lib/growth/specialists/execution/growth-asl-discovery-mission-work-items-launch-1d"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata } from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
 import { assertGrowthPipelinePromotionIntegrity } from "@/lib/growth/draft-factory/growth-pipeline-promotion-integrity-2a"
 import { logGrowthEngine } from "@/lib/growth/access"
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
@@ -69,6 +70,17 @@ export async function executeSalesWorkflowAgent(
   const { workItem, delegation } = input
   const { workflow_agent: workflowAgent } = delegation
   const leadId = extractLeadIdFromWorkItem(workItem)
+
+  if (leadId) {
+    const lead = await fetchGrowthLeadById(admin, leadId).catch(() => null)
+    if (lead && shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(lead.metadata)) {
+      return {
+        executed: false,
+        workflow_agent: workflowAgent,
+        skip_reason: "autonomous_sal_gpt_path",
+      }
+    }
+  }
 
   if (
     isDiscoveryMissionWorkItem(workItem) ||

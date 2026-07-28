@@ -26,6 +26,7 @@ import {
 } from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
 import { executeSalesWorkflowAgent } from "@/lib/growth/specialists/execution/execute-sales-workflow-agent"
 import { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"
+import { shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata } from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
 import {
   AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS,
   logAutonomousSalesLoopEvent,
@@ -205,6 +206,7 @@ function collectResearchWorkBatch(input: {
   workResult: AvaWorkManagerResult
   skippedWorkItemIds: Set<string>
   maxItems: number
+  leadMetadataById?: ReadonlyMap<string, Record<string, unknown>>
 }): ResearchWorkBatchEntry[] {
   const batch: ResearchWorkBatchEntry[] = []
   const reserved = new Set(input.skippedWorkItemIds)
@@ -212,6 +214,14 @@ function collectResearchWorkBatch(input: {
   while (batch.length < input.maxItems) {
     const workItem = selectNextExecutableWorkItem(input.workResult, { excludeWorkItemIds: reserved })
     if (!workItem) break
+    const leadId = extractLeadIdFromWorkItem(workItem)
+    if (leadId) {
+      const metadata = input.leadMetadataById?.get(leadId)
+      if (metadata && shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(metadata)) {
+        reserved.add(workItem.id)
+        continue
+      }
+    }
     const delegation = delegateWorkItem(workItem)
     if (!delegation.delegated) {
       reserved.add(workItem.id)
@@ -310,6 +320,13 @@ export async function runAutonomousSalesLoop(
     return loadedContext.portfolioLeads ?? []
   }
 
+  const leadMetadataById = new Map<string, Record<string, unknown>>(
+    resolvePortfolioLeadsFromContext().map((lead) => [
+      lead.id,
+      (lead.metadata ?? {}) as Record<string, unknown>,
+    ]),
+  )
+
   function diagnoseCurrentWorkResult(
     workResult: AvaWorkManagerResult,
   ): AutonomousSalesLoopNonExecutionReason {
@@ -333,6 +350,7 @@ export async function runAutonomousSalesLoop(
         workResult,
         skippedWorkItemIds,
         maxItems: Math.min(remainingIterations, GROWTH_ORG_MAX_CONCURRENT_RESEARCH_JOBS),
+        leadMetadataById,
       })
 
       if (researchBatch.length >= 2) {
@@ -462,6 +480,19 @@ export async function runAutonomousSalesLoop(
           },
         )
         break
+      }
+
+      const nextLeadId = extractLeadIdFromWorkItem(nextItem)
+      const nextLeadMetadata = nextLeadId ? leadMetadataById.get(nextLeadId) : undefined
+      if (nextLeadMetadata && shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(nextLeadMetadata)) {
+        skippedWorkItemIds.add(nextItem.id)
+        iterationLog.push({
+          work_item_id: nextItem.id,
+          workflow_agent: "none",
+          completed: false,
+          skip_reason: "autonomous_sal_gpt_path",
+        })
+        continue
       }
 
       const delegation = delegateWorkItem(nextItem)

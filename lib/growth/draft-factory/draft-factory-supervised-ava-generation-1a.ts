@@ -16,6 +16,8 @@ import { listOutreachPreparationRunsForLead } from "@/lib/growth/aios/growth/gro
 import { findExistingAvaSupervisedSendableDraft } from "@/lib/growth/ava-reasoning/equipify-supervised-draft-persistence"
 import { resolveFirstTouchOutboundCompletionForLead } from "@/lib/growth/ava-reasoning/ava-first-touch-outbound-completion-1a"
 import { runEquipifySupervisedAvaOutreach } from "@/lib/growth/ava-reasoning/equipify-supervised-cutover-service"
+import { shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata } from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import {
   GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_1A_QA_MARKER,
   GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_EMAIL,
@@ -61,6 +63,17 @@ export async function runDraftFactorySupervisedAvaGenerationForScheduler(
     generatedAt: string
   },
 ): Promise<DraftFactorySupervisedAvaGenerationHandoffResult> {
+  const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
+  if (lead && shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(lead.metadata)) {
+    logGrowthEngine("draft_factory_supervised_generation_autonomous_sal_gpt_path_skipped", {
+      qa_marker: GROWTH_AVA_SUPERVISED_SCHEDULER_ACTOR_1A_QA_MARKER,
+      convergence_qa_marker: "ava-sal-runtime-convergence-1a-v1",
+      organization_id: input.organizationId,
+      lead_id: input.leadId,
+    })
+    return null
+  }
+
   let draftFactoryPackageId: string | null = null
   let draftFactoryState: string | null = null
   try {

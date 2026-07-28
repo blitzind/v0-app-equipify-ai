@@ -19,11 +19,18 @@ import {
 } from "@/lib/growth/lead-repository"
 import type { GrowthLead } from "@/lib/growth/types"
 
-export const AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER =
-  "ava-simple-gpt-qualification-1a-v1" as const
+import {
+  AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY,
+  AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER,
+  isAutonomousDiscoveryGptQualificationLead,
+  readAutonomousGptQualificationRecord,
+} from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
 
-export const AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY =
-  "ava_autonomous_gpt_qualification_1a" as const
+export {
+  AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY,
+  AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER,
+  isAutonomousDiscoveryGptQualificationLead,
+} from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
 
 const AUTONOMOUS_GPT_ACTING_EMAIL = "ava-autonomous-discovery@equipify.local"
 const INFLIGHT_STALE_MS = 15 * 60 * 1000
@@ -48,22 +55,6 @@ function readMetadataRecord(
   return metadata
 }
 
-function readQualificationRecord(
-  metadata: Record<string, unknown> | null | undefined,
-): Record<string, unknown> | null {
-  const raw = readMetadataRecord(metadata)
-  const existing = raw.ava_gpt_qualification
-  if (!existing || typeof existing !== "object" || Array.isArray(existing)) return null
-  return existing as Record<string, unknown>
-}
-
-export function isAutonomousDiscoveryGptQualificationLead(
-  metadata: Record<string, unknown> | null | undefined,
-): boolean {
-  const raw = readMetadataRecord(metadata)
-  return raw[AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY] === AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER
-}
-
 export function isAutonomousExternalDiscoveryIntakeMetadata(
   metadata: Record<string, unknown> | null | undefined,
 ): boolean {
@@ -82,7 +73,7 @@ export function shouldScheduleAutonomousDiscoveryGptQualification(
   }
   if (!isAutonomousDiscoveryGptQualificationLead(lead.metadata)) return false
 
-  const qualification = readQualificationRecord(lead.metadata)
+  const qualification = readAutonomousGptQualificationRecord(lead.metadata)
   if (qualification?.evaluated_at && typeof qualification.evaluated_at === "string") {
     return false
   }

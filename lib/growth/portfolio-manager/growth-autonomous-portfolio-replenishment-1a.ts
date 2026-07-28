@@ -51,11 +51,12 @@ export function evaluatePortfolioReplenishmentDecision(input: {
   const remainingDaily = Math.max(0, input.target.maximumDailyDiscovery - discoveriesToday)
   const plannedBatchSize = rawBatch > 0 ? Math.min(rawBatch, remainingDaily) : 0
 
+  // AVA-SAL-RUNTIME-CONVERGENCE-1A — Autonomous DataMoon replenishment must not stall behind
+  // legacy admission/review queue depth; GPT-path discovery is admission-independent.
   const shouldReplenish =
     shouldPortfolioManagerTriggerDiscovery(input.health) &&
     plannedBatchSize > 0 &&
     !blockedByDailyLimit &&
-    !blockedByQueueLimit &&
     !blockedByResearchLimit &&
     !duplicateDiscoveryPrevented
 
@@ -81,8 +82,6 @@ export function evaluatePortfolioReplenishmentDecision(input: {
     reason = "Discovery already running."
   } else if (blockedByDailyLimit) {
     reason = "Daily discovery limit reached."
-  } else if (blockedByQueueLimit) {
-    reason = "Admission queue is full."
   } else if (blockedByResearchLimit) {
     reason = "Research concurrency limit reached."
   } else if (shouldReplenish) {

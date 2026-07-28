@@ -13,6 +13,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createDraftFactorySupervisedAvaGenerationHandoff } from "@/lib/growth/draft-factory/draft-factory-supervised-ava-generation-1a"
+import { shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata } from "@/lib/growth/ava-reasoning/ava-sal-runtime-convergence-1a"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { ensureGrowthAiEventBusInProcessSubscribers } from "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
 import {
@@ -321,6 +322,11 @@ async function runAdmissionIntegrityReconcileForOrganization(
 
     const metadata = metadataCache.get(row.leadId) ?? null
     if (metadata == null) {
+      orgSkipped += 1
+      continue
+    }
+
+    if (shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(metadata)) {
       orgSkipped += 1
       continue
     }
@@ -700,6 +706,9 @@ export async function tickDraftFactoryDueStatesForScheduler(
           const dueRow = dueStateByLead.get(candidate.leadId)
           const lead = await fetchGrowthLeadById(admin, candidate.leadId).catch(() => null)
           if (lead) {
+            if (shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(lead.metadata)) {
+              continue
+            }
             const portfolioEligibility = evaluateGrowthPortfolioLeadEligibility({
               lead,
               organizationId,
@@ -803,6 +812,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
           if (Date.now() - startedAt >= maxRuntimeMs) {
             budgetExhaustedPhase = "advancement"
             break
+          }
+          const skipLead = await fetchGrowthLeadById(admin, leadId).catch(() => null)
+          if (skipLead && shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(skipLead.metadata)) {
+            continue
           }
           const capacityClass = selection.selectedByClass[leadId]
           const candidate = enriched.find((row) => row.leadId === leadId)
@@ -954,6 +967,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
           }
           const lead = await fetchGrowthLeadById(admin, row.leadId).catch(() => null)
           if (lead) {
+            if (shouldSkipLegacyGrowthEngineOrchestrationForLeadMetadata(lead.metadata)) {
+              capacityTelemetry.excluded_ineligible += 1
+              continue
+            }
             const portfolioEligibility = evaluateGrowthPortfolioLeadEligibility({
               lead,
               organizationId,
