@@ -107,6 +107,60 @@ const DRY_RUN_B2B_TOPIC_SEARCH: Record<string, DatamoonResolvedB2bTopic[]> = {
       match_method: "dry_run",
     },
   ],
+  "fleet maintenance operations": [
+    {
+      originalQuery: "fleet maintenance operations",
+      topic_id: "48191",
+      label: "Fleet Maintenance",
+      match_score: 91,
+      match_method: "dry_run",
+    },
+  ],
+  "commercial kitchen equipment service": [
+    {
+      originalQuery: "commercial kitchen equipment service",
+      topic_id: "46930",
+      label: "Commercial Kitchen Equipment",
+      match_score: 92,
+      match_method: "dry_run",
+    },
+  ],
+  "field service operations": [
+    {
+      originalQuery: "field service operations",
+      topic_id: "1897",
+      label: "Field Service Management",
+      match_score: 90,
+      match_method: "dry_run",
+    },
+  ],
+  "equipment service": [
+    {
+      originalQuery: "equipment service",
+      topic_id: "48172",
+      label: "Industrial Equipment Maintenance",
+      match_score: 89,
+      match_method: "dry_run",
+    },
+  ],
+  "preventive maintenance contracts": [
+    {
+      originalQuery: "preventive maintenance contracts",
+      topic_id: "506",
+      label: "Preventive Maintenance",
+      match_score: 88,
+      match_method: "dry_run",
+    },
+  ],
+  "appliance repair service": [
+    {
+      originalQuery: "appliance repair service",
+      topic_id: "37513",
+      label: "Appliance Repair",
+      match_score: 90,
+      match_method: "dry_run",
+    },
+  ],
 }
 
 type DatamoonB2bTopicSearchResponse = {
@@ -182,6 +236,7 @@ export async function resolveDatamoonB2bTopicQueries(
     clusterBroadeningAnchors?: readonly string[]
     multiVerticalProfile?: boolean
     topicRankingSignals?: DatamoonB2bTopicRankingSignals
+    maxTopicIds?: number
   },
 ): Promise<{
   matches: DatamoonResolvedB2bTopic[]
@@ -205,7 +260,11 @@ export async function resolveDatamoonB2bTopicQueries(
     }
   }
 
-  const selected = selectBroadenedDatamoonB2bTopics(candidates, options?.topicRankingSignals)
+  const selected = selectBroadenedDatamoonB2bTopics(
+    candidates,
+    options?.topicRankingSignals,
+    options?.maxTopicIds,
+  )
 
   logGrowthEngine("datamoon_b2b_topic_resolution", {
     qa_marker: GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_1_QA_MARKER,

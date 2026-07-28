@@ -597,6 +597,9 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
             targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
             firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
             discovery_search_slice: input.discoverySearchSliceSelection ?? null,
+            broad_discovery_observability:
+              projection.request.workbench_context?.broadDiscoveryObservability ?? null,
+            workbench_context: projection.request.workbench_context ?? null,
           },
         ),
       },
@@ -640,6 +643,9 @@ export async function runProspectSearchDatamoonAutonomousDiscovery(
     targeting_strategy: projection.targetingSummary.targetingStrategy ?? null,
     firmographic_strategy: projection.targetingSummary.firmographicStrategy ?? null,
     discovery_search_slice: input.discoverySearchSliceSelection ?? null,
+    broad_discovery_observability:
+      projection.request.workbench_context?.broadDiscoveryObservability ?? null,
+    workbench_context: projection.request.workbench_context ?? null,
   })
 
   logGrowthEngine("prospect_search_datamoon_autonomous_discovery_started", {

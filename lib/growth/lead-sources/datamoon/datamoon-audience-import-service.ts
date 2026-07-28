@@ -332,6 +332,14 @@ export async function startDatamoonAudienceImportRun(
         audience_mode: build.audience_mode,
         provider_audience_id: audienceId,
         ...(targetingStrategy ? { targeting_strategy: targetingStrategy } : {}),
+        ...(providerInput.workbench_context
+          ? {
+              workbench_context: providerInput.workbench_context,
+              broad_discovery_observability:
+                (providerInput.workbench_context as Record<string, unknown>)
+                  .broadDiscoveryObservability ?? null,
+            }
+          : {}),
       }) as Record<string, unknown>,
     })
 

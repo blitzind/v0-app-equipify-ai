@@ -176,11 +176,13 @@ export function rankDatamoonB2bTopicCandidates(
 export function selectBroadenedDatamoonB2bTopics(
   candidates: readonly DatamoonB2bTopicCandidate[],
   signals?: DatamoonB2bTopicRankingSignals,
+  maxTopicIds: number = DATAMOON_MAX_TOPIC_IDS,
 ): { matches: DatamoonResolvedB2bTopic[]; topic_ids: string[] } {
   const ranked = rankDatamoonB2bTopicCandidates(candidates, signals)
   const seenTopicIds = new Set<string>()
   const matches: DatamoonResolvedB2bTopic[] = []
   const topic_ids: string[] = []
+  const limit = Math.max(1, Math.min(maxTopicIds, DATAMOON_MAX_TOPIC_IDS))
 
   for (const candidate of ranked) {
     if (seenTopicIds.has(candidate.topic_id)) continue
@@ -193,7 +195,7 @@ export function selectBroadenedDatamoonB2bTopics(
       match_method: candidate.match_method,
     })
     topic_ids.push(candidate.topic_id)
-    if (topic_ids.length >= DATAMOON_MAX_TOPIC_IDS) break
+    if (topic_ids.length >= limit) break
   }
 
   return { matches, topic_ids }

@@ -93,7 +93,7 @@ async function main() {
   assert.match(enrichmentSource, /discovery_authority/)
   assert.match(enrichmentSource, /autonomous_portfolio_discovery/)
   assert.match(projectionSource, /autonomousBroadProviderDiscovery/)
-  assert.match(projectionSource, /discoveryQualificationContext/)
+  assert.match(projectionSource, /providerDiscoveryConcept/)
   assert.doesNotMatch(projectionSource, /field: "state"/)
   console.log("  ✓ Architecture guard — broad provider discovery + deferred qualification")
 
@@ -141,7 +141,6 @@ async function main() {
       rotatedFromSliceKey: null,
     },
   })
-  assert.equal(slicedRequest.request.audience_type, "advanced_search")
   const stateFilters = slicedRequest.request.filters.filter(
     (row) => row.field === "state" || row.field === "personal_state",
   )
@@ -151,11 +150,9 @@ async function main() {
       (row) => row.field === "country" && row.value === "United States",
     ),
   )
-  assert.ok(
-    (slicedRequest.request.workbench_context?.discoveryQualificationContext?.topicPhrases?.length ??
-      0) >= 3,
-  )
-  console.log("  ✓ Sliced provider request is US-wide advanced_search with qualification metadata")
+  assert.equal(slicedRequest.request.workbench_context?.topics?.length, 1)
+  assert.ok(slicedRequest.request.workbench_context?.providerDiscoveryConcept)
+  console.log("  ✓ Sliced provider request is US-wide with one broad discovery concept")
 
   if (PRODUCTION_REPLAY) {
     process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN = "1"

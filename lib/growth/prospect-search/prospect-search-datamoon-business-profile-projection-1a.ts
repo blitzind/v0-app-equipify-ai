@@ -20,6 +20,10 @@ import {
   GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-provider-discovery-1a"
 import {
+  buildAutonomousBroadDiscoveryObservability,
+  resolveAutonomousBroadDiscoveryConceptFromSlice,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-search-signal-1a"
+import {
   AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX,
   GROWTH_DATAMOON_AUTONOMOUS_DISCOVERY_CUTOVER_1A_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-datamoon-autonomous-discovery-types-1a"
@@ -128,24 +132,32 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     audienceName: projection.audienceNameSuggestion,
     recordLimit: Math.max(1, Math.min(100, Math.floor(input.batchSize))),
     excludeDuplicates: true,
-    // Qualification topics/personas stay in workbench metadata — not provider B2B filters.
-    topics: [],
     jobTitles: [],
     intentLevels: [],
     lookbackDays: 0,
   })
 
+  const broadDiscoveryConcept = resolveAutonomousBroadDiscoveryConceptFromSlice({
+    searchSlice,
+    operationalTargeting,
+  })
+  const broadDiscoveryObservability = buildAutonomousBroadDiscoveryObservability(broadDiscoveryConcept)
+
   const request = buildDatamoonImportRequestFromAudienceDraft(draft)
-  request.audience_type = "advanced_search"
   request.filters = applyDiscoveryGeoBucketFilters([], searchSlice)
   request.run_name = `${AUTONOMOUS_PROSPECT_SEARCH_DATAMOON_RUN_PREFIX}:${input.generatedAt.slice(0, 10)}`
   request.limit = Math.max(1, Math.min(100, Math.floor(input.batchSize)))
   request.workbench_context = {
     ...(request.workbench_context ?? {}),
-    topics: [],
+    topics: [broadDiscoveryConcept.primaryConcept],
     intentLevels: [],
     lookbackDays: 0,
     autonomousBroadProviderDiscovery: true,
+    autonomousBroadSearchSignal: true,
+    qualificationFiltersDeferred: true,
+    providerDiscoveryConcept: broadDiscoveryConcept.primaryConcept,
+    providerDiscoveryConceptSource: broadDiscoveryConcept.conceptSource,
+    broadDiscoveryObservability,
     qaMarker: GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER,
     discoveryQualificationContext: {
       topicPhrases: operationalTargeting.topicPhrases,
@@ -189,7 +201,8 @@ export function buildDatamoonAutonomousDiscoveryRequestFromBusinessProfile(input
     String(input.audienceOrdinal ?? 0),
     searchSlice?.sliceKey ?? "no-slice",
     String(searchSlice?.topicVariantIndex ?? 0),
-    operationalTargeting.operationalCluster,
+    broadDiscoveryConcept.primaryConcept,
+    broadDiscoveryConcept.conceptSource,
     operationalTargeting.selectedVerticalIds.join("|"),
     operationalTargeting.topicPhrases.join("|"),
     operationalTargeting.industryAliasesUsed.join("|"),

@@ -2,6 +2,11 @@
 
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
+  GROWTH_DATAMOON_AUTONOMOUS_BROAD_SEARCH_SIGNAL_1A_QA_MARKER,
+  type AutonomousBroadDiscoveryConcept,
+  type AutonomousBroadDiscoveryObservability,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-search-signal-1a"
+import {
   mapDatamoonFiltersToProviderFilters,
   type DatamoonAudienceImportWorkbenchContext,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
@@ -34,6 +39,11 @@ export type AutonomousBroadProviderDiscoveryQualificationContext = {
 export type AutonomousBroadProviderDiscoveryWorkbenchContext = DatamoonAudienceImportWorkbenchContext & {
   qaMarker?: typeof GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER
   autonomousBroadProviderDiscovery?: boolean
+  autonomousBroadSearchSignal?: boolean
+  qualificationFiltersDeferred?: boolean
+  providerDiscoveryConcept?: string
+  providerDiscoveryConceptSource?: AutonomousBroadDiscoveryConcept["conceptSource"]
+  broadDiscoveryObservability?: AutonomousBroadDiscoveryObservability
   discoveryQualificationContext?: AutonomousBroadProviderDiscoveryQualificationContext
   deferredProviderQualificationFields?: string[]
 }
@@ -57,7 +67,8 @@ export function buildAutonomousBroadProviderDiscoveryFilters(): DatamoonAudience
   return [{ field: "country", operator: "=", value: "United States" }]
 }
 
-export function prepareAutonomousBroadProviderDiscoveryRequest(
+/** Strip qualification gates; keep US-wide geography and one provider discovery topic phrase. */
+export function stripAutonomousBroadProviderQualificationFromRequest(
   input: DatamoonAudienceImportRequest,
 ): DatamoonAudienceImportRequest {
   const broadFilters = buildAutonomousBroadProviderDiscoveryFilters()
@@ -66,22 +77,28 @@ export function prepareAutonomousBroadProviderDiscoveryRequest(
   const deferredFields = [
     ...new Set([
       ...priorFilters.map((row) => row.field),
-      ...(input.workbench_context?.topics ?? []).length > 0 ? ["topic_ids"] : [],
       ...(input.workbench_context?.intentLevels ?? []).length > 0 ? ["intent_levels"] : [],
+      ...(input.workbench_context?.lookbackDays != null && input.workbench_context.lookbackDays > 0
+        ? ["lookback_days"]
+        : []),
     ]),
   ]
+  const discoveryTopics =
+    input.workbench_context?.topics?.map((row) => row.trim()).filter((row) => row.length >= 3) ?? []
 
   return {
     ...input,
-    audience_type: "advanced_search",
     topic_ids: undefined,
     filters: mapped.providerFilters,
     workbench_context: {
       ...(input.workbench_context ?? {}),
-      topics: [],
+      topics: discoveryTopics.slice(0, 1),
       intentLevels: [],
+      lookbackDays: 0,
       supplementalTopicSearchQueries: undefined,
       autonomousBroadProviderDiscovery: true,
+      autonomousBroadSearchSignal: discoveryTopics.length > 0,
+      qualificationFiltersDeferred: true,
       qaMarker: GROWTH_DATAMOON_AUTONOMOUS_BROAD_PROVIDER_DISCOVERY_1A_QA_MARKER,
       deferredProviderQualificationFields: deferredFields,
       omittedWorkbenchFilterFields: [
@@ -92,8 +109,22 @@ export function prepareAutonomousBroadProviderDiscoveryRequest(
           "intent_level",
           "topic",
           "job_title",
+          "score_category",
+          "event_date",
+          "personal_state",
+          "state",
+          "primary_industry",
         ]),
       ],
     },
   }
 }
+
+/** @deprecated Use stripAutonomousBroadProviderQualificationFromRequest + broad search signal prepare. */
+export function prepareAutonomousBroadProviderDiscoveryRequest(
+  input: DatamoonAudienceImportRequest,
+): DatamoonAudienceImportRequest {
+  return stripAutonomousBroadProviderQualificationFromRequest(input)
+}
+
+export { GROWTH_DATAMOON_AUTONOMOUS_BROAD_SEARCH_SIGNAL_1A_QA_MARKER }

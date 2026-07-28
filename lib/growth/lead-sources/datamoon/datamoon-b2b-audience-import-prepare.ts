@@ -20,8 +20,8 @@ import { normalizeDatamoonTopicIds } from "@/lib/growth/ava-home/datamoon/ava-da
 import { mergeDatamoonOperationalTopicSearchQueries } from "@/lib/growth/lead-sources/datamoon/datamoon-operational-model-targeting-1a"
 import {
   isAutonomousBroadProviderDiscoveryRequest,
-  prepareAutonomousBroadProviderDiscoveryRequest,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-provider-discovery-1a"
+import { prepareAutonomousBroadSearchSignalDiscoveryRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-autonomous-broad-search-signal-prepare-1a"
 
 export async function prepareDatamoonAudienceImportRequestForBuild(
   input: DatamoonAudienceImportRequest,
@@ -31,7 +31,7 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
   | { ok: false; error: string; issues?: Array<{ code: string; field?: string; message: string }> }
 > {
   if (isAutonomousBroadProviderDiscoveryRequest(input)) {
-    return { ok: true, request: prepareAutonomousBroadProviderDiscoveryRequest(input) }
+    return prepareAutonomousBroadSearchSignalDiscoveryRequest(input, options)
   }
 
   if (!datamoonImportRequestIntendsB2bAudience(input)) {
