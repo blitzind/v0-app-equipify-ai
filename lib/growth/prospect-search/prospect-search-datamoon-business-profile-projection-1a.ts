@@ -74,7 +74,7 @@ function applyDiscoveryGeoBucketFilters(
 
   // Slice geo buckets drive rotation/exhaustion only — provider query stays US-wide so
   // DataMoon can return candidates; GPT-5.5 admission evaluates ICP fit downstream.
-  return [{ field: "country", operator: "=", value: "United States" }, ...withoutGeo]
+  return [{ field: "country", operator: "=", value: "US" }, ...withoutGeo]
 }
 
 function hashFingerprint(parts: string[]): string {

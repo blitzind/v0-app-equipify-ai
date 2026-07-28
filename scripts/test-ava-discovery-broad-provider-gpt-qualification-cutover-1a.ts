@@ -91,9 +91,7 @@ async function main() {
   )
   assert.equal(stateOrQualification.length, 0, "projection must not include qualification provider filters")
   assert.ok(
-    projection.request.filters.some(
-      (row) => row.field === "country" && row.value === "United States",
-    ),
+    projection.request.filters.some((row) => row.field === "country" && row.value === "US"),
   )
   console.log("  ✓ Autonomous projection is US-wide with one broad discovery concept")
 
@@ -106,7 +104,7 @@ async function main() {
   assert.ok((prepared.request.topic_ids?.length ?? 0) >= 1)
   const providerFields = prepared.request.filters.map((row) => row.field)
   assert.deepEqual(providerFields, ["contact_country"])
-  assert.equal(prepared.request.filters[0]?.value, "United States")
+  assert.equal(prepared.request.filters[0]?.value, "US")
   assert.equal(prepared.request.filters.some((row) => row.field === "score_category"), false)
   assert.equal(prepared.request.filters.some((row) => row.field === "event_date"), false)
   assert.equal(prepared.request.filters.some((row) => row.field === "job_title"), false)

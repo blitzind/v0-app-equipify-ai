@@ -20,6 +20,7 @@ import {
   isDatamoonProviderSupportedFilterField,
   listDatamoonExtOutputFieldsExcludedFromFilterAllowlist,
   mapDatamoonFiltersToProviderFilters,
+  normalizeDatamoonProviderContactCountryValue,
 } from "../lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
 import { validateDatamoonAudienceImportRequest } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 
@@ -138,6 +139,37 @@ async function main(): Promise<void> {
   ])
   assert.deepEqual(mapped.providerFilters, [{ field: "contact_country", operator: "=", value: "US" }])
   assert.deepEqual(mapped.omittedWorkbenchFilterFields, ["lookback_days"])
+
+  assert.equal(normalizeDatamoonProviderContactCountryValue("United States"), "US")
+  assert.equal(normalizeDatamoonProviderContactCountryValue("US"), "US")
+  assert.equal(normalizeDatamoonProviderContactCountryValue("USA"), "US")
+  assert.equal(normalizeDatamoonProviderContactCountryValue("U.S."), "US")
+  assert.equal(normalizeDatamoonProviderContactCountryValue("CA"), "CA")
+  assert.equal(normalizeDatamoonProviderContactCountryValue("UK"), "UK")
+
+  const unitedStatesMapped = mapDatamoonFiltersToProviderFilters([
+    { field: "country", operator: "=", value: "United States" },
+  ])
+  assert.deepEqual(unitedStatesMapped.providerFilters, [
+    { field: "contact_country", operator: "=", value: "US" },
+  ])
+
+  const contactCountryMapped = mapDatamoonFiltersToProviderFilters([
+    { field: "contact_country", operator: "=", value: "United States" },
+  ])
+  assert.deepEqual(contactCountryMapped.providerFilters, [
+    { field: "contact_country", operator: "=", value: "US" },
+  ])
+
+  const usaMapped = mapDatamoonFiltersToProviderFilters([
+    { field: "country", operator: "=", value: "USA" },
+  ])
+  assert.deepEqual(usaMapped.providerFilters, [{ field: "contact_country", operator: "=", value: "US" }])
+
+  const caMapped = mapDatamoonFiltersToProviderFilters([
+    { field: "country", operator: "=", value: "CA" },
+  ])
+  assert.deepEqual(caMapped.providerFilters, [{ field: "contact_country", operator: "=", value: "CA" }])
 
   const consolidatedJobTitles = mapDatamoonFiltersToProviderFilters([
     { field: "job_title", operator: "contains", value: "owner" },

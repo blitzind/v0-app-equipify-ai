@@ -62,9 +62,9 @@ export function stripAutonomousBroadProviderQualificationFilters(
   return filters.filter((row) => !deferred.has(row.field))
 }
 
-/** Minimal broad-sourcing filters: United States only. */
+/** Minimal broad-sourcing filters: US only (provider boundary normalizes long-form labels). */
 export function buildAutonomousBroadProviderDiscoveryFilters(): DatamoonAudienceFilter[] {
-  return [{ field: "country", operator: "=", value: "United States" }]
+  return [{ field: "country", operator: "=", value: "US" }]
 }
 
 /** Strip qualification gates; keep US-wide geography and one provider discovery topic phrase. */

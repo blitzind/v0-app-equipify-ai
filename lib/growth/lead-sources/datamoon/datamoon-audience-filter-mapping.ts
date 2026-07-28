@@ -116,6 +116,37 @@ export function listDatamoonProviderSupportedFilterFields(): readonly DatamoonPr
   return DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS
 }
 
+/** AVA-DATAMOON-COUNTRY-VALUE-HOTFIX-1A — DataMoon contact_country expects ISO-style US, not long-form labels. */
+export function normalizeDatamoonProviderContactCountryValue(value: string): string {
+  const trimmed = value.trim()
+  if (/^(united states|u\.s\.|usa|us)$/i.test(trimmed)) return "US"
+  return trimmed
+}
+
+function normalizeDatamoonProviderContactCountryFilterValue(
+  value: DatamoonAudienceFilter["value"],
+): DatamoonAudienceFilter["value"] {
+  if (Array.isArray(value)) {
+    return value.map((entry) =>
+      typeof entry === "string" ? normalizeDatamoonProviderContactCountryValue(entry) : entry,
+    )
+  }
+  if (typeof value === "string") {
+    return normalizeDatamoonProviderContactCountryValue(value)
+  }
+  return value
+}
+
+function applyDatamoonProviderContactCountryNormalization(
+  filter: DatamoonAudienceFilter,
+): DatamoonAudienceFilter {
+  if (filter.field !== "contact_country") return filter
+  return {
+    ...filter,
+    value: normalizeDatamoonProviderContactCountryFilterValue(filter.value),
+  }
+}
+
 export function mapDatamoonWorkbenchFilterToProviderFilter(
   filter: DatamoonAudienceFilter,
 ): DatamoonAudienceFilter | null {
@@ -125,7 +156,7 @@ export function mapDatamoonWorkbenchFilterToProviderFilter(
     ] ?? (isDatamoonProviderSupportedFilterField(filter.field) ? filter.field : null)
 
   if (!mappedField) return null
-  return { ...filter, field: mappedField }
+  return applyDatamoonProviderContactCountryNormalization({ ...filter, field: mappedField })
 }
 
 function readFilterStringValues(value: DatamoonAudienceFilter["value"]): string[] {

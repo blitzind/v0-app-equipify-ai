@@ -127,9 +127,7 @@ async function main() {
   )
   assert.equal(stateOrQualification.length, 0)
   assert.ok(
-    projection.request.filters.some(
-      (row) => row.field === "country" && row.value === "United States",
-    ),
+    projection.request.filters.some((row) => row.field === "country" && row.value === "US"),
   )
   console.log("  ✓ Autonomous projection retains US-wide geography and one discovery concept")
 
@@ -143,6 +141,7 @@ async function main() {
   assert.ok((prepared.request.topic_ids?.length ?? 0) <= AUTONOMOUS_BROAD_DISCOVERY_MAX_TOPIC_IDS)
   const providerFields = prepared.request.filters.map((row) => row.field)
   assert.deepEqual(providerFields, ["contact_country"])
+  assert.equal(prepared.request.filters[0]?.value, "US")
   assert.equal(prepared.request.workbench_context?.qualificationFiltersDeferred, true)
   assert.equal(
     prepared.request.filters.some((row) => row.field === "score_category"),
