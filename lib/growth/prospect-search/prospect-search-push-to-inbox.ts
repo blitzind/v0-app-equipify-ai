@@ -63,6 +63,13 @@ export async function pushProspectSearchCompanyToLeadInbox(
     }
   }
 
+  if (company.datamoon_company_identity_state === "insufficient_identity") {
+    return {
+      outcome: "skipped_invalid",
+      message: "Insufficient company identity — contact-only record without credible company domain.",
+    }
+  }
+
   if (company.is_suppressed) {
     return {
       outcome: "suppressed",
@@ -107,6 +114,10 @@ export async function pushProspectSearchCompanyToLeadInbox(
     pipeline_entry: "icp_targeting",
     company_name: company.company_name,
     domain: company.website,
+    contact_name: company.datamoon_intake?.contact_name ?? null,
+    email: company.datamoon_intake?.contact_email ?? null,
+    phone: company.datamoon_intake?.personal_phone ?? null,
+    linkedin_url: company.datamoon_intake?.contact_linkedin ?? null,
     dedupe_hash,
     candidate_reasoning: [
       company.source_type === "external_discovered"
@@ -153,7 +164,9 @@ export async function pushProspectSearchCompanyToLeadInbox(
           evidence: "Prospect search index growth_lead_id.",
         }
       : undefined,
-    metadata: buildProspectSearchPushMetadata(company, query),
+    metadata: buildProspectSearchPushMetadata(company, query, {
+      autonomous_gpt_qualification: company.source_type === "external_discovered",
+    }),
     actor,
   })
 

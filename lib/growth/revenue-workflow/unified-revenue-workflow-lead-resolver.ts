@@ -19,6 +19,10 @@ import {
   buildLeadAdmissionMetadata,
   evaluateGrowthLeadAdmission,
 } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import {
+  AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY,
+  AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER,
+} from "@/lib/growth/ava-reasoning/ava-autonomous-discovery-gpt-qualification-1a"
 import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import type { NormalizedLeadIntake } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 
@@ -110,7 +114,18 @@ export async function resolveUnifiedLeadFromIntake(
   const admissionContext = organizationId
     ? await loadGrowthLeadAdmissionContext(admin, organizationId)
     : { approvedProfile: null, activeMissionTitle: null }
-  const admission = evaluateGrowthLeadAdmission(intake, admissionContext)
+
+  const intakeMetadata =
+    intake.metadata && typeof intake.metadata === "object" && !Array.isArray(intake.metadata)
+      ? (intake.metadata as Record<string, unknown>)
+      : {}
+  const autonomousGptQualificationPath =
+    intakeMetadata[AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY] ===
+    AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER
+
+  const admission = evaluateGrowthLeadAdmission(intake, admissionContext, {
+    autonomousGptQualificationPath,
+  })
 
   if (!admission.allowLeadCreation) {
     throw new Error("invalid_company_identity")

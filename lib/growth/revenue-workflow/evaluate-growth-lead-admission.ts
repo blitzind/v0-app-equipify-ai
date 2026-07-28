@@ -38,6 +38,11 @@ export type GrowthLeadAdmissionEvaluateOptions = {
   prospectSearchIndustryGatePassed?: boolean | null
   /** GE-AIOS-ADMISSION-POLICY-1A — canonical Research Sufficiency projection. */
   researchSufficiency?: GrowthResearchSufficiencyDecision | null
+  /**
+   * AVA-SIMPLE-GPT-QUALIFICATION-1A — Autonomous DataMoon discovery uses GPT-5.5 directly.
+   * Skips deterministic ICP/keyword/industry gates; identity validation still applies.
+   */
+  autonomousGptQualificationPath?: boolean
 }
 
 export type GrowthLeadAdmissionIntakeInput = Pick<
@@ -300,6 +305,39 @@ export function evaluateGrowthLeadAdmission(
   }
 
   const externalDiscovery = isExternalDiscoveryLeadIntakeSource(intake.source)
+
+  if (
+    externalDiscovery &&
+    options?.autonomousGptQualificationPath === true &&
+    state !== "invalid"
+  ) {
+    return {
+      qa_marker: GROWTH_LEAD_ADMISSION_21C_QA_MARKER,
+      state: "accepted",
+      reasons: uniqueReasons([
+        ...reasons.filter(
+          (reason) =>
+            reason !== "pending_operational_keyword_validation" &&
+            !reason.startsWith("negative_keyword:") &&
+            !reason.startsWith("profile_disqualifier:") &&
+            !reason.startsWith("known_icp_mismatch:"),
+        ),
+        "gpt_qualification_pending",
+        "autonomous_discovery_gpt_path",
+      ]),
+      allowLeadCreation: true,
+      allowAutoResearch: false,
+      leadStatus: "new",
+      requiresHumanReview: false,
+      blockers: [],
+      sanitized: {
+        companyName: sanitizedCompanyName,
+        website: sanitizedWebsite,
+        domain: sanitizedDomain,
+      },
+    }
+  }
+
   if (externalDiscovery && state !== "invalid") {
     const industryGatePassed = options?.prospectSearchIndustryGatePassed !== false
     if (!industryGatePassed) {

@@ -21,6 +21,9 @@ import { stripAccidentalAvaSignatureFromBody } from "@/lib/growth/ava-reasoning/
 import { normalizeProhibitedAvaOutboundCopy } from "@/lib/growth/ava-reasoning/ava-outbound-copy-quality-boundary-core"
 import { persistAvaUnderstandingMemory } from "@/lib/growth/ava-reasoning/ava-direct/equipify-ava-understanding-memory"
 import {
+  buildAutonomousDiscoveryEvidenceText,
+} from "@/lib/growth/ava-reasoning/ava-autonomous-discovery-evidence-1a"
+import {
   retrieveWebsiteTextForAvaDirect,
   type AvaDirectWebsiteRetrievalResult,
 } from "@/lib/growth/ava-reasoning/ava-direct/ava-direct-website-retrieval"
@@ -67,6 +70,11 @@ export type RunEquipifySupervisedAvaOutreachInput = {
   ignoreApprovedExistingDraft?: boolean
   /** Ignored — Company Intelligence is no longer required on the critical path. */
   forceRegenerateCompanyIntelligence?: boolean
+  /**
+   * AVA-SIMPLE-GPT-QUALIFICATION-1A — When true, GPT runs with best available evidence
+   * even if website fetch fails or websiteText would otherwise be empty.
+   */
+  websiteEvidenceOptional?: boolean
 }
 
 export type EquipifySupervisedAvaOutreachOutput = {
@@ -156,7 +164,9 @@ function mapToOutput(input: {
     companyIntelligenceVersionId: input.understandingMemoryVersionId,
     evidenceFingerprint: input.websiteRetrieval?.ok
       ? `ava-direct-website-${input.websiteRetrieval.charCount}`
-      : null,
+      : input.websiteRetrieval?.normalizedUrl
+        ? `ava-direct-website-unavailable-${input.websiteRetrieval.normalizedUrl}`
+        : null,
     ciReused: false,
     ciRegenerated: false,
     companyIdentityUnresolved: input.companyIdentityUnresolved,
@@ -348,7 +358,7 @@ export async function runEquipifySupervisedAvaOutreach(
     return { ok: true, output }
   }
 
-  if (!preflight.canEnsure && !lead.website?.trim()) {
+  if (!preflight.canEnsure && !lead.website?.trim() && !input.websiteEvidenceOptional) {
     logGrowthEngine("ava_direct_cutover_company_identity_hold", {
       leadId: input.leadId,
       reason: preflight.reason,
@@ -365,33 +375,59 @@ export async function runEquipifySupervisedAvaOutreach(
     })
   }
 
-  const websiteRetrieval = await retrieveWebsiteTextForAvaDirect(lead.website)
-  if (!websiteRetrieval.ok) {
-    logGrowthEngine("ava_direct_cutover_website_retrieval_failed", {
+  let websiteRetrieval: AvaDirectWebsiteRetrievalResult | null = null
+  if (lead.website?.trim()) {
+    websiteRetrieval = await retrieveWebsiteTextForAvaDirect(lead.website)
+  }
+
+  if (!input.websiteEvidenceOptional) {
+    if (!websiteRetrieval?.ok) {
+      logGrowthEngine("ava_direct_cutover_website_retrieval_failed", {
+        leadId: input.leadId,
+        code: websiteRetrieval?.code ?? "website_missing",
+        message: websiteRetrieval?.message ?? "Website unavailable.",
+      })
+      return buildHold({
+        rationale: `Website retrieval failed: ${websiteRetrieval?.message ?? "Website unavailable."}`,
+        missingInformation: [
+          "Usable public website content",
+          websiteRetrieval?.message ?? "Website unavailable.",
+        ],
+        evidenceReferences: [
+          websiteRetrieval?.normalizedUrl ?? lead.website ?? "unknown",
+          websiteRetrieval?.message ?? "Website unavailable.",
+        ],
+        companyIdentityUnresolved: false,
+        websiteRetrieval,
+      })
+    }
+  } else if (websiteRetrieval && !websiteRetrieval.ok) {
+    logGrowthEngine("ava_direct_cutover_website_retrieval_optional_failed", {
       leadId: input.leadId,
       code: websiteRetrieval.code,
       message: websiteRetrieval.message,
     })
-    return buildHold({
-      rationale: `Website retrieval failed: ${websiteRetrieval.message}`,
-      missingInformation: [
-        "Usable public website content",
-        websiteRetrieval.message,
-      ],
-      evidenceReferences: [
-        websiteRetrieval.normalizedUrl ?? lead.website ?? "unknown",
-        websiteRetrieval.message,
-      ],
-      companyIdentityUnresolved: false,
-      websiteRetrieval,
-    })
   }
+
+  const leadMetadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : null
+
+  const evidenceText = input.websiteEvidenceOptional
+    ? buildAutonomousDiscoveryEvidenceText({
+        companyName: lead.companyName,
+        website: lead.website,
+        websiteRetrieval,
+        metadata: leadMetadata,
+      })
+    : `${websiteRetrieval!.text}`
 
   const reasoned = await runEquipifyAvaDirectReasoning({
     companyName: lead.companyName,
-    website: websiteRetrieval.normalizedUrl,
-    websiteText: websiteRetrieval.text,
-    websiteSourceUrls: websiteRetrieval.sourceUrls,
+    website: websiteRetrieval?.ok ? websiteRetrieval.normalizedUrl : lead.website,
+    websiteText: evidenceText,
+    websiteSourceUrls: websiteRetrieval?.ok ? websiteRetrieval.sourceUrls : undefined,
     organizationId,
     actingUserEmail: input.actingUserEmail,
     roleKnowledge: EQUIPIFY_AVA_CALIBRATED_ROLE_KNOWLEDGE,
@@ -439,9 +475,9 @@ export async function runEquipifySupervisedAvaOutreach(
       leadId: input.leadId,
       companyId: preflight.canEnsure ? preflight.externalCompanyId : null,
       companyName: lead.companyName,
-      website: websiteRetrieval.normalizedUrl,
+      website: websiteRetrieval?.ok ? websiteRetrieval.normalizedUrl : lead.website,
       companyUnderstanding,
-      websiteSourceUrls: websiteRetrieval.sourceUrls,
+      websiteSourceUrls: websiteRetrieval?.ok ? websiteRetrieval.sourceUrls : undefined,
       model: reasoned.model,
       promptVersion: AVA_DIRECT_PRODUCTION_PROMPT_VERSION,
       aiDeploymentId: EQUIPIFY_AVA_DEPLOYMENT_ID,
@@ -492,7 +528,8 @@ export async function runEquipifySupervisedAvaOutreach(
     decision: output.decision,
     persistedGenerationId: output.persistedGenerationId,
     signatureApplied: output.signatureApplied,
-    websiteChars: websiteRetrieval.charCount,
+    websiteChars: websiteRetrieval?.ok ? websiteRetrieval.charCount : 0,
+    websiteEvidenceOptional: input.websiteEvidenceOptional === true,
     durationMs: output.durationMs,
   })
 

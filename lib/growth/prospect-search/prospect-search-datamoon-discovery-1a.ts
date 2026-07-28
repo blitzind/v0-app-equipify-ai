@@ -11,6 +11,9 @@ import {
   resolveDatamoonCompanyWebsite,
   resolveDatamoonProspectCompanyIdentityKey,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
+import {
+  resolveDatamoonCredibleCompanyIdentity,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-company-identity-resolution-1a"
 import { normalizeDatamoonAudienceRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-normalizer"
 import { applyDatamoonProviderIndustryIcpBridge } from "@/lib/growth/lead-sources/datamoon/datamoon-provider-industry-icp-bridge-1a"
 import { pollDatamoonAudienceImportRun } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
@@ -112,10 +115,15 @@ function datamoonRecordToProspectCompany(
   record: DatamoonAudienceImportRecord,
   index: number,
   filterIndustry?: string | null,
-): GrowthProspectSearchCompanyResult {
+): GrowthProspectSearchCompanyResult | null {
   const normalized = record.normalized
-  const companyName = resolveDatamoonCompanyName(normalized)
-  const website = resolveDatamoonCompanyWebsite(normalized)
+  const identity = resolveDatamoonCredibleCompanyIdentity(normalized)
+  if (identity.state === "insufficient_identity") {
+    return null
+  }
+
+  const companyName = identity.companyName ?? resolveDatamoonCompanyName(normalized)
+  const website = identity.companyWebsite ?? resolveDatamoonCompanyWebsite(normalized)
   const companyGeo = resolveDatamoonCompanyGeography(normalized)
   const id =
     resolveDatamoonProspectCompanyIdentityKey(normalized) ??
@@ -170,6 +178,22 @@ function datamoonRecordToProspectCompany(
     discovery_source_badge: "DataMoon",
     keywords: bridge.keywords,
     datamoon_provider_industry_icp_bridge: bridge.metadata,
+    datamoon_company_identity_state: identity.state,
+    datamoon_intake: {
+      provider_company_id: identity.providerCompanyId,
+      company_domain: identity.companyDomain,
+      contact_name: identity.contactName,
+      contact_title: identity.contactTitle,
+      contact_email: identity.contactEmail,
+      contact_linkedin: identity.contactLinkedIn,
+      primary_industry: identity.primaryIndustry,
+      job_title: normalized.job_title,
+      department: normalized.department,
+      naics_codes: normalized.naics_codes,
+      sic_codes: normalized.sic_codes,
+      business_email: normalized.business_email,
+      personal_phone: normalized.personal_phone,
+    },
     notes: [
       normalized.provider_company_id ? `Provider company id: ${normalized.provider_company_id}` : null,
       normalized.company_linkedin_url ? `Company LinkedIn: ${normalized.company_linkedin_url}` : null,
@@ -229,13 +253,13 @@ export function recordsToProspectCompanies(
   filterIndustry?: string | null,
 ): { companies: GrowthProspectSearchCompanyResult[]; stats: DatamoonProspectSearchNormalizationStats } {
   const consolidated = consolidateDatamoonAudienceImportRecords(records)
-  const companies = consolidated.records.map((record, index) =>
-    datamoonRecordToProspectCompany(record, index, filterIndustry),
-  )
+  const eligibleRecordCount = consolidated.records.length
+  const mapped = consolidated.records
+    .map((record, index) => datamoonRecordToProspectCompany(record, index, filterIndustry))
+    .filter((company): company is GrowthProspectSearchCompanyResult => company != null)
+  const companies = mapped
 
-  const company_identity_missing_count = companies.filter(
-    (company) => !company.company_name?.trim() && !company.website?.trim(),
-  ).length
+  const company_identity_missing_count = eligibleRecordCount - companies.length
 
   return {
     companies,

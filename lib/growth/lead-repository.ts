@@ -709,11 +709,28 @@ export async function createGrowthLead(
   const { scheduleGrowthLeadProspectResearchIfNeeded } = await import(
     "@/lib/growth/research/growth-lead-research-execution-service"
   )
-  scheduleGrowthLeadProspectResearchIfNeeded(admin, {
-    leadId: lead.id,
-    trigger: "import",
-    organizationId: getGrowthEngineAiOrgId() ?? undefined,
-  })
+  const leadMetadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : {}
+  const usesAutonomousGptQualification =
+    leadMetadata.ava_autonomous_gpt_qualification_1a === "ava-simple-gpt-qualification-1a-v1"
+
+  if (!usesAutonomousGptQualification) {
+    scheduleGrowthLeadProspectResearchIfNeeded(admin, {
+      leadId: lead.id,
+      trigger: "import",
+      organizationId: getGrowthEngineAiOrgId() ?? undefined,
+    })
+  } else {
+    const { scheduleAutonomousDiscoveryGptQualificationIfNeeded } = await import(
+      "@/lib/growth/ava-reasoning/ava-autonomous-discovery-gpt-qualification-1a"
+    )
+    scheduleAutonomousDiscoveryGptQualificationIfNeeded(admin, {
+      leadId: lead.id,
+      organizationId: getGrowthEngineAiOrgId() ?? undefined,
+    })
+  }
 
   return lead
 }

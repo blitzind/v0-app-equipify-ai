@@ -467,7 +467,10 @@ export async function pollDatamoonAudienceImportRun(
 
   for (let index = 0; index < rawRecords.length; index += 1) {
     const raw = rawRecords[index]
-    const normalized = normalizeDatamoonAudienceRecord(raw, { providerMode: existing.providerMode })
+    const normalized = normalizeDatamoonAudienceRecord(raw, {
+      providerMode: existing.providerMode,
+      audienceType: existing.audienceType,
+    })
     const providerRecord = sanitizeDatamoonProviderRecord(raw)
 
     if (!isDatamoonRecordImportable(normalized)) {

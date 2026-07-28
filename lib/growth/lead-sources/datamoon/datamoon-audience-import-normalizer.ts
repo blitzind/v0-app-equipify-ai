@@ -16,7 +16,21 @@ import {
   type DatamoonExtOutputField,
   type DatamoonNormalizedLeadRecord,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import type { DatamoonAudienceType } from "@/lib/growth/providers/datamoon"
 import type { DatamoonAudienceMode } from "@/lib/growth/providers/datamoon/datamoon-config"
+
+export type NormalizeDatamoonAudienceRecordOptions = {
+  providerMode?: DatamoonAudienceMode
+  /** B2B audiences retain company identity fields even when providerMode is ext. */
+  audienceType?: DatamoonAudienceType | null
+}
+
+function shouldFilterDatamoonRecordToExtFields(
+  options?: NormalizeDatamoonAudienceRecordOptions,
+): boolean {
+  if (options?.audienceType === "b2b") return false
+  return options?.providerMode === "ext"
+}
 
 function pickString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key]
@@ -84,11 +98,11 @@ export function filterDatamoonRecordToExtFields(
 
 export function normalizeDatamoonAudienceRecord(
   record: unknown,
-  options?: { providerMode?: DatamoonAudienceMode },
+  options?: NormalizeDatamoonAudienceRecordOptions,
 ): DatamoonNormalizedLeadRecord {
   const raw =
     record && typeof record === "object"
-      ? options?.providerMode === "ext"
+      ? shouldFilterDatamoonRecordToExtFields(options)
         ? filterDatamoonRecordToExtFields(record as Record<string, unknown>)
         : (record as Record<string, unknown>)
       : {}

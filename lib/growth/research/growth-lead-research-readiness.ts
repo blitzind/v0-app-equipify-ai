@@ -132,6 +132,14 @@ export function shouldAutoQueueLeadResearch(lead: Pick<
     return false
   }
 
+  const metadata =
+    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
+      ? (lead.metadata as Record<string, unknown>)
+      : {}
+  if (metadata.ava_autonomous_gpt_qualification_1a === "ava-simple-gpt-qualification-1a-v1") {
+    return false
+  }
+
   const admissionState = resolveLeadAdmissionStateFromMetadata(lead.metadata)
   if (admissionState === "invalid" || admissionState === "rejected") {
     return false
@@ -152,10 +160,6 @@ export function shouldAutoQueueLeadResearch(lead: Pick<
     return false
   }
 
-  const metadata =
-    lead.metadata && typeof lead.metadata === "object" && !Array.isArray(lead.metadata)
-      ? (lead.metadata as Record<string, unknown>)
-      : {}
   const boundedGate = evaluateBoundedResearchExecutionGate(metadata)
   if (boundedGate.mode === "bounded") {
     return boundedGate.authorized && boundedGate.selection != null

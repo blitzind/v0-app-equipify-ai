@@ -58,6 +58,23 @@ function websiteFromDomain(domain: string | null | undefined): string | null {
   return normalized.startsWith("http") ? normalized : `https://${normalized}`
 }
 
+function readContactTitleFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  if (!metadata) return null
+  const datamoonIntake = metadata.datamoon_intake
+  if (datamoonIntake && typeof datamoonIntake === "object" && !Array.isArray(datamoonIntake)) {
+    const title =
+      asString((datamoonIntake as { contact_title?: string; job_title?: string }).contact_title) ||
+      asString((datamoonIntake as { job_title?: string }).job_title)
+    if (title) return title
+  }
+  const datamoon = metadata.datamoon
+  if (datamoon && typeof datamoon === "object" && !Array.isArray(datamoon)) {
+    const title = asString((datamoon as { contactTitle?: string }).contactTitle)
+    if (title) return title
+  }
+  return asString(metadata.contact_title) || null
+}
+
 async function resolveFromExistingLeadId(
   admin: SupabaseClient,
   leadId: string,
@@ -103,6 +120,7 @@ export async function resolveCanonicalLeadForInboxInput(
       email: input.email,
       phone: input.phone,
       linkedinUrl: input.linkedin_url,
+      title: readContactTitleFromMetadata(input.metadata),
     },
     metadata: {
       ...(input.metadata ?? {}),

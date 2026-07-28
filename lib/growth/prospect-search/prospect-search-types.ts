@@ -393,6 +393,24 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   keywords?: string[]
   /** DataMoon provider taxonomy → SSV ICP alias bridge metadata (diagnostic only). */
   datamoon_provider_industry_icp_bridge?: DatamoonProviderIndustryIcpBridgeMetadata | null
+  /** AVA-SIMPLE-GPT-QUALIFICATION-1A — credible vs contact-only provider identity. */
+  datamoon_company_identity_state?: "credible" | "insufficient_identity" | null
+  /** Raw DataMoon contact/company fields carried into canonical intake for GPT evidence. */
+  datamoon_intake?: {
+    provider_company_id?: string | null
+    company_domain?: string | null
+    contact_name?: string | null
+    contact_title?: string | null
+    contact_email?: string | null
+    contact_linkedin?: string | null
+    primary_industry?: string | null
+    job_title?: string | null
+    department?: string | null
+    naics_codes?: string[]
+    sic_codes?: string[]
+    business_email?: string | null
+    personal_phone?: string | null
+  } | null
   notes?: string | null
   /** Contact-first reachable human scoring overlay. */
   reachable_human?: import("@/lib/growth/prospect-search/prospect-search-reachable-human-scoring").ProspectSearchReachableHumanSnapshot | null

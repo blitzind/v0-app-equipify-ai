@@ -2,6 +2,10 @@ import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchSourceType,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY,
+  AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER,
+} from "@/lib/growth/ava-reasoning/ava-autonomous-discovery-gpt-qualification-1a"
 
 export const GROWTH_PROSPECT_SEARCH_BULK_PUSH_QA_MARKER =
   "growth-prospect-search-bulk-push-v1" as const
@@ -58,8 +62,30 @@ export type GrowthProspectSearchBulkPushResult = {
 export function buildProspectSearchPushMetadata(
   company: GrowthProspectSearchCompanyResult,
   query: string,
+  options?: { autonomous_gpt_qualification?: boolean },
 ): Record<string, unknown> {
   return {
+    ...(options?.autonomous_gpt_qualification === true
+      ? {
+          [AVA_AUTONOMOUS_DISCOVERY_GPT_QUALIFICATION_METADATA_KEY]:
+            AVA_SIMPLE_GPT_QUALIFICATION_1A_QA_MARKER,
+        }
+      : {}),
+    ...(company.datamoon_intake
+      ? {
+          datamoon: {
+            companyDomain: company.datamoon_intake.company_domain,
+            companyName: company.company_name,
+            industry: company.datamoon_intake.primary_industry ?? company.industry,
+            providerCompanyId: company.datamoon_intake.provider_company_id,
+            contactName: company.datamoon_intake.contact_name,
+            contactTitle: company.datamoon_intake.contact_title ?? company.datamoon_intake.job_title,
+            contactEmail: company.datamoon_intake.contact_email,
+            contactLinkedIn: company.datamoon_intake.contact_linkedin,
+          },
+          datamoon_intake: company.datamoon_intake,
+        }
+      : {}),
     prospect_search: {
       source_type: company.source_type,
       source_id: company.id,
