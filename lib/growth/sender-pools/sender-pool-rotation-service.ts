@@ -235,6 +235,18 @@ export async function resolveSenderRotationForPool(
     persistDecision?: boolean
   },
 ): Promise<GrowthSenderRotationOutput & { decisionId?: string | null }> {
+  if (process.env.GROWTH_EQUIPIFY_SENDER_ROUTING_RETIRED === "true") {
+    return {
+      selectedSenderAccountId: null,
+      selectedProviderId: null,
+      selectedRouteId: null,
+      reason: "health_score",
+      riskLevel: "critical",
+      fallbackSenderCandidates: [],
+      decisionId: null,
+    }
+  }
+
   const pool = await getSenderPool(admin, input.senderPoolId)
   if (!pool || pool.status !== "active") {
     return {
