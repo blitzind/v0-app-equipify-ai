@@ -29,14 +29,6 @@
       "schedule": "30 5 * * *"
     },
     {
-      "path": "/api/cron/growth-warmup-progression",
-      "schedule": "15 0 * * *"
-    },
-    {
-      "path": "/api/cron/growth-warmup-send-executor",
-      "schedule": "0 13-21 * * *"
-    },
-    {
       "path": "/api/cron/growth-event-retention",
       "schedule": "0 4 * * *"
     }
