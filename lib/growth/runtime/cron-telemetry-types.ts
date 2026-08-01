@@ -2,8 +2,43 @@
 
 export const GROWTH_CRON_TELEMETRY_QA_MARKER = "growth-operational-send-plane-v1" as const
 
+/**
+ * Ava/AI OS autonomous runtime crons removed from vercel.json (Phase 1 shutdown).
+ * Route handlers, schemas, and historical data are preserved for future migration.
+ */
+export const GROWTH_CRON_ROUTES_AVA_SHUTDOWN_RETIRED_FROM_VERCEL = [
+  "growth-objective-runtime-scheduler",
+  "growth-acquisition-worker",
+  "growth-sequence-scheduler",
+  "growth-sequence-safe-execute",
+  "growth-inbox-sync",
+  "growth-signal-ingest",
+  "growth-discovery-worker",
+  "growth-email-discovery-worker",
+  "growth-phone-discovery-worker",
+  "growth-social-profile-discovery-worker",
+  "growth-company-intelligence-worker",
+  "growth-buying-committee-intelligence-worker",
+  "growth-company-signal-refresh",
+  "growth-contact-refresh",
+  "growth-prospect-graph-expansion-worker",
+  "growth-territory-refresh",
+  "growth-market-health-refresh",
+  "growth-sequence-recovery",
+  "growth-sequence-wait-timeouts",
+  "growth-lifecycle-maintenance",
+  "growth-provider-runtime-diagnostics",
+  "growth-pdl-test-lookup-run",
+  "growth-pdl-coverage-audit-run",
+  "growth-pdl-benchmark-validation-run",
+  "growth-email-discovery-cert-run",
+] as const
+
 /** Crons removed from vercel.json but route handlers retained for rollback / telemetry history. */
-export const GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL = ["growth-outreach-execute"] as const
+export const GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL = [
+  "growth-outreach-execute",
+  ...GROWTH_CRON_ROUTES_AVA_SHUTDOWN_RETIRED_FROM_VERCEL,
+] as const
 
 export const GROWTH_CRON_ROUTE_IDS = [
   "growth-outreach-execute",

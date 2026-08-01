@@ -21,88 +21,8 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/growth-sequence-scheduler",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-objective-runtime-scheduler",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-sequence-safe-execute",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-inbox-sync",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-signal-ingest",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-discovery-worker",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/growth-email-discovery-worker",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-phone-discovery-worker",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-social-profile-discovery-worker",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-company-intelligence-worker",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-buying-committee-intelligence-worker",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-acquisition-worker",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-company-signal-refresh",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/growth-contact-refresh",
-      "schedule": "30 4 * * *"
-    },
-    {
-      "path": "/api/cron/growth-prospect-graph-expansion-worker",
-      "schedule": "45 3 * * *"
-    },
-    {
-      "path": "/api/cron/growth-territory-refresh",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/growth-market-health-refresh",
-      "schedule": "0 1 * * *"
-    },
-    {
       "path": "/api/cron/growth-dns-verify",
       "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/growth-sequence-recovery",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-sequence-wait-timeouts",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/growth-lifecycle-maintenance",
-      "schedule": "0 */4 * * *"
     },
     {
       "path": "/api/cron/growth-reputation-snapshot",
@@ -115,26 +35,6 @@
     {
       "path": "/api/cron/growth-warmup-send-executor",
       "schedule": "0 13-21 * * *"
-    },
-    {
-      "path": "/api/cron/growth-provider-runtime-diagnostics",
-      "schedule": "0 0 1 1 *"
-    },
-    {
-      "path": "/api/cron/growth-pdl-test-lookup-run",
-      "schedule": "0 0 1 1 *"
-    },
-    {
-      "path": "/api/cron/growth-pdl-coverage-audit-run",
-      "schedule": "0 0 1 1 *"
-    },
-    {
-      "path": "/api/cron/growth-pdl-benchmark-validation-run",
-      "schedule": "0 0 1 1 *"
-    },
-    {
-      "path": "/api/cron/growth-email-discovery-cert-run",
-      "schedule": "0 0 1 1 *"
     },
     {
       "path": "/api/cron/growth-event-retention",
