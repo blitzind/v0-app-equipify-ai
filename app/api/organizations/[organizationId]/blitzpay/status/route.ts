@@ -6,6 +6,7 @@ import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-repor
 import { fetchBlitzpayStoredPaymentProfilesSummary } from "@/lib/blitzpay/blitzpay-payment-profiles"
 import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
 import { runBlitzpaySchemaHealthCheckCached } from "@/lib/blitzpay/blitzpay-schema-health"
+import { fetchBlitzpayAchCapabilitySnapshot } from "@/lib/blitzpay/blitzpay-ach-capability"
 
 export const runtime = "nodejs"
 
@@ -143,11 +144,20 @@ export async function GET(
   const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim() ?? ""
   const stripeMode = stripeSecret.startsWith("sk_live_") ? "live" : stripeSecret.startsWith("sk_test_") ? "test" : "unknown"
 
+  const connectAccountId = String((org as { stripe_connect_account_id?: string | null } | null)?.stripe_connect_account_id ?? "").trim()
+  const achEnabledInSettings = Boolean(
+    (settings as { blitzpay_payment_method_ach_enabled?: boolean } | null)?.blitzpay_payment_method_ach_enabled,
+  )
+  const achSnapshot =
+    connectAccountId && achEnabledInSettings ? await fetchBlitzpayAchCapabilitySnapshot(connectAccountId) : null
+
   return NextResponse.json({
     organizationId,
     blitzpay: {
       ...(org ?? {}),
       settings: settings ?? null,
+      achCapabilityStatus: achSnapshot?.status ?? (achEnabledInSettings && connectAccountId ? "unrequested" : null),
+      achReady: achSnapshot?.achReady ?? false,
       payoutVisibility: reporting
         ? {
             estimatedNetPayoutCents: reporting.estimatedNetMerchantPayoutCents,

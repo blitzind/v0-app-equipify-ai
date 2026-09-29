@@ -22,6 +22,7 @@ export async function createUsExpressConnectedAccount(organizationId: string): P
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
+        us_bank_account_ach_payments: { requested: true },
       },
     },
     { idempotencyKey },

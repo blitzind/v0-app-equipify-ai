@@ -17,6 +17,28 @@ import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-cen
 import { cn } from "@/lib/utils"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
+function achCapabilityStatusLabel(
+  status: "active" | "pending" | "inactive" | "unrequested" | "restricted" | null | undefined,
+  achEnabled: boolean,
+): { configured: string; readiness: string; tone: "ok" | "warn" | "muted" } {
+  if (!achEnabled) {
+    return { configured: "Disabled", readiness: "—", tone: "muted" }
+  }
+  switch (status) {
+    case "active":
+      return { configured: "Enabled", readiness: "Ready", tone: "ok" }
+    case "pending":
+      return { configured: "Enabled", readiness: "Pending — complete Stripe requirements", tone: "warn" }
+    case "restricted":
+      return { configured: "Enabled", readiness: "Restricted — resolve issues in Stripe", tone: "warn" }
+    case "inactive":
+      return { configured: "Enabled", readiness: "Setup required — save settings or continue Stripe onboarding", tone: "warn" }
+    case "unrequested":
+    default:
+      return { configured: "Enabled", readiness: "Setup required — save settings to request ACH in Stripe", tone: "warn" }
+  }
+}
+
 type BlitzPayStatusPayload = {
   stripe_connect_account_id: string | null
   stripe_connect_status: string | null
@@ -64,6 +86,8 @@ type BlitzPayStatusPayload = {
     blitzpayActivePaymentPlansCount?: number
     blitzpayFinancingSessionsTotal?: number
   } | null
+  achCapabilityStatus?: "active" | "pending" | "inactive" | "unrequested" | "restricted" | null
+  achReady?: boolean
   operationalAlerts?: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }>
   storedPaymentProfiles?: {
     totalProfiles: number
@@ -560,16 +584,35 @@ function BlitzPaySettingsPageInner() {
                 />
                 Card
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  className="rounded border-border"
-                  checked={achEnabled}
-                  onChange={(e) => setAchEnabled(e.target.checked)}
-                  disabled={!canConfigure}
-                />
-                Bank transfer (ACH)
-              </label>
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border"
+                    checked={achEnabled}
+                    onChange={(e) => setAchEnabled(e.target.checked)}
+                    disabled={!canConfigure}
+                  />
+                  Bank transfer (ACH)
+                </label>
+                {(() => {
+                  const achState = achCapabilityStatusLabel(bp?.achCapabilityStatus ?? null, achEnabled)
+                  return (
+                    <p className="text-[11px] pl-6 text-muted-foreground leading-relaxed">
+                      <span className="text-foreground/80">Configured:</span> {achState.configured}
+                      <span className="mx-1.5">·</span>
+                      <span
+                        className={cn(
+                          achState.tone === "ok" && "text-emerald-700 dark:text-emerald-400",
+                          achState.tone === "warn" && "text-amber-800 dark:text-amber-300",
+                        )}
+                      >
+                        {achState.readiness}
+                      </span>
+                    </p>
+                  )
+                })()}
+              </div>
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
