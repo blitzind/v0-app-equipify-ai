@@ -1,8 +1,13 @@
-import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
-import { sha256Hex } from "@/lib/portal/token-hash"
+import { getPublicAppOrigin } from "@/lib/email/config"
+import { isValidEmail } from "@/lib/email/format"
+import { sendEmail } from "@/lib/email/resend"
+import { buildPortalAccessEmailContent } from "@/lib/email/portal-access-email"
+import { PORTAL_DASHBOARD_PATH } from "@/lib/portal/constants"
+import { mintPortalAccessLink, type PortalAccessLinkKind } from "@/lib/portal/mint-portal-access-link"
+import { sanitizePortalNext } from "@/lib/portal/safe-portal-next"
 
 export const runtime = "nodejs"
 
@@ -14,8 +19,8 @@ function jsonError(message: string, status: number) {
 }
 
 /**
- * Staff-only: create or refresh a portal user and return a one-time invite URL for the customer.
- * Gated by `canManagePortalSettings` (same as Settings → Customer Portal), including profile overlays.
+ * Staff-only: mint a portal access link (and optionally email it).
+ * Gated by `canManagePortalSettings`. Uses the configured public origin — never the request Origin header.
  */
 export async function POST(
   request: Request,
@@ -29,7 +34,14 @@ export async function POST(
   const gate = await requireOrgPermission(organizationId, "canManagePortalSettings")
   if ("error" in gate) return gate.error
 
-  let body: { customerId?: string; email?: string; displayName?: string | null }
+  let body: {
+    customerId?: string
+    email?: string
+    displayName?: string | null
+    kind?: PortalAccessLinkKind
+    next?: string | null
+    sendEmail?: boolean
+  }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -39,11 +51,14 @@ export async function POST(
   const customerId = typeof body.customerId === "string" ? body.customerId.trim() : ""
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : null
+  const kind: PortalAccessLinkKind = body.kind === "magic_login" ? "magic_login" : "invite"
+  const next = sanitizePortalNext(body.next) ?? PORTAL_DASHBOARD_PATH
+  const shouldEmail = body.sendEmail === true
 
   if (!UUID_RE.test(customerId)) {
     return jsonError("Invalid customer id.", 400)
   }
-  if (!email || !email.includes("@")) {
+  if (!isValidEmail(email)) {
     return jsonError("A valid email is required.", 400)
   }
 
@@ -54,90 +69,69 @@ export async function POST(
     return jsonError("Server misconfigured.", 503)
   }
 
-  const { data: cust, error: cErr } = await svc
-    .from("customers")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("id", customerId)
-    .is("archived_at", null)
-    .maybeSingle()
-
-  if (cErr || !cust) {
-    return jsonError("Customer not found for this organization.", 404)
-  }
-
-  const { data: existing } = await svc
-    .from("portal_users")
-    .select("id, status")
-    .eq("organization_id", organizationId)
-    .eq("email", email)
-    .maybeSingle()
-
-  if ((existing as { status?: string } | null)?.status === "revoked") {
-    return jsonError("This portal email was revoked. Restore access before sending a new link.", 409)
-  }
-
-  const nowIso = new Date().toISOString()
-  let portalUserId = (existing as { id?: string } | null)?.id
-
-  if (!portalUserId) {
-    const { data: inserted, error: insErr } = await svc
-      .from("portal_users")
-      .insert({
-        organization_id: organizationId,
-        customer_id: customerId,
-        email,
-        display_name: displayName,
-        status: "pending",
-        invited_at: nowIso,
-      })
-      .select("id")
-      .single()
-
-    if (insErr || !inserted) {
-      return jsonError("Could not create portal user.", 500)
-    }
-    portalUserId = inserted.id as string
-  } else {
-    await svc
-      .from("portal_users")
-      .update({
-        customer_id: customerId,
-        display_name: displayName ?? undefined,
-        invited_at: nowIso,
-      })
-      .eq("organization_id", organizationId)
-      .eq("id", portalUserId)
-  }
-
-  const rawToken = Buffer.from(randomBytes(32)).toString("base64url")
-  const tokenHash = sha256Hex(rawToken)
-  const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
-
-  const { error: linkErr } = await svc.from("portal_access_links").insert({
-    organization_id: organizationId,
-    portal_user_id: portalUserId,
-    token_hash: tokenHash,
-    kind: "invite",
-    expires_at: expiresAt,
-    max_uses: 1,
-    use_count: 0,
+  const minted = await mintPortalAccessLink({
+    supabase: svc,
+    organizationId,
+    customerId,
+    email,
+    displayName,
+    kind,
+    next,
   })
 
-  if (linkErr) {
-    return jsonError("Could not create access link.", 500)
+  if (!minted.ok) {
+    const status =
+      minted.code === "customer_not_found" ? 404 : minted.code === "revoked" ? 409 : minted.code === "invalid_email" ? 400 : 500
+    return jsonError(minted.message, status)
   }
 
-  const origin =
-    request.headers.get("origin")?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    new URL(request.url).origin
-
-  const inviteUrl = `${origin.replace(/\/$/, "")}/portal/login?token=${encodeURIComponent(rawToken)}`
+  let emailed = false
+  if (shouldEmail) {
+    const [{ data: org }, { data: cust }] = await Promise.all([
+      svc.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+      svc.from("customers").select("company_name").eq("organization_id", organizationId).eq("id", customerId).maybeSingle(),
+    ])
+    const organizationName =
+      ((org as { name?: string } | null)?.name ?? "").trim() || "Your service provider"
+    const customerName =
+      displayName ||
+      ((cust as { company_name?: string } | null)?.company_name ?? "").trim() ||
+      email
+    const content = buildPortalAccessEmailContent({
+      organizationName,
+      customerName,
+      accessUrl: minted.accessUrl,
+      expiresAtIso: minted.expiresAt,
+    })
+    const send = await sendEmail({
+      to: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      category: "portal_access_invite",
+      organizationId,
+    })
+    if (!send.ok) {
+      return NextResponse.json(
+        {
+          error: send.error,
+          inviteUrl: minted.accessUrl,
+          expiresAt: minted.expiresAt,
+          portalUserId: minted.portalUserId,
+          emailed: false,
+        },
+        { status: send.code === "config" ? 503 : 502 },
+      )
+    }
+    emailed = true
+  }
 
   return NextResponse.json({
-    inviteUrl,
-    expiresAt,
-    portalUserId,
+    inviteUrl: minted.accessUrl,
+    accessUrl: minted.accessUrl,
+    expiresAt: minted.expiresAt,
+    portalUserId: minted.portalUserId,
+    publicOrigin: getPublicAppOrigin(),
+    emailed,
   })
 }

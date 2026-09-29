@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getPublicAppOrigin } from "@/lib/email/config"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { sendEmail, type SendEmailResult } from "@/lib/email/resend"
 import { buildInvoiceCustomerEmailFromTemplate } from "@/lib/email/invoice-customer-email-html"
 import { formatUsdFromCents } from "@/lib/billing/invoice-financial-display"
@@ -10,6 +10,8 @@ import { generateInvoicePdfBuffer } from "@/lib/invoices/generate-invoice-pdf"
 import { buildInvoicePdfFilename } from "@/lib/invoices/invoice-pdf-filename"
 import { isBlitzPayInvoicePayEnabledEnv } from "@/lib/blitzpay/phase2-feature-flag"
 import { prepareBlitzpayInvoiceHostedCheckout } from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
+import { mintPortalAccessLink } from "@/lib/portal/mint-portal-access-link"
+import { portalInvoicePath } from "@/lib/portal/safe-portal-next"
 
 export type DispatchCustomerInvoiceEmailArgs = {
   supabase: SupabaseClient
@@ -107,8 +109,38 @@ export async function dispatchCustomerInvoiceEmail(
     }
   }
 
-  const origin = getPublicAppOrigin()
-  const viewInvoiceUrl = `${origin}/portal/invoices/${encodeURIComponent(args.invoiceId)}`
+  let mintSvc: ReturnType<typeof createServiceRoleSupabaseClient>
+  try {
+    mintSvc = createServiceRoleSupabaseClient()
+  } catch {
+    return {
+      ok: false,
+      code: "config",
+      message: "Portal access is not configured. Could not create a secure invoice link.",
+    }
+  }
+
+  const minted = await mintPortalAccessLink({
+    supabase: mintSvc,
+    organizationId: args.organizationId,
+    customerId: ctx.customerId,
+    email: args.to,
+    displayName: ctx.customerCompanyName,
+    kind: "magic_login",
+    next: portalInvoicePath(args.invoiceId),
+  })
+  if (!minted.ok) {
+    return {
+      ok: false,
+      code: minted.code,
+      message:
+        minted.code === "revoked"
+          ? "Portal access for this email is disabled. Restore portal access before sending a view-invoice link."
+          : minted.message,
+    }
+  }
+
+  const viewInvoiceUrl = minted.accessUrl
 
   const { subject, html, text } = buildInvoiceCustomerEmailFromTemplate({
     organizationName: ctx.organizationName,

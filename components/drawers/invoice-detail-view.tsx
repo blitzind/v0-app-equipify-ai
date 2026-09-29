@@ -4243,7 +4243,7 @@ export function InvoiceDetailView({ invoice, onClose, onSelectInvoiceId }: Invoi
     Boolean(invoicePrintHref) && (permissions.canViewFinancials || permissions.canEditInvoices)
 
   const canCopyCustomerInvoiceUrl =
-    canStaffInvoiceDocuments &&
+    canEditInvoices &&
     !invoice.isArchived &&
     invoice.status !== "Draft" &&
     invoice.status !== "Void"
@@ -4310,9 +4310,29 @@ export function InvoiceDetailView({ invoice, onClose, onSelectInvoiceId }: Invoi
       toast("Copy link is only available in the browser.", "error")
       return
     }
-    const u = `${window.location.origin}/portal/invoices/${encodeURIComponent(invoice.id)}`
+    const oid = organizationId?.trim()
+    if (!oid) {
+      toast("Select an organization to copy a customer invoice link.", "error")
+      return
+    }
     try {
-      await navigator.clipboard.writeText(u)
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/customer-portal-link`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as { accessUrl?: string; error?: string; message?: string }
+      if (!res.ok || !data.accessUrl) {
+        toast(
+          typeof data.error === "string"
+            ? data.error
+            : typeof data.message === "string"
+              ? data.message
+              : "Could not create a secure customer invoice link.",
+          "error",
+        )
+        return
+      }
+      await navigator.clipboard.writeText(data.accessUrl)
       toast("Customer invoice link copied")
     } catch {
       toast("Could not copy link", "error")
@@ -4708,7 +4728,7 @@ export function InvoiceDetailView({ invoice, onClose, onSelectInvoiceId }: Invoi
                           }}
                         >
                           <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          Copy invoice URL
+                          Copy Customer Invoice Link
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuItem

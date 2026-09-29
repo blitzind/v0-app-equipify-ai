@@ -1,7 +1,9 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getPublicAppOrigin, isOutboundEmailConfigured } from "@/lib/email/config"
+import { isOutboundEmailConfigured } from "@/lib/email/config"
+import { mintPortalAccessLink } from "@/lib/portal/mint-portal-access-link"
+import { portalInvoicePath } from "@/lib/portal/safe-portal-next"
 import { sendEmail } from "@/lib/email/resend"
 import { isValidEmail } from "@/lib/email/format"
 import { buildInvoicePaymentReceiptShape } from "@/lib/blitzpay/invoice-payment-receipt"
@@ -166,8 +168,23 @@ async function fetchReceiptContext(
     referenceRaw: `blitzpay_pi:${stripePaymentIntentIdForRef}`,
   })
 
-  const origin = getPublicAppOrigin()
-  const portalUrl = `${origin}/portal/invoices/${encodeURIComponent(orgInvoiceId)}`
+  let portalUrl: string | null = null
+  if (customerTo && custId) {
+    try {
+      const minted = await mintPortalAccessLink({
+        supabase: admin,
+        organizationId,
+        customerId: custId,
+        email: customerTo,
+        displayName: customerName,
+        kind: "magic_login",
+        next: portalInvoicePath(orgInvoiceId),
+      })
+      if (minted.ok) portalUrl = minted.accessUrl
+    } catch {
+      portalUrl = null
+    }
+  }
 
   const viewModel = buildBlitzPayPaymentReceiptViewModel(shape, {
     currencyCode: currency,

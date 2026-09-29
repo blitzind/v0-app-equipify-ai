@@ -14,6 +14,11 @@ export async function portalAuthGate(request: NextRequest): Promise<NextResponse
   if (pathname === "/portal/login") return undefined
   /** Staff preview uses dashboard auth in the route handler — never the customer portal cookie. */
   if (pathname === "/portal/preview" || pathname.startsWith("/portal/preview/")) return undefined
+  /**
+   * `/portal/pay/{token}` is BlitzPay's own bearer token. Excluding it from this gate is not
+   * sufficient on its own: the resolver still redirects to `/portal/invoices/{id}`, which
+   * requires a portal session. Session minting on pay-token resolve is follow-up work.
+   */
 
   const secret = getPortalSessionSecret()
   if (!secret) {
