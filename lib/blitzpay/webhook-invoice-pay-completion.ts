@@ -21,6 +21,7 @@ import {
   sumNetRecordedPaymentsCentsForBlitzpay,
 } from "@/lib/blitzpay/invoice-pay-eligibility"
 import { syncBlitzpayPayrollAccrualForOrgInvoice } from "@/lib/blitzpay/blitzpay-payroll-accrual"
+import { invoicePaymentMethodFromPaymentIntent } from "@/lib/blitzpay/map-stripe-payment-method-to-invoice-db"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -143,7 +144,7 @@ export async function completeBlitzpayPaymentIntentSucceeded(
       invoiceId: row.org_invoice_id,
       amountCents: applyAmount,
       paidOn,
-      paymentMethod: "card",
+      paymentMethod: invoicePaymentMethodFromPaymentIntent(pi),
       reference: ref,
       note: scheduledPaymentId ? "BlitzPay (scheduled payment)" : "BlitzPay (Stripe Checkout)",
       createdByUserId: null,

@@ -1,4 +1,3 @@
-import type Stripe from "stripe"
 import type { BlitzpayPaymentMethodType } from "@/lib/blitzpay/payment-domain"
 
 export type BlitzpayCheckoutStripePaymentMethodType = "card" | "us_bank_account"
@@ -9,10 +8,7 @@ export type BlitzpayCheckoutPaymentMethodResolution = {
   achEnabled: boolean
 }
 
-/** True when the connected Express account can accept ACH Direct Debit in Checkout. */
-export function connectedAccountSupportsAch(account: Pick<Stripe.Account, "capabilities">): boolean {
-  return account.capabilities?.us_bank_account_ach_payments?.status === "active"
-}
+export { connectedAccountSupportsAch } from "@/lib/blitzpay/blitzpay-ach-capability-status"
 
 export function paymentMethodsEnabledInOrgSettings(settings: Record<string, unknown>): BlitzpayPaymentMethodType[] {
   const cardEnabled = settings.blitzpay_payment_method_card_enabled !== false

@@ -6,6 +6,7 @@ import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-
 import { ensureBlitzPayOrgSettings } from "@/lib/blitzpay/payment-repository"
 import { DEFAULT_BLITZPAY_DISCLOSURE_COPY } from "@/lib/blitzpay/convenience-fees"
 import { picksPlatformManagedFeeFields, picksPlatformOnlyOrgSettings } from "@/lib/blitzpay/blitzpay-settings-policy"
+import { ensureBlitzpayAchCapabilityRequested } from "@/lib/blitzpay/blitzpay-ach-capability"
 
 export const runtime = "nodejs"
 
@@ -239,5 +240,22 @@ export async function PATCH(
     )
     .maybeSingle()
   if (error) return jsonError(500, "update_failed", "Could not update BlitzPay settings.")
-  return NextResponse.json({ ok: true, settings: data ?? null })
+
+  let achCapabilityRequest: { ok: boolean; status?: string; requested?: boolean; message?: string } | null = null
+  if (achEnabled) {
+    const { data: orgRow } = await db
+      .from("organizations")
+      .select("stripe_connect_account_id")
+      .eq("id", gate.organizationId)
+      .maybeSingle()
+    const connectId = String((orgRow as { stripe_connect_account_id?: string | null } | null)?.stripe_connect_account_id ?? "").trim()
+    if (connectId) {
+      const ensured = await ensureBlitzpayAchCapabilityRequested(connectId)
+      achCapabilityRequest = ensured.ok
+        ? { ok: true, status: ensured.status, requested: ensured.requested }
+        : { ok: false, status: ensured.status, message: ensured.message }
+    }
+  }
+
+  return NextResponse.json({ ok: true, settings: data ?? null, achCapabilityRequest })
 }

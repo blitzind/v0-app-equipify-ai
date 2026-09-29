@@ -41,6 +41,8 @@ function testLaunchWorkspaceChecklistNoRawEnvLabels() {
     stripeChargesEnabled: true,
     orgBlitzpayInvoicePayEnabled: true,
     orgCardOrAchEnabled: true,
+    orgAchEnabled: true,
+    achCapabilityActive: true,
     orgRemindersEnabled: true,
     orgReceiptEmailsEnabled: true,
     outboundEmailConfigured: true,
@@ -48,17 +50,17 @@ function testLaunchWorkspaceChecklistNoRawEnvLabels() {
   } as const
 
   const items = buildBlitzpayLaunchWorkspaceChecklist({ ...base })
-  assert.equal(items.length, 10)
+  assert.equal(items.length, 11)
   const joined = items.map((i) => `${i.label} ${i.detail}`).join(" ")
   assert.doesNotMatch(joined, /BLITZPAY_INVOICE_PAY_ENABLED/)
   assert.doesNotMatch(joined, /STRIPE_BLITZPAY_WEBHOOK_SECRET/)
   assert.doesNotMatch(joined, /CRON_SECRET/)
 
   const s = blitzpayLaunchReadinessScore(items)
-  assert.equal(s.total, 10)
-  assert.equal(s.passed, 10)
+  assert.equal(s.total, 11)
+  assert.equal(s.passed, 11)
   assert.equal(blitzpayLaunchReadinessStatusPhrase(items), "Ready to go")
-  assert.match(blitzpayLaunchReadinessSubline(items), /10 of 10/)
+  assert.match(blitzpayLaunchReadinessSubline(items), /11 of 11/)
 
   const tech = buildBlitzpayLaunchTechnicalDiagnostics({
     platformInvoicePayEnv: true,
@@ -81,6 +83,8 @@ function testRemindersRow() {
     stripeChargesEnabled: true,
     orgBlitzpayInvoicePayEnabled: true,
     orgCardOrAchEnabled: true,
+    orgAchEnabled: true,
+    achCapabilityActive: true,
     orgRemindersEnabled: false,
     orgReceiptEmailsEnabled: true,
     outboundEmailConfigured: true,
@@ -102,6 +106,8 @@ function testRolloutHostedPayGate() {
     stripeChargesEnabled: true,
     orgBlitzpayInvoicePayEnabled: true,
     orgCardOrAchEnabled: true,
+    orgAchEnabled: true,
+    achCapabilityActive: true,
     orgRemindersEnabled: true,
     orgReceiptEmailsEnabled: true,
     outboundEmailConfigured: true,

@@ -17,6 +17,7 @@ import {
   blitzpayLaunchReadinessStatusPhrase,
   blitzpayLaunchReadinessSubline,
 } from "@/lib/blitzpay/blitzpay-launch-readiness"
+import { fetchBlitzpayAchCapabilitySnapshot } from "@/lib/blitzpay/blitzpay-ach-capability"
 
 export const runtime = "nodejs"
 
@@ -103,6 +104,7 @@ export async function GET(
 
   const card = s?.blitzpay_payment_method_card_enabled !== false
   const ach = Boolean(s?.blitzpay_payment_method_ach_enabled)
+  const achSnapshot = await fetchBlitzpayAchCapabilitySnapshot(o?.stripe_connect_account_id)
   const workspaceArgs = {
     platformInvoicePayEnv: isBlitzPayInvoicePayEnabledEnv(),
     schemaHealthy: schemaHealth.ok,
@@ -112,6 +114,8 @@ export async function GET(
     stripeChargesEnabled: Boolean(o?.stripe_charges_enabled),
     orgBlitzpayInvoicePayEnabled: Boolean(s?.blitzpay_invoice_pay_enabled),
     orgCardOrAchEnabled: card || ach,
+    orgAchEnabled: ach,
+    achCapabilityActive: achSnapshot?.achReady === true,
     orgRemindersEnabled: s?.blitzpay_reminders_enabled !== false,
     orgReceiptEmailsEnabled: s?.blitzpay_receipt_emails_enabled !== false,
     outboundEmailConfigured: isOutboundEmailConfigured(),

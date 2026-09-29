@@ -19,6 +19,9 @@ export type BlitzpayLaunchReadinessWorkspaceArgs = {
   stripeChargesEnabled: boolean
   orgBlitzpayInvoicePayEnabled: boolean
   orgCardOrAchEnabled: boolean
+  orgAchEnabled: boolean
+  /** When ACH is enabled in settings, Stripe Connect ACH capability must be active. */
+  achCapabilityActive: boolean
   orgRemindersEnabled: boolean
   orgReceiptEmailsEnabled: boolean
   outboundEmailConfigured: boolean
@@ -93,11 +96,23 @@ export function buildBlitzpayLaunchWorkspaceChecklist(input: BlitzpayLaunchReadi
 
   items.push({
     id: "payment_methods",
-    label: "Payment methods are enabled",
+    label: "Payment methods are configured",
     ok: input.orgCardOrAchEnabled,
     detail: input.orgCardOrAchEnabled
-      ? "Customers can pay with card and/or bank (ACH), based on your settings."
+      ? "At least one payment method is enabled in BlitzPay settings. Stripe must also support each method you offer."
       : "Enable card or bank (ACH) in BlitzPay payment settings above.",
+  })
+
+  items.push({
+    id: "ach_bank_transfer",
+    label: "Bank transfer (ACH) is ready for customers",
+    ok: !input.orgAchEnabled || input.achCapabilityActive,
+    detail:
+      !input.orgAchEnabled
+        ? "ACH is not enabled in your workspace settings."
+        : input.achCapabilityActive
+          ? "Stripe ACH is active — customers can pay by bank transfer when card is also available."
+          : "ACH is enabled in Equipify but Stripe ACH setup is incomplete. Finish ACH setup in Stripe (see Bank transfer status above).",
   })
 
   items.push({
