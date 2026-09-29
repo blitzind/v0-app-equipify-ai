@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { portalAccentCssVariables } from "@/lib/portal/portal-theme-css"
+import { sanitizePortalNext } from "@/lib/portal/safe-portal-next"
 
 /**
  * Hex used by the main app sidebar (`components/app-sidebar.tsx` line ~396).
@@ -104,9 +105,7 @@ function PortalLoginInner() {
       .then(async (r) => {
         const j = (await r.json().catch(() => ({}))) as { error?: string; redirectTo?: string }
         if (!r.ok) throw new Error(j.error ?? "Could not sign in.")
-        const next = searchParams.get("next")?.trim()
-        const safeNext =
-          next && next.startsWith("/portal") && !next.startsWith("/portal/login") ? next : null
+        const safeNext = sanitizePortalNext(searchParams.get("next"))
         router.replace(safeNext ?? j.redirectTo ?? "/portal/dashboard")
         router.refresh()
       })
@@ -130,9 +129,7 @@ function PortalLoginInner() {
       })
       const j = (await r.json().catch(() => ({}))) as { error?: string; redirectTo?: string }
       if (!r.ok) throw new Error(j.error ?? "Could not sign in.")
-      const next = searchParams.get("next")?.trim()
-      const safeNext =
-        next && next.startsWith("/portal") && !next.startsWith("/portal/login") ? next : null
+      const safeNext = sanitizePortalNext(searchParams.get("next"))
       router.replace(safeNext ?? j.redirectTo ?? "/portal/dashboard")
       router.refresh()
     } catch (ex) {
@@ -193,8 +190,8 @@ function PortalLoginInner() {
               Sign in to your service portal
             </h1>
             <p className="text-sm leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
-              Customers normally arrive here from a secure invite link sent by their service
-              provider. Open that email link to sign in — no password required.
+              Open the secure link from your invoice or portal access email to sign in. No password
+              is required.
             </p>
           </div>
 
@@ -314,14 +311,13 @@ function PortalLoginInner() {
                   className="text-[13px] font-medium"
                   style={{ color: "var(--portal-foreground)" }}
                 >
-                  Need an invite link?
+                  Need a new sign-in link?
                 </p>
                 <p
                   className="text-[12px] mt-0.5 leading-relaxed"
                   style={{ color: "var(--portal-nav-text)" }}
                 >
-                  Reach out to your service provider — they can send a secure sign-in link to
-                  your inbox.
+                  Contact your service provider and they can send another secure email.
                 </p>
               </div>
             </div>
@@ -361,14 +357,14 @@ function PortalLoginInner() {
                   id="portal-invite-token"
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
-                  placeholder="Paste the token from your invite email"
+                  placeholder="Paste the token from your sign-in link"
                   className="text-xs"
                   disabled={busy}
                   autoComplete="off"
                   spellCheck={false}
                 />
                 <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
-                  Tokens are one-time use and never stored in the URL.
+                  Use this only if the email link did not open automatically.
                 </p>
               </div>
               <div className="flex items-center gap-2">

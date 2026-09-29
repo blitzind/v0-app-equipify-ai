@@ -12,7 +12,6 @@ import {
   DetailDrawer,
   DRAWER_ANCHORED_SURFACE,
   DRAWER_FIELD_CLASS,
-  DRAWER_NESTED_CARD,
   DrawerRow,
   DrawerToastStack,
   type ToastItem,
@@ -21,13 +20,13 @@ import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
   ExternalLink, Pencil, X, Plus, Trash2, Archive,
   MoreHorizontal, Star,
-  Globe, Send, Link2, RotateCcw,
-  Paintbrush, LayoutGrid, UserCog,
+  Globe, Send, Link2,
 } from "lucide-react"
 import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockMaintenancePlanDialogIfNotEligible } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -36,6 +35,7 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { tryOpenStaffPortalPreviewInNewTab } from "@/lib/portal/staff-portal-preview-open-client"
 import {
   loadCustomerHierarchy,
   type CustomerHierarchySummary,
@@ -455,6 +455,8 @@ function drawerWoStatusLabel(s: string): string {
 
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { has } = useOrgPermissions()
+  const canManagePortalSettings = has("canManagePortalSettings")
   const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [drawerRefresh, setDrawerRefresh] = useState(0)
@@ -465,7 +467,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [openLocationMenu, setOpenLocationMenu] = useState<string | null>(null)
 
-  const [portalEnabled, setPortalEnabled] = useState(true)
+  const [portalEnabled, setPortalEnabled] = useState(false)
+  const [portalAccessLoading, setPortalAccessLoading] = useState(false)
+  const [portalActionBusy, setPortalActionBusy] = useState(false)
+  const [portalInviteEmail, setPortalInviteEmail] = useState("")
   const [open, setOpen] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [header, setHeader] = useState<DrawerHeader | null>(null)
@@ -493,13 +498,6 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     is_primary: false,
   })
   const [contactBusy, setContactBusy] = useState(false)
-  const [portalModules, setPortalModules] = useState({
-    workOrders: true,
-    invoices: true,
-    equipment: true,
-    quotes: false,
-    documents: false,
-  })
 
   const activeCustPlans = drawerPlans.filter((p) => planStatusDbToUi(p.status) === "Active")
 
@@ -522,6 +520,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         setDrawerPlans([])
         setPlanEquipmentNames({})
         setDrawerContracts([])
+        setPortalEnabled(false)
+        setPortalInviteEmail("")
         return
       }
 
@@ -543,7 +543,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
       const { data: custRow, error: custErr } = await supabase
         .from("customers")
-        .select("id, company_name, status, joined_at, notes")
+        .select("id, company_name, status, joined_at, notes, billing_email")
         .eq("organization_id", orgId)
         .eq("id", customerId)
         .single()
@@ -642,6 +642,30 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         })),
       )
 
+      const contactEmail =
+        ((contacts as DbContact[] | null) ?? []).find((c) => c.is_primary && c.email?.trim())?.email?.trim() ||
+        ((contacts as DbContact[] | null) ?? []).find((c) => c.email?.trim())?.email?.trim() ||
+        ""
+      const billing = (custRow as { billing_email?: string | null }).billing_email?.trim() || ""
+      setPortalInviteEmail((contactEmail || billing).toLowerCase())
+
+      if (canManagePortalSettings) {
+        setPortalAccessLoading(true)
+        try {
+          const res = await fetch(
+            `/api/organizations/${encodeURIComponent(orgId)}/customers/${encodeURIComponent(customerId)}/portal-access`,
+          )
+          const data = (await res.json().catch(() => ({}))) as { accessEnabled?: boolean }
+          setPortalEnabled(data.accessEnabled === true)
+        } catch {
+          setPortalEnabled(false)
+        } finally {
+          setPortalAccessLoading(false)
+        }
+      } else {
+        setPortalEnabled(false)
+      }
+
       setDrawerLocations(
         (((locations as Array<{
           id: string
@@ -713,7 +737,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     }
 
     void loadOrgAndRelated()
-  }, [customerId, drawerRefresh, activeOrgId, orgStatus])
+  }, [customerId, drawerRefresh, activeOrgId, orgStatus, canManagePortalSettings])
 
   // Hierarchy summary loads independently so the rest of the drawer never
   // waits on it. Always non-blocking; missing-migration cases degrade in-card.
@@ -765,6 +789,88 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       () => setToasts((prev) => prev.filter((t) => t.id !== id)),
       type === "error" ? 6000 : 3500,
     )
+  }
+
+  async function mintPortalAccess(opts: { sendEmail: boolean }): Promise<string | null> {
+    if (!activeOrgId || !customerId) return null
+    const email = portalInviteEmail.trim().toLowerCase()
+    if (!email.includes("@")) {
+      toast("Add a contact or billing email before sending portal access.", "error")
+      return null
+    }
+    setPortalActionBusy(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(activeOrgId)}/portal-invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId,
+          email,
+          displayName: header?.company ?? null,
+          kind: "invite",
+          sendEmail: opts.sendEmail,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        accessUrl?: string
+        inviteUrl?: string
+        emailed?: boolean
+      }
+      if (!res.ok) {
+        toast(typeof data.error === "string" ? data.error : "Could not create portal access.", "error")
+        return null
+      }
+      const url = data.accessUrl || data.inviteUrl || ""
+      if (opts.sendEmail) {
+        toast(data.emailed === false ? "Link created, but the email could not be sent." : "Portal access email sent.")
+        setPortalEnabled(true)
+      }
+      return url || null
+    } catch {
+      toast("Could not create portal access.", "error")
+      return null
+    } finally {
+      setPortalActionBusy(false)
+    }
+  }
+
+  async function onTogglePortalAccess(enabled: boolean) {
+    if (!activeOrgId || !customerId || portalActionBusy) return
+    if (enabled && !portalEnabled && !portalInviteEmail.includes("@")) {
+      toast("Send a portal invite to grant access.", "error")
+      return
+    }
+    setPortalActionBusy(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/customers/${encodeURIComponent(customerId)}/portal-access`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled }),
+        },
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string; accessEnabled?: boolean }
+      if (!res.ok) {
+        toast(typeof data.error === "string" ? data.error : "Could not update portal access.", "error")
+        return
+      }
+      setPortalEnabled(data.accessEnabled === true)
+      toast(enabled ? "Portal access enabled." : "Portal access disabled.")
+    } catch {
+      toast("Could not update portal access.", "error")
+    } finally {
+      setPortalActionBusy(false)
+    }
+  }
+
+  function onViewAsCustomer() {
+    if (!activeOrgId || !customerId) return
+    const r = tryOpenStaffPortalPreviewInNewTab({ organizationId: activeOrgId, customerId })
+    if (!r.ok) {
+      toast("Could not open portal preview. Try Customer Portal in Settings.", "error")
+    }
   }
 
   if (!customerId) {
@@ -1369,7 +1475,6 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
         {/* Portal Access */}
         <CustomerDrawerCard title="Portal Access">
-          {/* Status bar */}
           <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/25 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <div
@@ -1380,11 +1485,16 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               />
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground">
-                  {portalEnabled ? "Portal active" : "Portal disabled"}
+                  {portalAccessLoading ? "Portal access" : portalEnabled ? "Portal active" : "Portal disabled"}
                 </p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
-                  {portalEnabled ? "The customer can sign in to the portal." : "The customer cannot sign in to the portal."}
+                  {portalEnabled
+                    ? "This customer can sign in with a secure email link."
+                    : "Send a portal invite to grant access, or restore access if it was disabled."}
                 </p>
+                {portalInviteEmail ? (
+                  <p className="mt-0.5 text-[10px] text-muted-foreground truncate">{portalInviteEmail}</p>
+                ) : null}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2 self-center">
@@ -1393,94 +1503,64 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               </span>
               <Switch
                 checked={portalEnabled}
+                disabled={!canManagePortalSettings || portalActionBusy || portalAccessLoading}
                 onCheckedChange={(checked) => {
-                  setPortalEnabled(checked)
-                  toast(checked ? "Portal access enabled" : "Portal access disabled")
+                  void onTogglePortalAccess(checked)
                 }}
                 aria-label={portalEnabled ? "Disable portal access" : "Enable portal access"}
               />
             </div>
           </div>
 
-          {/* Quick actions */}
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            {[
-              { icon: Globe, label: "View as Customer" },
-              { icon: Send, label: "Send Portal Invite" },
-              { icon: Link2, label: "Copy Magic Link" },
-              { icon: RotateCcw, label: "Reset Portal Access" },
-            ].map(({ icon: Icon, label }) => (
-              <button
-                key={label}
-                type="button"
-                disabled
-                aria-disabled
-                title="Manage portal access from workspace settings."
-                className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors cursor-not-allowed opacity-60"
-              >
-                <Icon size={13} className="shrink-0 text-muted-foreground" />
-                <span className="truncate">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Admin controls */}
-          <div className="space-y-3 rounded-xl border border-border bg-muted/15 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin controls</p>
-
-            {/* Branding + contacts */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled
-                aria-disabled
-                title="Manage branding from workspace settings."
-                className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
-              >
-                <Paintbrush size={12} className="text-muted-foreground" />
-                Edit Branding
-              </button>
-              <button
-                type="button"
-                disabled
-                aria-disabled
-                title="Manage portal contacts from workspace settings."
-                className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
-              >
-                <UserCog size={12} className="text-muted-foreground" />
-                Portal Contacts
-              </button>
-            </div>
-
-            {/* Module toggles */}
-            <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Enabled modules</p>
-              <div className={cn(DRAWER_NESTED_CARD, "divide-y divide-border/60 rounded-lg shadow-none")}>
-                {(Object.entries(portalModules) as [keyof typeof portalModules, boolean][]).map(([key, enabled]) => {
-                  const labels: Record<keyof typeof portalModules, string> = {
-                    workOrders: "Work Orders",
-                    invoices: "Invoices",
-                    equipment: "Equipment",
-                    quotes: "Quotes",
-                    documents: "Documents",
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={!canManagePortalSettings || portalActionBusy}
+              title={
+                canManagePortalSettings
+                  ? "Open a staff preview of this customer’s portal. Does not send an invite."
+                  : "You need permission to manage the customer portal."
+              }
+              onClick={onViewAsCustomer}
+              className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Globe size={13} className="shrink-0 text-muted-foreground" />
+              <span className="truncate">View as Customer</span>
+            </button>
+            <button
+              type="button"
+              disabled={!canManagePortalSettings || portalActionBusy}
+              title="Email a secure portal sign-in link to this customer."
+              onClick={() => {
+                void mintPortalAccess({ sendEmail: true })
+              }}
+              className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send size={13} className="shrink-0 text-muted-foreground" />
+              <span className="truncate">Send Portal Access</span>
+            </button>
+            <button
+              type="button"
+              disabled={!canManagePortalSettings || portalActionBusy}
+              title="Mint a new secure portal link and copy it."
+              onClick={() => {
+                void (async () => {
+                  const url = await mintPortalAccess({ sendEmail: false })
+                  if (!url) return
+                  try {
+                    await navigator.clipboard.writeText(url)
+                    toast("Secure portal link copied")
+                    setPortalEnabled(true)
+                  } catch {
+                    toast("Could not copy link", "error")
                   }
-                  return (
-                    <div key={key} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <LayoutGrid size={14} className="shrink-0 text-muted-foreground" />
-                        <span className="text-sm text-foreground">{labels[key]}</span>
-                      </div>
-                      <Switch
-                        checked={enabled}
-                        onCheckedChange={(checked) => setPortalModules((m) => ({ ...m, [key]: checked }))}
-                        disabled={!portalEnabled}
-                        aria-label={`${labels[key]} module ${enabled ? "on" : "off"}`}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+                })()
+              }}
+              className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60 col-span-2"
+            >
+              <Link2 size={13} className="shrink-0 text-muted-foreground" />
+              <span className="truncate">Copy Secure Portal Link</span>
+            </button>
           </div>
         </CustomerDrawerCard>
 

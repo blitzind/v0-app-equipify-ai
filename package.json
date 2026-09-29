@@ -80,6 +80,7 @@
     "test:parse-line-items": "tsx scripts/test-parse-line-items.ts",
     "test:quote-pdf": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-quote-pdf.ts",
     "test:invoice-pdf": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-invoice-pdf.ts",
+    "test:portal-magic-link": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-portal-magic-link.ts",
     "test:purchase-order-pdf": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-purchase-order-pdf.ts",
     "test:document-address": "tsx scripts/test-document-address.ts",
     "test:document-customer-info-hotfix": "tsx scripts/test-document-customer-info-hotfix.ts",
