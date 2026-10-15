@@ -88,9 +88,32 @@ assert.match(sendSms, /evaluateGrowthSmsLiveSendGate/)
 assert.match(sendSms, /isOrganizationSmsSuppressed/)
 
 const inbound = readFileSync(resolve("lib/growth/sms/webhooks/twilio-sms-ingestion.ts"), "utf8")
+const smsRepo = readFileSync(resolve("lib/growth/sms/sms-repository.ts"), "utf8")
 assert.match(inbound, /persistStopKeywordSuppression/)
 assert.match(inbound, /classifySmsOptOutKeyword/)
-assert.match(inbound, /promotedOrganizationId/)
-assert.doesNotMatch(inbound, /lead\.organizationId/)
+assert.match(inbound, /lead\.organizationId/)
+assert.doesNotMatch(inbound, /lead\.promotedOrganizationId/)
+
+// findLeadByPhone maps promoted_organization_id → organizationId (remote main contract).
+assert.match(smsRepo, /organizationId: asString\(row\.promoted_organization_id\)/)
+
+// STOP resolves org from lead without requiring workspace settings in the stopOrgId chain.
+assert.match(
+  inbound,
+  /conversation\.organizationId \?\? lead\.organizationId \?\? settings\?\.organizationId/,
+)
+
+// Missing organization fails safely (no downstream reply/sequence path).
+assert.match(inbound, /stop_missing_org/)
+assert.match(inbound, /stop_not_persisted/)
+
+// Settings fallback when lead is missing (no lead row) but STOP is received.
+assert.match(inbound, /settingsForStop\?\.organizationId/)
+
+// STOP returns before AI/reply ingestion (processSmsInboundReply).
+const stopHandlerStart = inbound.indexOf('if (optOut === "stop")')
+const stopReturnMarker = inbound.indexOf('optOut: confirmedStop ? "stop"', stopHandlerStart)
+const replyIngestion = inbound.indexOf("processSmsInboundReply", stopHandlerStart)
+assert.ok(stopHandlerStart >= 0 && stopReturnMarker > stopHandlerStart && replyIngestion > stopReturnMarker)
 
 console.log("OK: SMS fail-closed gates, STOP keywords, and period-end cancel contracts passed.")

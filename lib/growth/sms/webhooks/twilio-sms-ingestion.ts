@@ -160,7 +160,7 @@ export async function ingestTwilioSmsInboundWebhook(
   const conversation = await findOrCreateSmsConversation(admin, {
     leadId: lead.id,
     participantE164: fromE164,
-    organizationId: lead.promotedOrganizationId ?? settings?.organizationId ?? null,
+    organizationId: lead.organizationId ?? settings?.organizationId ?? null,
   })
 
   const now = new Date().toISOString()
@@ -184,7 +184,7 @@ export async function ingestTwilioSmsInboundWebhook(
 
   const optOut = classifySmsOptOutKeyword(body)
   const stopOrgId =
-    conversation.organizationId ?? lead.promotedOrganizationId ?? settings?.organizationId ?? null
+    conversation.organizationId ?? lead.organizationId ?? settings?.organizationId ?? null
   if (optOut === "stop") {
     const confirmedStop =
       stopOrgId != null
