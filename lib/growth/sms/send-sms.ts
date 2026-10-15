@@ -21,6 +21,10 @@ import {
 } from "@/lib/growth/sms/sms-repository"
 import { appendSmsMessageToInboxBridge, findOrCreateSmsConversation } from "@/lib/growth/sms/sms-threading"
 import type { GrowthSmsSendInput, GrowthSmsSendResult } from "@/lib/growth/sms/sms-types"
+import {
+  evaluateGrowthSmsLiveSendGate,
+  isOrganizationSmsSuppressed,
+} from "@/lib/sms/sms-opt-out"
 
 export async function sendSms(
   admin: SupabaseClient,
@@ -47,6 +51,23 @@ export async function sendSms(
   const settings = await fetchGrowthSmsWorkspaceSettings(admin)
   if (!settings || settings.status !== "active") {
     return { ok: false, code: "sms_inactive", message: "Growth SMS workspace is not active." }
+  }
+
+  const organizationId = lead.promotedOrganizationId
+  const liveSend = isGrowthSmsLiveSendEnabled()
+  const suppressed =
+    organizationId != null ? await isOrganizationSmsSuppressed(admin, organizationId, toE164) : false
+  const liveGate = evaluateGrowthSmsLiveSendGate({
+    liveSendEnabled: liveSend,
+    suppressed,
+    organizationId,
+  })
+  if (!liveGate.allow) {
+    logGrowthEngine("sms_send_blocked", {
+      leadId: lead.id,
+      code: liveGate.code,
+    })
+    return { ok: false, code: liveGate.code, message: liveGate.message }
   }
 
   const providerKind = settings.providerKind === "noop" ? resolveDefaultGrowthSmsProviderKind() : settings.providerKind
@@ -94,7 +115,6 @@ export async function sendSms(
     },
   })
 
-  const liveSend = isGrowthSmsLiveSendEnabled()
   const provider = resolveGrowthSmsProvider(liveSend ? providerKind : "noop")
   const sendResult = await provider.send({
     fromE164,

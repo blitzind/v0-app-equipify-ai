@@ -47,7 +47,12 @@ export async function POST(request: Request) {
       conversationId: result.conversationId,
     })
 
-    return new NextResponse("<Response></Response>", {
+    const twiml =
+      result.optOut === "stop"
+        ? "<Response><Message>You are unsubscribed from Equipify text messages for this number.</Message></Response>"
+        : "<Response></Response>"
+
+    return new NextResponse(twiml, {
       status: 200,
       headers: { "Content-Type": "text/xml" },
     })

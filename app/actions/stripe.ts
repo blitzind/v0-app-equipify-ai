@@ -5,6 +5,13 @@ import type { PlanId } from "@/lib/plans"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { resolveActiveOrganizationForUser } from "@/lib/billing/resolve-active-organization"
+import { requireOrgPermissionForServerAction } from "@/lib/api/require-org-permission"
+import {
+  mapStripeSubscriptionStatus,
+  unixSecondsToIso,
+  upsertOrganizationSubscriptionPatch,
+} from "@/lib/billing/stripe-webhook-sync"
+import { runPeriodEndCancelFlow } from "@/lib/billing/period-end-cancel-request"
 import {
   priceIdForPlan,
   validateCheckoutPlanAndCycle,
@@ -245,7 +252,8 @@ export async function createCheckoutSession(
 
 /**
  * Stripe Billing Portal session for the SaaS subscription customer.
- * The Settings → Billing UI does not expose this entry point; keep for programmatic, support, or future flows that need a portal URL.
+ * Not linked from Settings → Billing: Dashboard Portal products (immediate cancel, refunds, proration)
+ * are not verified. Customer cancel uses {@link requestCancelSubscriptionAtPeriodEnd} instead.
  */
 export async function createPortalSession(): Promise<{ url: string | null; error?: string }> {
   const origin = (await headers()).get("origin") ?? "http://localhost:3000"
@@ -269,6 +277,11 @@ export async function createPortalSession(): Promise<{ url: string | null; error
   const resolved = await resolveActiveOrganizationForUser(supabase, user.id)
   if ("error" in resolved) {
     return { url: null, error: resolved.error }
+  }
+
+  const gate = await requireOrgPermissionForServerAction(resolved.organizationId, "canEditOrgBilling")
+  if (!gate.ok) {
+    return { url: null, error: gate.error }
   }
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
@@ -305,5 +318,132 @@ export async function createPortalSession(): Promise<{ url: string | null; error
     logStripeSaaSBillingFailure("createPortalSession.billingPortal.sessions.create", resolved.organizationId, err)
     await tryClearStaleStripeCustomerId(admin, resolved.organizationId, customerId, err)
     return { url: null, error: userFacingStripeSaaSBillingError(err, "portal") }
+  }
+}
+
+/**
+ * Customer-initiated SaaS cancellation at period end. Does not refund, prorate, or cancel immediately.
+ * Syncs `cancel_at_period_end` locally; Stripe webhooks remain the source of truth.
+ */
+export async function requestCancelSubscriptionAtPeriodEnd(): Promise<{
+  ok: boolean
+  alreadyScheduled?: boolean
+  periodEndIso?: string | null
+  message?: string
+  localSyncPending?: boolean
+  error?: string
+}> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, error: "You must be signed in to cancel a subscription." }
+  }
+
+  const resolved = await resolveActiveOrganizationForUser(supabase, user.id)
+  if ("error" in resolved) {
+    return { ok: false, error: resolved.error }
+  }
+
+  const gate = await requireOrgPermissionForServerAction(resolved.organizationId, "canEditOrgBilling")
+  if (!gate.ok) {
+    return { ok: false, error: gate.error }
+  }
+
+  let stripe: ReturnType<typeof getStripe>
+  try {
+    stripe = getStripe()
+  } catch (e) {
+    logStripeSaaSBillingFailure("requestCancelSubscriptionAtPeriodEnd.getStripe", resolved.organizationId, e)
+    return { ok: false, error: userFacingStripeSaaSBillingError(e, "generic") }
+  }
+
+  let admin: ReturnType<typeof createServiceRoleSupabaseClient>
+  try {
+    admin = createServiceRoleSupabaseClient()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error:
+        msg.includes("SUPABASE_SERVICE_ROLE_KEY") ?
+          "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
+        : userFacingStripeSaaSBillingError(e, "generic"),
+    }
+  }
+
+  const organizationId = resolved.organizationId
+  const sub = await getOrganizationSubscription(admin, organizationId)
+  const stripeSubscriptionId = normalizeStripeIdColumn(sub?.stripe_subscription_id)
+  if (!stripeSubscriptionId) {
+    return {
+      ok: false,
+      error:
+        "No paid Stripe subscription is on file for this workspace yet. If you need to cancel a trial or a billing issue, contact support.",
+    }
+  }
+
+  const flow = await runPeriodEndCancelFlow({
+    organizationId,
+    stripeSubscriptionId,
+    localSubscription: sub
+      ? {
+          stripe_customer_id: normalizeStripeIdColumn(sub.stripe_customer_id),
+          current_period_end: sub.current_period_end,
+        }
+      : null,
+    deps: {
+      retrieveSubscription: async (id) => {
+        const s = await stripe.subscriptions.retrieve(id)
+        return {
+          id: s.id,
+          status: s.status,
+          cancel_at_period_end: s.cancel_at_period_end,
+          customer: s.customer,
+          current_period_end: (s as typeof s & { current_period_end?: number }).current_period_end,
+        }
+      },
+      scheduleCancelAtPeriodEnd: async (id) => {
+        const s = await stripe.subscriptions.update(id, { cancel_at_period_end: true })
+        return {
+          id: s.id,
+          status: s.status,
+          cancel_at_period_end: s.cancel_at_period_end,
+          customer: s.customer,
+          current_period_end: (s as typeof s & { current_period_end?: number }).current_period_end,
+        }
+      },
+      lookupSubscriptionOwnerOrganizationId: async (id) => {
+        const { data } = await admin
+          .from("organization_subscriptions")
+          .select("organization_id")
+          .eq("stripe_subscription_id", id)
+          .maybeSingle()
+        return data?.organization_id
+      },
+      upsertLocalSubscription: async (patch) => {
+        await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
+      },
+      mapStripeStatus: mapStripeSubscriptionStatus,
+      unixSecondsToIso,
+    },
+  })
+
+  if (!flow.ok) {
+    if (flow.code === "subscription_org_mismatch" || flow.code === "customer_mismatch") {
+      logStripeSaaSBillingFailure(`requestCancelSubscriptionAtPeriodEnd.${flow.code}`, organizationId, new Error(flow.code))
+    } else if (flow.code === "stripe_update_failed" || flow.code === "stripe_retrieve_failed") {
+      logStripeSaaSBillingFailure("requestCancelSubscriptionAtPeriodEnd.stripe", organizationId, new Error(flow.code))
+    }
+    return { ok: false, error: flow.error }
+  }
+
+  return {
+    ok: true,
+    alreadyScheduled: flow.alreadyScheduled,
+    periodEndIso: flow.periodEndIso,
+    message: flow.message,
+    localSyncPending: flow.localSyncPending,
   }
 }

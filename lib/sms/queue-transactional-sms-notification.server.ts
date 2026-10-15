@@ -113,19 +113,23 @@ export async function queueTransactionalSmsNotification(
     return { status: "skipped", code: "quiet_hours" }
   }
 
-  const { data: supRow } = await svc
+  const { data: supRow, error: supLookupError } = await svc
     .from("organization_sms_suppressions")
     .select("e164")
     .eq("organization_id", organizationId)
     .eq("e164", recipientE164.trim())
     .maybeSingle()
+  if (supLookupError) {
+    await logAttempt("skipped", "suppression_lookup_failed", supLookupError.message)
+    return { status: "skipped", code: "suppression_lookup_failed" }
+  }
   if (supRow) {
     await logAttempt("skipped", "suppressed", null)
     return { status: "skipped", code: "suppressed" }
   }
 
   if (smsWorkspace.optInRequired) {
-    const { data: consent } = await svc
+    const { data: consent, error: consentLookupError } = await svc
       .from("organization_sms_recipient_consents")
       .select("id")
       .eq("organization_id", organizationId)
@@ -133,6 +137,10 @@ export async function queueTransactionalSmsNotification(
       .eq("consent_scope", "transactional")
       .is("revoked_at", null)
       .maybeSingle()
+    if (consentLookupError) {
+      await logAttempt("skipped", "consent_lookup_failed", consentLookupError.message)
+      return { status: "skipped", code: "consent_lookup_failed" }
+    }
     if (!consent) {
       await logAttempt("skipped", "missing_consent", null)
       return { status: "skipped", code: "missing_consent" }
