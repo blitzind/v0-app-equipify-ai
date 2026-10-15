@@ -25,6 +25,7 @@ import {
 import { appendSmsMessageToInboxBridge, findOrCreateSmsConversation } from "@/lib/growth/sms/sms-threading"
 import { processSmsInboundReply } from "@/lib/growth/sms/sms-reply-ingestion"
 import { dispatchSequenceWakeForSmsAttempt } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
+import { classifySmsOptOutKeyword, recordOrganizationSmsSuppression } from "@/lib/sms/sms-opt-out"
 
 export type IngestTwilioSmsWebhookInput = {
   rawBody: string
@@ -44,6 +45,7 @@ export type IngestTwilioSmsWebhookResult = {
   signatureFailed?: boolean
   code?: string
   message?: string
+  optOut?: "stop" | "help"
 }
 
 function isInboundMessage(params: Record<string, string>): boolean {
@@ -52,6 +54,24 @@ function isInboundMessage(params: Record<string, string>): boolean {
 
 function isStatusCallback(params: Record<string, string>): boolean {
   return isTwilioSmsStatusPayload(params)
+}
+
+async function persistStopKeywordSuppression(
+  admin: SupabaseClient,
+  input: { organizationId: string; e164: string },
+): Promise<boolean> {
+  const result = await recordOrganizationSmsSuppression(admin, {
+    organizationId: input.organizationId,
+    e164: input.e164,
+    reason: "stop",
+  })
+  if (!result.ok) {
+    logGrowthEngine("sms_stop_record_failed", {
+      organizationId: input.organizationId,
+      e164: input.e164,
+    })
+  }
+  return result.ok
 }
 
 export async function ingestTwilioSmsInboundWebhook(
@@ -115,14 +135,24 @@ export async function ingestTwilioSmsInboundWebhook(
 
   const lead = await findLeadByPhone(admin, fromE164)
   if (!lead) {
+    const optOut = classifySmsOptOutKeyword(body)
+    const settingsForStop = await fetchGrowthSmsWorkspaceSettings(admin)
+    let confirmedStop = false
+    if (optOut === "stop" && settingsForStop?.organizationId) {
+      confirmedStop = await persistStopKeywordSuppression(admin, {
+        organizationId: settingsForStop.organizationId,
+        e164: fromE164,
+      })
+    }
     await finalizeSmsProviderEvent(admin, event.id, { processingStatus: "ignored" })
-    logGrowthEngine("sms_inbound_lead_not_found", { fromE164, providerMessageId })
+    logGrowthEngine("sms_inbound_lead_not_found", { fromE164, providerMessageId, optOut })
     return {
       ok: true,
       eventId: event.id,
       eventType: "inbound_message",
-      code: "lead_not_found",
+      code: confirmedStop ? "lead_not_found" : optOut === "stop" ? "stop_not_persisted" : "lead_not_found",
       message: "Inbound SMS stored — no matching lead for sender phone.",
+      optOut: confirmedStop ? "stop" : optOut === "help" ? "help" : undefined,
     }
   }
 
@@ -130,7 +160,7 @@ export async function ingestTwilioSmsInboundWebhook(
   const conversation = await findOrCreateSmsConversation(admin, {
     leadId: lead.id,
     participantE164: fromE164,
-    organizationId: lead.organizationId,
+    organizationId: lead.organizationId ?? settings?.organizationId ?? null,
   })
 
   const now = new Date().toISOString()
@@ -151,6 +181,37 @@ export async function ingestTwilioSmsInboundWebhook(
     bodyPreview: body,
     messageTimestamp: now,
   })
+
+  const optOut = classifySmsOptOutKeyword(body)
+  const stopOrgId =
+    conversation.organizationId ?? lead.organizationId ?? settings?.organizationId ?? null
+  if (optOut === "stop") {
+    const confirmedStop =
+      stopOrgId != null
+        ? await persistStopKeywordSuppression(admin, { organizationId: stopOrgId, e164: fromE164 })
+        : false
+    if (confirmedStop) {
+      logGrowthEngine("sms_stop_recorded", {
+        leadId: lead.id,
+        organizationId: stopOrgId,
+        fromE164,
+      })
+    }
+    await finalizeSmsProviderEvent(admin, event.id, {
+      processingStatus: confirmedStop ? "processed" : "failed",
+      conversationId: conversation.id,
+      messageId: message.id,
+    })
+    return {
+      ok: true,
+      eventId: event.id,
+      eventType: "inbound_message",
+      messageId: message.id,
+      conversationId: conversation.id,
+      code: confirmedStop ? undefined : stopOrgId ? "stop_not_persisted" : "stop_missing_org",
+      optOut: confirmedStop ? "stop" : undefined,
+    }
+  }
 
   try {
     const replyResult = await processSmsInboundReply(admin, {
@@ -176,6 +237,7 @@ export async function ingestTwilioSmsInboundWebhook(
       providerMessageId,
       ingestionEventId: replyResult.ingestionEventId,
       outboundReplyId: replyResult.outboundReplyId,
+      optOut,
     })
 
     return {
@@ -184,6 +246,7 @@ export async function ingestTwilioSmsInboundWebhook(
       eventType: "inbound_message",
       messageId: message.id,
       conversationId: conversation.id,
+      optOut: optOut ?? undefined,
     }
   } catch (processingError) {
     await finalizeSmsProviderEvent(admin, event.id, {
