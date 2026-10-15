@@ -3,6 +3,8 @@
  * Stripe remains source of truth; local patch is best-effort until webhooks reconcile.
  */
 
+import type Stripe from "stripe"
+
 import {
   periodEndCancelConfirmationMessage,
   periodEndCancelOwnershipErrorMessage,
@@ -17,6 +19,30 @@ export type PeriodEndCancelStripeSubscription = {
   cancel_at_period_end: boolean
   customer: string | { id: string; deleted?: boolean }
   current_period_end?: number
+}
+
+/** Normalize Stripe SDK subscription objects for {@link runPeriodEndCancelFlow} deps. */
+export function stripeSubscriptionForPeriodEndCancelFlow(
+  subscription: Stripe.Subscription,
+): PeriodEndCancelStripeSubscription {
+  const customer = subscription.customer
+  const normalizedCustomer: PeriodEndCancelStripeSubscription["customer"] =
+    typeof customer === "string"
+      ? customer
+      : customer.deleted
+        ? { id: customer.id, deleted: true }
+        : { id: customer.id }
+
+  const currentPeriodEnd = (subscription as Stripe.Subscription & { current_period_end?: number })
+    .current_period_end
+
+  return {
+    id: subscription.id,
+    status: subscription.status,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    customer: normalizedCustomer,
+    current_period_end: currentPeriodEnd,
+  }
 }
 
 export type PeriodEndCancelLocalSubscription = {

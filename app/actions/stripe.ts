@@ -11,7 +11,10 @@ import {
   unixSecondsToIso,
   upsertOrganizationSubscriptionPatch,
 } from "@/lib/billing/stripe-webhook-sync"
-import { runPeriodEndCancelFlow } from "@/lib/billing/period-end-cancel-request"
+import {
+  runPeriodEndCancelFlow,
+  stripeSubscriptionForPeriodEndCancelFlow,
+} from "@/lib/billing/period-end-cancel-request"
 import {
   priceIdForPlan,
   validateCheckoutPlanAndCycle,
@@ -394,26 +397,12 @@ export async function requestCancelSubscriptionAtPeriodEnd(): Promise<{
         }
       : null,
     deps: {
-      retrieveSubscription: async (id) => {
-        const s = await stripe.subscriptions.retrieve(id)
-        return {
-          id: s.id,
-          status: s.status,
-          cancel_at_period_end: s.cancel_at_period_end,
-          customer: s.customer,
-          current_period_end: (s as typeof s & { current_period_end?: number }).current_period_end,
-        }
-      },
-      scheduleCancelAtPeriodEnd: async (id) => {
-        const s = await stripe.subscriptions.update(id, { cancel_at_period_end: true })
-        return {
-          id: s.id,
-          status: s.status,
-          cancel_at_period_end: s.cancel_at_period_end,
-          customer: s.customer,
-          current_period_end: (s as typeof s & { current_period_end?: number }).current_period_end,
-        }
-      },
+      retrieveSubscription: async (id) =>
+        stripeSubscriptionForPeriodEndCancelFlow(await stripe.subscriptions.retrieve(id)),
+      scheduleCancelAtPeriodEnd: async (id) =>
+        stripeSubscriptionForPeriodEndCancelFlow(
+          await stripe.subscriptions.update(id, { cancel_at_period_end: true }),
+        ),
       lookupSubscriptionOwnerOrganizationId: async (id) => {
         const { data } = await admin
           .from("organization_subscriptions")
