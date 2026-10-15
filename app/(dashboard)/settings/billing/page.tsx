@@ -27,6 +27,7 @@ import {
   getSaaSBillingSetupPrefill,
   updateSaaSSubscriptionStripeCustomerBilling,
 } from "@/app/actions/stripe-setup"
+import { requestCancelSubscriptionAtPeriodEnd } from "@/app/actions/stripe"
 import {
   defaultSaasBillingFormFromWorkspace,
   emptySaasSubscriptionBillingForm,
@@ -353,6 +354,7 @@ function BillingPageContent() {
   const searchParams = useSearchParams()
   const { workspace, dispatch, workspaceUsers } = useTenant()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { toast } = useToast()
   const orgPermissions = useOrgPermissions()
   /** `useOrgPermissions()` exposes capabilities via `.has()` / `.permissions`, not top-level flags. */
   const canEditOrgInvoiceDefaults =
@@ -397,6 +399,9 @@ function BillingPageContent() {
   const [setupPrefillKind, setSetupPrefillKind] = useState<"none" | "workspace" | "stripe">("none")
   const [intendedPlanId, setIntendedPlanId] = useState<PlanId | null>(null)
   const [highlightedPlanId, setHighlightedPlanId] = useState<PlanId | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cancelConfirming, setCancelConfirming] = useState(false)
 
   const billingCountrySelectOptions = useMemo(() => getBillingCountrySelectOptions(), [])
 
@@ -618,6 +623,29 @@ function BillingPageContent() {
   function handleComparePlansFromManageBilling() {
     setManageBillingOpen(false)
     window.setTimeout(() => jumpToPlanComparison(), 120)
+  }
+
+  async function confirmCancelAtPeriodEnd() {
+    if (!canEditOrgInvoiceDefaults) return
+    setCancelBusy(true)
+    setCancelError(null)
+    try {
+      const result = await requestCancelSubscriptionAtPeriodEnd()
+      if (!result.ok) {
+        setCancelError(result.error ?? "Could not schedule cancellation.")
+        return
+      }
+      setCancelConfirming(false)
+      setBillingRefreshTick((n) => n + 1)
+      toast({
+        title: "Cancellation scheduled",
+        description: result.message ?? "Your subscription will end at the close of the current billing period.",
+      })
+    } catch {
+      setCancelError("Could not schedule cancellation. Contact support if this continues.")
+    } finally {
+      setCancelBusy(false)
+    }
   }
 
   function jumpToPlanComparison() {
@@ -924,10 +952,76 @@ function BillingPageContent() {
               <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleComparePlansFromManageBilling}>
                 Compare plans on this page
               </Button>
-              <div className="rounded-md border border-border/60 bg-background px-2.5 py-2 text-[11px] text-muted-foreground leading-snug">
-                Canceling or downgrading your subscription through a self-serve control is not available in this dialog
-                yet. This billing action will be available here soon.
-              </div>
+              {subscription?.cancel_at_period_end ? (
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Cancellation is already scheduled
+                  {billingScheduleUi.accessEndsDateDisplay ? (
+                    <>
+                      {" "}
+                      for <span className="font-medium text-foreground">{billingScheduleUi.accessEndsDateDisplay}</span>
+                    </>
+                  ) : null}
+                  . Access continues until then. No refund is issued for time already paid.
+                </p>
+              ) : canEditOrgInvoiceDefaults && subscription?.stripe_subscription_id ? (
+                <div className="space-y-2">
+                  {!cancelConfirming ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        setCancelError(null)
+                        setCancelConfirming(true)
+                      }}
+                    >
+                      Cancel at period end
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 rounded-md border border-border/60 bg-background px-2.5 py-2">
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        This schedules cancellation at the end of the current billing period. You keep access until then.
+                        No refund or proration is issued. Immediate cancellation is not available here.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={cancelBusy}
+                          onClick={() => void confirmCancelAtPeriodEnd()}
+                        >
+                          {cancelBusy ? "Scheduling…" : "Confirm period-end cancel"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={cancelBusy}
+                          onClick={() => setCancelConfirming(false)}
+                        >
+                          Back
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {cancelError ? <p className="text-[11px] text-destructive leading-snug">{cancelError}</p> : null}
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {canEditOrgInvoiceDefaults
+                    ? "No paid Stripe subscription is on file yet. Contact support to cancel a trial or resolve billing."
+                    : "Ask a workspace billing admin to cancel the subscription."}
+                </p>
+              )}
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Support-assisted cancellation: email{" "}
+                <a className="underline underline-offset-2" href="mailto:support@equipify.ai?subject=Subscription%20cancellation">
+                  support@equipify.ai
+                </a>
+                .
+              </p>
             </section>
           </div>
 
@@ -1184,7 +1278,7 @@ function BillingPageContent() {
               {hasStripeCustomer ? (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Need to change or cancel? Open <span className="font-medium text-foreground/90">Manage billing</span>{" "}
-                  for plan details, payment method, invoices, and billing contact — without leaving Equipify.
+                  to schedule cancellation at period end, or email support@equipify.ai.
                 </p>
               ) : (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">

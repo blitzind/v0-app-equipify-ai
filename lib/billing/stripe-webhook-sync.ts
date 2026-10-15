@@ -23,7 +23,9 @@ export function unixSecondsToIso(sec: number | null | undefined): string | null 
 }
 
 /** Maps Stripe subscription.status to organization_subscriptions.status (CHECK constraint). */
-export function mapStripeSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): string {
+export function mapStripeSubscriptionStatus(
+  stripeStatus: Stripe.Subscription.Status | string,
+): string {
   switch (stripeStatus) {
     case "trialing":
     case "active":
